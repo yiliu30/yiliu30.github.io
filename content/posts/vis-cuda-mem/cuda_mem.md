@@ -1,18 +1,16 @@
 +++
-title = 'Cuda_mem'
+title = 'Understanding CUDA Memory Usage with Example'
 date = 2024-08-08T21:03:18-04:00
 draft = false
 +++
 
 
 
-## Understanding CUDA Memory Usage with Example
-
-A tiny example for understanding the cuda memory snapshot.
+A tiny example for understanding the CUDA memory snapshot.
 
 > https://pytorch.org/docs/stable/torch_cuda_memory.html
 
-[full_code](./vis.py)
+[full_code](images/vis.py)
 ```python
 torch.cuda.memory._record_memory_history()
 
@@ -43,6 +41,6 @@ torch.cuda.memory._dump_snapshot("my_snapshot_empty2.pickle")
 ```
 
 ### The visualization result with notes
-> Open the [my_snapshot_empty2.pickle](./my_snapshot_empty2.pickle) at [pytorch.org/memory_viz](https://pytorch.org/memory_viz)
+> Open the [my_snapshot_empty2.pickle](images/my_snapshot_empty2.pickle) at [pytorch.org/memory_viz](https://pytorch.org/memory_viz)
 
-![cuda_mem](./cuda_mem.png)
+![cuda_mem](images/cuda_mem.png)
