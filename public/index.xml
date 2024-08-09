@@ -10,9 +10,9 @@
     <atom:link href="https://yiliu30.github.io/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Understanding CUDA Memory Usage with Example</title>
-      <link>https://yiliu30.github.io/posts/vis-cuda-mem/cuda_mem/</link>
+      <link>https://yiliu30.github.io/posts/vis-cuda-mem/</link>
       <pubDate>Thu, 08 Aug 2024 21:03:18 -0400</pubDate>
-      <guid>https://yiliu30.github.io/posts/vis-cuda-mem/cuda_mem/</guid>
+      <guid>https://yiliu30.github.io/posts/vis-cuda-mem/</guid>
       <description>A tiny example for understanding the CUDA memory snapshot.&#xA;https://pytorch.org/docs/stable/torch_cuda_memory.html&#xA;full_code&#xA;torch.cuda.memory._record_memory_history() device = torch.device(&amp;#34;cuda&amp;#34;) see_memory_usage(&amp;#34;Before run&amp;#34;) one_gb_tensor = torch.randn(1024**3 // 4, dtype=torch.float32).to(device) x1 = one_gb_tensor.clone() x2 = one_gb_tensor.clone() see_memory_usage(&amp;#34;After allocating three 1GB tensors&amp;#34;) x_lst = torch.cat([one_gb_tensor, x1, x2], dim=0) see_memory_usage(&amp;#34;After concatenating three 1GB tensors&amp;#34;) del one_gb_tensor see_memory_usage(&amp;#34;After deleting three 1GB tensors&amp;#34;) torch.cuda.empty_cache() see_memory_usage(&amp;#34;After emptying the cache&amp;#34;) del x1, x2 see_memory_usage(&amp;#34;After deleting the x1, x2&amp;#34;) del x_lst see_memory_usage(&amp;#34;After deleting the concatenated tensor&amp;#34;) torch.</description>
     </item>
   </channel>
