@@ -4,7 +4,7 @@ baseURL: 'https://yiliu30.github.io/'
 title: 'Yi Liu'
 copyright: "© [PaperMod Contributors](https://github.com/adityatelange/hugo-PaperMod/graphs/contributors)"
 paginate: 5
-theme: [hugo-PaperMod]
+theme: [papermod]
 
 
 enableInlineShortcodes: true
