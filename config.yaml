@@ -1,8 +1,7 @@
 # If your site is in 'https', then make sure your base url isn't written using 'http' otherwise your sitemap would
 # contain http (as opposeed to https) URLs. This would affect Google indexing of your URLs.
-baseURL = 'https://yiliu30.github.io/'
-languageCode = 'en-us'
-title = 'Yi Liu'
+baseURL: 'https://yiliu30.github.io/'
+title: 'Yi Liu'
 copyright: "© [PaperMod Contributors](https://github.com/adityatelange/hugo-PaperMod/graphs/contributors)"
 paginate: 5
 theme: [hugo-PaperMod]
