@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>My New Hugo Site</title>
+    <link>https://yiliu30.github.io/</link>
+    <description>Recent content on My New Hugo Site</description>
+    <generator>Hugo -- 0.131.0</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 08 Aug 2024 21:03:18 -0400</lastBuildDate>
+    <atom:link href="https://yiliu30.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Cuda_mem</title>
+      <link>https://yiliu30.github.io/posts/vis-cuda-mem/cuda_mem/</link>
+      <pubDate>Thu, 08 Aug 2024 21:03:18 -0400</pubDate>
+      <guid>https://yiliu30.github.io/posts/vis-cuda-mem/cuda_mem/</guid>
+      <description>Understanding CUDA Memory Usage with Example A tiny example for understanding the cuda memory snapshot.
+https://pytorch.org/docs/stable/torch_cuda_memory.html
+full_code
+torch.cuda.memory._record_memory_history() device = torch.device(&amp;#34;cuda&amp;#34;) see_memory_usage(&amp;#34;Before run&amp;#34;) one_gb_tensor = torch.randn(1024**3 // 4, dtype=torch.float32).to(device) x1 = one_gb_tensor.clone() x2 = one_gb_tensor.clone() see_memory_usage(&amp;#34;After allocating three 1GB tensors&amp;#34;) x_lst = torch.cat([one_gb_tensor, x1, x2], dim=0) see_memory_usage(&amp;#34;After concatenating three 1GB tensors&amp;#34;) del one_gb_tensor see_memory_usage(&amp;#34;After deleting three 1GB tensors&amp;#34;) torch.cuda.empty_cache() see_memory_usage(&amp;#34;After emptying the cache&amp;#34;) del x1, x2 see_memory_usage(&amp;#34;After deleting the x1, x2&amp;#34;) del x_lst see_memory_usage(&amp;#34;After deleting the concatenated tensor&amp;#34;) torch.</description>
+    </item>
+  </channel>
+</rss>
