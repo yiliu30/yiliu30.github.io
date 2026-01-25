@@ -58,3 +58,6 @@ theme = 'PaperMod'
   [markup.highlight]
     style = "monokai"
     lineNos = true
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
