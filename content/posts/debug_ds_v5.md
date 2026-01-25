@@ -466,7 +466,7 @@ print(dm_eager.debug_string())
 </table>
 </details>
 
-Line 3 shows a difference. Let's check the stack trace for more details.
+Line 4 shows a difference. Let's check the stack trace for more details.
 ```bash
     ...
 
