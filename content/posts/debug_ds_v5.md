@@ -16,17 +16,17 @@ This document tracks the debugging process for accuracy issues encountered when 
 
 ## Full Model Output Comparison
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-  <div>
-    <h3 style="text-align: center; margin-bottom: 10px;">v4.57.3</h3>
+<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; width: 100%;">
+  <div style="min-width: 0;">
+    <h3 style="text-align: center; margin-bottom: 10px; font-weight: bold;">v4.57.3</h3>
     <div style="background: #f6f8fa; padding: 15px; border-radius: 6px; border: 1px solid #d0d7de;">
-      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">The capital of France is Paris. Paris is the most populous city in France, with a population of over 12 million people in its metropolitan area. The city is located in the north</pre>
+      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;">The capital of France is Paris. Paris is the most populous city in France, with a population of over 12 million people in its metropolitan area. The city is located in the north</pre>
     </div>
   </div>
-  <div>
-    <h3 style="text-align: center; margin-bottom: 10px;">v5.0.0.dev0</h3>
+  <div style="min-width: 0;">
+    <h3 style="text-align: center; margin-bottom: 10px; font-weight: bold;">v5.0.0.dev0</h3>
     <div style="background: #fff5f5; padding: 15px; border-radius: 6px; border: 1px solid #ffd7d5;">
-      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">The capital of France is Paris.
+      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;">The capital of France is Paris.
 
 Answer 1. Paris is the capital city.
 
