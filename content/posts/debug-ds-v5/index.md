@@ -7,16 +7,15 @@ categories = ['Technical']
 comments = true
 +++
 
-This document tracks the debugging process for accuracy issues encountered when upgrading transformers from v4.57.3 to v5.0, using PyTorch debug mode to compare layer-by-layer outputs.
-
 <!--more-->
 
 ## Overview
 
-This document details the debugging process for accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch debug mode to compare layer-by-layer outputs.
+This post details debugging accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch `DebugMode` to identify the source of numerical divergence.
 
 ## Full Model Output Comparison
 
+Output from the DeepSeek model with prompt `The capital of France is`:
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
   <tr>
     <th style="width: 50%; text-align: center; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd;">v4.57.3</th>
@@ -37,6 +36,11 @@ The capital of France is Paris. The capital of France is Paris</pre>
     </td>
   </tr>
 </table>
+
+The `v5.0.0.dev0` output is incorrect, indicating an issue with model initialization.
+To find the root cause, we need to compare the output of each operation.
+
+Fortunately, `torch 2.10` was recently released with `DebugMode`, a perfect tool for this case.
 
 ## Introduce torch `DebugMode`
 
@@ -75,7 +79,7 @@ print(dm_eager.debug_string())
 
 ## One Layer Debug String Comparison
 
-
+Given that DeepSeek has 61 layers, we start with a reduced model (`num_hidden_layers=1`) to shorten the runtime.
 ```python
 # ds_in_v5.py
 import psutil
@@ -88,18 +92,8 @@ from transformers.utils.import_utils import clear_import_cache
 # clear cache to reload modified code
 clear_import_cache()
 model_name = "/mnt/disk5/unsloth/DeepSeek-R1-BF16"
-# model_name = "/mnt/disk8/deepseek-ai/DeepSeek-V2-Lite-Chat"
 device = "cpu"
 from loguru import logger
-
-
-# Memory monitor implementation
-
-
-def dump_cur_ram(msg: str = ""):
-    process = psutil.Process()
-    current_ram = process.memory_info().rss / 1024**2  # MB
-    logger.warning(f"[Memory] {msg} Current RAM usage: {round(current_ram, 2)}MB")
 
 
 def fixed_seed(seed: int):
@@ -132,7 +126,6 @@ def main(args):
     apply_transformer_patches()
     with torch.no_grad():
         trust_remote_code = False
-        dump_cur_ram("before model load")
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
@@ -579,7 +572,7 @@ python ds_in_v5.py --debug
 </table>
 </details>
 
-Line 4 shows a difference. Let's check the stack trace for more details.
+Fortunately, we found the hash difference immediately. Line 5 in v4.57.3 corresponds to Line 4 in v5.0, where the input hash differs. Let's examine the stack trace with `DebugMode(record_stack_trace=args.record_stack_trace, ...)` for more details.
 ```bash
     ...
 
@@ -609,29 +602,15 @@ The input to `aten::unsqueeze` differs between versions. Let's check the source 
     ...
 
 ```
-We found that `self.inv_freq` differs between versions. After checking the code, we discovered that `self.inv_freq` is initialized in the `DeepseekV3RotaryEmbedding.__init__` stage. However, in v5, the model is initialized with the `meta` device, which requires post-processing in the `_init_weights` stage. These lines were commented out because they caused significant initialization overhead.
+`self.inv_freq` differs between versions. This value is initialized in `DeepseekV3RotaryEmbedding.__init__`. In v5, the model uses the `meta` device, requiring post-processing in `_init_weights`. These lines were commented out to avoid initialization overhead.
+
 The problem was resolved by uncommenting the `_init_weights` implementation.
  
 ```python
 @auto_docstring
 class DeepseekV3PreTrainedModel(PreTrainedModel):
     config: DeepseekV3Config
-    base_model_prefix = "model"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["DeepseekV3DecoderLayer"]
-    _skip_keys_device_placement = ["past_key_values"]
-    _supports_flash_attn = True
-    _supports_sdpa = True
-    _supports_flex_attn = True
-    _can_compile_fullgraph = (
-        is_grouped_mm_available()
-    )  # https://huggingface.co/docs/transformers/experts_interface#torchcompile
-    _supports_attention_backend = True
-    _can_record_outputs = {
-        "hidden_states": DeepseekV3DecoderLayer,
-        "attentions": DeepseekV3Attention,
-    }
-    _keep_in_fp32_modules_strict = ["e_score_correction_bias"]
+    ...
 
     @torch.no_grad()
     def _init_weights(self, module):
