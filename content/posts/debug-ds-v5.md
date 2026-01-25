@@ -38,7 +38,7 @@ The capital of France is Paris. The capital of France is Paris</pre>
 </table>
 
 The result with `v5.0.0.dev0` is not reasonable, there are some issue on initialized the model.
-To find the root cause, we may need to compare the output of each OPs. Giving the Deepseek has 61 layers, we can start with the reduced model(`num_hidden_layers=1`), which can short the time for one run.
+To find the root cause, we may need to compare the output of each OPs.
 
 At the same time, I noticed the `torch 2.10` was relased with coll feature, `DebugMode`, which is perfer tool for such case.
 
@@ -78,8 +78,7 @@ print(dm_eager.debug_string())
 ```
 
 ## One Layer Debug String Comparison
-
-
+Giving the Deepseek has 61 layers, we can start with the reduced model(`num_hidden_layers=1`), which can short the time for one run.
 ```python
 # ds_in_v5.py
 import psutil
