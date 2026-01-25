@@ -47,8 +47,8 @@ theme = 'PaperMod'
   url = "https://github.com/yiliu30"
 
 [[params.socialIcons]]
-  name = "twitter"
-  url = "https://twitter.com/yiliu30"
+  name = "linkedin"
+  url = "https://www.linkedin.com/in/randall-liu-27b076240/"
 
 [menu]
   [[menu.main]]
