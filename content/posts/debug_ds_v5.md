@@ -37,6 +37,41 @@ The capital of France is Paris. The capital of France is Paris</pre>
   </tr>
 </table>
 
+## Introduce torch `DebugMode`
+
+`DebugMode` inherits from `TorchDispatchMode` and intercepts torch operation calls (`__torch_function__` or `__torch_dispatch__`) to record the input and output of each operation. More details can be found in the [PyTorch documentation](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
+
+Below is an example from the PyTorch documentation:
+```python
+from torch._inductor.decomposition import decomps_to_exclude
+import torch
+from torch.utils._debug_mode import DebugMode
+
+def run_model(model, data, *, compile_with=None):
+    if compile_with is not None:
+        model = torch.compile(model, backend=compile_with)
+    with DebugMode(record_output=True) as dm, DebugMode.log_tensor_hashes(
+        hash_inputs=True,
+    ):
+        dm_out = model(*data)
+    return dm, dm_out
+
+class Toy(torch.nn.Module):
+    def forward(self, x):
+        return torch.relu(x).mm(x.T)
+
+inputs = (torch.randn(4, 4),)
+dm_eager, _ = run_model(Toy(), inputs)
+print("Eager mode:")
+print(dm_eager.debug_string())
+
+# Output:
+# Eager mode:
+#     aten::relu(t: f32[4, 4])  ->  t: f32[4, 4]  # {'input_hash': ((14.893587063997984,), {}), 'hash': 7.259045481681824}
+#     aten::permute(t: f32[4, 4], [1, 0])  ->  t: f32[4, 4]  # {'input_hash': ((14.893587063997984, [None, None]), {}), 'hash': 14.893587063997984}
+#     aten::mm(t: f32[4, 4], t: f32[4, 4])  ->  t: f32[4, 4]  # {'input_hash': ((7.259045481681824, 14.893587063997984), {}), 'hash': 26.860059764236212}
+```
+
 ## One Layer Debug String Comparison
 
 <details open>
@@ -505,42 +540,4 @@ class DeepseekV3PreTrainedModel(PreTrainedModel):
         #     init.copy_(module.inv_freq, buffer_value)
         #     init.copy_(module.original_inv_freq, buffer_value)
 ```
-
-
-
-### Introduce torch `DebugMode`
-
-`DebugMode` inherits from `TorchDispatchMode` and intercepts torch operation calls (`__torch_function__` or `__torch_dispatch__`) to record the input and output of each operation. More details can be found in the [PyTorch documentation](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
-
-Below is an example from the PyTorch documentation:
-```python
-from torch._inductor.decomposition import decomps_to_exclude
-import torch
-from torch.utils._debug_mode import DebugMode
-
-def run_model(model, data, *, compile_with=None):
-    if compile_with is not None:
-        model = torch.compile(model, backend=compile_with)
-    with DebugMode(record_output=True) as dm, DebugMode.log_tensor_hashes(
-        hash_inputs=True,
-    ):
-        dm_out = model(*data)
-    return dm, dm_out
-
-class Toy(torch.nn.Module):
-    def forward(self, x):
-        return torch.relu(x).mm(x.T)
-
-inputs = (torch.randn(4, 4),)
-dm_eager, _ = run_model(Toy(), inputs)
-print("Eager mode:")
-print(dm_eager.debug_string())
-
-# Output:
-# Eager mode:
-#     aten::relu(t: f32[4, 4])  ->  t: f32[4, 4]  # {'input_hash': ((14.893587063997984,), {}), 'hash': 7.259045481681824}
-#     aten::permute(t: f32[4, 4], [1, 0])  ->  t: f32[4, 4]  # {'input_hash': ((14.893587063997984, [None, None]), {}), 'hash': 14.893587063997984}
-#     aten::mm(t: f32[4, 4], t: f32[4, 4])  ->  t: f32[4, 4]  # {'input_hash': ((7.259045481681824, 14.893587063997984), {}), 'hash': 26.860059764236212}
-```
-
 
