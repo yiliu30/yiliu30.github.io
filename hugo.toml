@@ -1,6 +1,6 @@
 baseURL = 'https://yiliu30.github.io/'
 languageCode = 'en-us'
-title = 'Yi's Personal Blog'
+title = "Yi's Personal Blog"
 theme = 'PaperMod'
 
 [params]
