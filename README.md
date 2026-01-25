@@ -22,8 +22,8 @@ A personal website built with [Hugo](https://gohugo.io/), a fast and flexible st
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/yiliu30/yliu7.github.io.git
+cd yliu7.github.io
 ```
 
 2. **Add the PaperMod theme**
@@ -95,7 +95,7 @@ This site is configured to automatically deploy to GitHub Pages using GitHub Act
 3. Under "Build and deployment", select "GitHub Actions" as the source
 4. Push to the `main` branch to trigger deployment
 
-Your site will be available at `https://yourusername.github.io/`
+Your site will be available at `https://yiliu30.github.io/yliu7.github.io/`
 
 ### Other Hosting Options
 
@@ -166,9 +166,9 @@ This project is open source and available under the [MIT License](LICENSE).
 
 Feel free to reach out:
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Twitter: [@yourusername](https://twitter.com/yourusername)
-- Email: your.email@example.com
+- GitHub: [@yiliu30](https://github.com/yiliu30)
+- Twitter: [@yiliu30](https://twitter.com/yiliu30)
+- Email: yliu7@example.com
 
 ---
 

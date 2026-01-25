@@ -19,9 +19,9 @@ Welcome to my personal website. I'm passionate about technology, programming, an
 
 Feel free to connect with me:
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Twitter: [@yourusername](https://twitter.com/yourusername)
-- Email: your.email@example.com
+- GitHub: [@yiliu30](https://github.com/yiliu30)
+- Twitter: [@yiliu30](https://twitter.com/yiliu30)
+- Email: yliu7@example.com
 
 ### About This Site
 
