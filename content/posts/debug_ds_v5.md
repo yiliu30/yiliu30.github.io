@@ -4,6 +4,7 @@ date = 2026-01-24T10:00:00+00:00
 draft = false
 tags = ['transformers', 'debugging', 'pytorch', 'deep-learning', 'vibe']
 categories = ['Technical']
+comments = true
 +++
 
 This document tracks the debugging process for accuracy issues encountered when upgrading transformers from v4.57.3 to v5.0, using PyTorch debug mode to compare layer-by-layer outputs.
