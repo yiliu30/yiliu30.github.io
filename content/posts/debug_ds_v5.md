@@ -39,8 +39,8 @@ The capital of France is Paris. The capital of France is Paris</pre>
 
 ## One Layer Debug String Comparison
 
-<details>
-<summary><strong>Click to expand detailed layer-by-layer comparison</strong></summary>
+<details open>
+<summary><strong>Click to collapse detailed layer-by-layer comparison</strong></summary>
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
   <tr>
