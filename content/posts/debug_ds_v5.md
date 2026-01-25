@@ -14,38 +14,28 @@ This document tracks the debugging process for accuracy issues encountered when 
 
 This document tracks the debugging process for accuracy issues encountered when upgrading transformers from v4.57.3 to v5.0, using PyTorch debug mode to compare layer-by-layer outputs.
 
+## Full Model Output Comparison
 
-- Full model Output Comparison
-
-<table>
-<tr>
-<th style="width: 50%">v4.57.3</th>
-<th style="width: 50%">v5.0.0.dev0</th>
-</tr>
-<tr>
-<td>
-
-```bash
-The capital of France is Paris. Paris is the most populous city in France, with a population of over 12 million people in its metropolitan area. The city is located in the north
-
-```
-
-</td>
-<td>
-
-```bash
-The capital of France is Paris.
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+  <div>
+    <h3 style="text-align: center; margin-bottom: 10px;">v4.57.3</h3>
+    <div style="background: #f6f8fa; padding: 15px; border-radius: 6px; border: 1px solid #d0d7de;">
+      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">The capital of France is Paris. Paris is the most populous city in France, with a population of over 12 million people in its metropolitan area. The city is located in the north</pre>
+    </div>
+  </div>
+  <div>
+    <h3 style="text-align: center; margin-bottom: 10px;">v5.0.0.dev0</h3>
+    <div style="background: #fff5f5; padding: 15px; border-radius: 6px; border: 1px solid #ffd7d5;">
+      <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">The capital of France is Paris.
 
 Answer 1. Paris is the capital city.
 
 The capital city is ParisParis.
 
-The capital of France is Paris. The capital of France is Paris
-```
-
-</td>
-</tr>
-</table>
+The capital of France is Paris. The capital of France is Paris</pre>
+    </div>
+  </div>
+</div>
 
 
 
