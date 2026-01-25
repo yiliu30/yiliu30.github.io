@@ -1,0 +1,70 @@
+/* Custom CSS for the blog */
+
+/* Increase content width for better readability */
+:root {
+  --content-max-width: 800px;
+}
+
+.main {
+  max-width: var(--content-max-width);
+}
+
+/* Custom styling for code blocks */
+.highlight {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+pre {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+/* Improve heading spacing */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* Style for inline code */
+:not(pre) > code {
+  background-color: rgba(175, 184, 193, 0.2);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+/* Better link styling */
+a {
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+a:hover {
+  border-bottom-color: currentColor;
+}
+
+/* Improve table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th, td {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+th {
+  background-color: var(--code-bg);
+  font-weight: 600;
+}
+
+/* Image styling */
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
