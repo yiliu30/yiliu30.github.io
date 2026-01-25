@@ -12,7 +12,7 @@ This document tracks the debugging process for accuracy issues encountered when 
 
 ## Overview
 
-This document tracks the debugging process for accuracy issues encountered when upgrading transformers from v4.57.3 to v5.0, using PyTorch debug mode to compare layer-by-layer outputs.
+This document details the debugging process for accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch debug mode to compare layer-by-layer outputs.
 
 ## Full Model Output Comparison
 
@@ -431,7 +431,7 @@ The capital of France is Paris. The capital of France is Paris</pre>
 </table>
 </details>
 
-The 3rd line is diff! Let check the stack trace for more details.
+Line 3 shows a difference. Let's check the stack trace for more details.
 ```bash
     ...
 
@@ -451,7 +451,7 @@ The 3rd line is diff! Let check the stack trace for more details.
     # File: /mnt/disk3/yiliu4/transformers/src/transformers/models/deepseek_v3/modeling_deepseek_v3.py:109 in forward, code: inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1).to(x.device)
     aten::unsqueeze(t$6: f32[32], 0)  ->  t$7: f32[1, 32]  # {'input_hash': ((9.351147240759962e+31, None), {}), 'hash': 9.351147240759962e+31}
 ```
-So the input of `aten::unsqueeze` is diff, let's check the source code.
+The input to `aten::unsqueeze` differs between versions. Let's check the source code.
 ```python
     @torch.no_grad()
     @dynamic_rope_update  # power user: used with advanced RoPE types (e.g. dynamic rope)
@@ -461,8 +461,8 @@ So the input of `aten::unsqueeze` is diff, let's check the source code.
     ...
 
 ```
-And we can find the `self.inv_freq` is diff, after check the code, the `self.inv_freq` was initialized at `DeepseekV3RotaryEmbedding` `__init__` stage. But in v5, the model was initialized with `meta` device, so we need to post-porcess that at `_init_weights` stage. But these lines was commented me due to it causes too much time.......
-Any way the probloem was solved by add the `_init_weights` back.
+We found that `self.inv_freq` differs between versions. After checking the code, we discovered that `self.inv_freq` is initialized in the `DeepseekV3RotaryEmbedding.__init__` stage. However, in v5, the model is initialized with the `meta` device, which requires post-processing in the `_init_weights` stage. These lines were commented out because they caused significant initialization overhead.
+The problem was resolved by uncommenting the `_init_weights` implementation.
  
 ```python
 @auto_docstring
@@ -510,9 +510,9 @@ class DeepseekV3PreTrainedModel(PreTrainedModel):
 
 ### Introduce torch `DebugMode`
 
-The `DebugMode` is inherit from the `TorchDispatchMode`, and inject the torch op calls(`__torch_function__` or `__torch_dispatch__`) to record the input/output of each call. More details can be found in [Torch docs](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
+`DebugMode` inherits from `TorchDispatchMode` and intercepts torch operation calls (`__torch_function__` or `__torch_dispatch__`) to record the input and output of each operation. More details can be found in the [PyTorch documentation](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
 
-Below is a demo copied from docs:
+Below is an example from the PyTorch documentation:
 ```python
 from torch._inductor.decomposition import decomps_to_exclude
 import torch
