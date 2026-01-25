@@ -22,7 +22,7 @@ theme = 'PaperMod'
 [params.comments]
   [params.comments.giscus]
     repo = "yiliu30/yiliu30.github.io"
-    repoId = "R_kgDONqZP5A"
+    repoId = "R_kgDORAs6IQ"
     category = "General"
     categoryId = "DIC_kwDORAs6Ic4C1ZCt"
     mapping = "pathname"
