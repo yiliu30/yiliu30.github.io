@@ -23,11 +23,14 @@ When upgrading the Transformers library from version 4.57.3 to 5.0, we encounter
 We employed PyTorch's `DebugMode` to perform layer-by-layer comparison of tensor operations between the two versions. This tool intercepts torch operations and records input/output hashes, allowing precise identification of where numerical divergence begins.
 
 **Root Cause:**  
-The investigation revealed a critical issue at the `unsqueeze` operation in the Rotary Position Embedding (RoPE) layer. In v5.0, the tensor hash value was abnormally large (7.372678e+31 vs. expected ~3.95), indicating uninitialized data. The root cause was:
+The investigation revealed a critical issue at the `unsqueeze` operation in the **Rotary Position Embedding (RoPE)** layer. RoPE is a position encoding mechanism that helps the model understand token positions in sequences - if it's broken, the model loses its understanding of word order, leading to garbled outputs.
 
-- Models in v5.0 initialize on the `meta` device for memory efficiency
+In v5.0, the tensor hash value was abnormally large (7.372678e+31 vs. expected ~3.95). Hash values in DebugMode help track tensor contents - extremely large values like `7e+31` typically indicate uninitialized memory filled with garbage data rather than meaningful numbers. The root cause was:
+
+- Models in v5.0 initialize on the **meta device** (a PyTorch optimization that delays memory allocation until weights are loaded) for memory efficiency
 - The `_init_weights` method was commented out to reduce initialization overhead  
 - This left the `self.inv_freq` buffer in `DeepseekV3RotaryEmbedding` uninitialized with garbage values
+- Since RoPE relies on `inv_freq` to compute position encodings, corrupted values cascade through all attention layers
 
 **Solution:**  
 Re-enabling the `_init_weights` implementation properly initializes the RoPE frequency buffer, resolving the accuracy issues.
@@ -60,7 +63,7 @@ The capital of France is Paris. The capital of France is Paris</pre>
 
 ## Introduce torch `DebugMode`
 
-`DebugMode` inherits from `TorchDispatchMode` and intercepts torch operation calls (`__torch_function__` or `__torch_dispatch__`) to record the input and output of each operation. More details can be found in the [PyTorch documentation](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
+`DebugMode` inherits from `TorchDispatchMode` and intercepts torch operation calls (`__torch_function__` or `__torch_dispatch__`) to record the input and output of each operation. It computes **tensor hashes** - numerical fingerprints that help identify when tensors diverge between different runs or versions. More details can be found in the [PyTorch documentation](https://docs.pytorch.org/tutorials/recipes/debug_mode_tutorial.html).
 
 Below is an example from the PyTorch documentation:
 ```python
@@ -599,7 +602,7 @@ python ds_in_v5.py --debug
 </table>
 </details>
 
-Line 4 shows a difference. Let's check the stack trace for more details.
+Line 4 shows a difference. Let's check the stack trace for more details to understand where the divergence begins.
 ```bash
     ...
 
@@ -619,7 +622,7 @@ Line 4 shows a difference. Let's check the stack trace for more details.
     # File: /mnt/disk3/yiliu4/transformers/src/transformers/models/deepseek_v3/modeling_deepseek_v3.py:109 in forward, code: inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1).to(x.device)
     aten::unsqueeze(t$6: f32[32], 0)  ->  t$7: f32[1, 32]  # {'input_hash': ((9.351147240759962e+31, None), {}), 'hash': 9.351147240759962e+31}
 ```
-The input to `aten::unsqueeze` differs between versions. Let's check the source code.
+The input to `aten::unsqueeze` differs between versions. Notice the hash values: v4.57.3 shows `3.9489362656597677` while v5.0 shows the abnormally large `9.351147240759962e+31` - this 30+ order of magnitude difference is a clear sign of uninitialized memory. Let's check the source code.
 ```python
     @torch.no_grad()
     @dynamic_rope_update  # power user: used with advanced RoPE types (e.g. dynamic rope)
@@ -629,8 +632,9 @@ The input to `aten::unsqueeze` differs between versions. Let's check the source 
     ...
 
 ```
-We found that `self.inv_freq` differs between versions. After checking the code, we discovered that `self.inv_freq` is initialized in the `DeepseekV3RotaryEmbedding.__init__` stage. However, in v5, the model is initialized with the `meta` device, which requires post-processing in the `_init_weights` stage. These lines were commented out because they caused significant initialization overhead.
-The problem was resolved by uncommenting the `_init_weights` implementation.
+We found that `self.inv_freq` differs between versions. After checking the code, we discovered that `self.inv_freq` is initialized in the `DeepseekV3RotaryEmbedding.__init__` stage. However, in v5, the model is initialized with the **meta device** - a PyTorch feature that creates tensor placeholders without allocating actual memory, allowing huge models to be initialized efficiently. The actual tensor values must be filled in later during the `_init_weights` stage. These initialization lines were commented out because they caused significant initialization overhead.
+
+The problem was resolved by uncommenting the `_init_weights` implementation, which properly initializes the `inv_freq` buffer with the correct frequency values for position encoding.
  
 ```python
 @auto_docstring
