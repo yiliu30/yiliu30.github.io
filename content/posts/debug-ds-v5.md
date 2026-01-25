@@ -11,11 +11,11 @@ comments = true
 
 ## Overview
 
-This document details the debugging process for accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch `DebugMode` to find where the numerical divergence is coming from.
+This post details debugging accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch `DebugMode` to identify the source of numerical divergence.
 
 ## Full Model Output Comparison
 
-Here is the output for the full Deepseek Model with prompt `The capital of France is`.
+Output from the DeepSeek model with prompt `The capital of France is`:
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
   <tr>
     <th style="width: 50%; text-align: center; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd;">v4.57.3</th>
@@ -37,10 +37,10 @@ The capital of France is Paris. The capital of France is Paris</pre>
   </tr>
 </table>
 
-The result with `v5.0.0.dev0` is not reasonable, there are some issue on initialized the model.
-To find the root cause, we may need to compare the output of each OPs.
+The `v5.0.0.dev0` output is incorrect, indicating an issue with model initialization.
+To find the root cause, we need to compare the output of each operation.
 
-At the same time, I noticed the `torch 2.10` was relased with coll feature, `DebugMode`, which is perfer tool for such case.
+Fortunately, `torch 2.10` was recently released with `DebugMode`, a perfect tool for this case.
 
 ## Introduce torch `DebugMode`
 
@@ -78,7 +78,8 @@ print(dm_eager.debug_string())
 ```
 
 ## One Layer Debug String Comparison
-Giving the Deepseek has 61 layers, we can start with the reduced model(`num_hidden_layers=1`), which can short the time for one run.
+
+Given that DeepSeek has 61 layers, we start with a reduced model (`num_hidden_layers=1`) to shorten the runtime.
 ```python
 # ds_in_v5.py
 import psutil
@@ -91,7 +92,6 @@ from transformers.utils.import_utils import clear_import_cache
 # clear cache to reload modified code
 clear_import_cache()
 model_name = "/mnt/disk5/unsloth/DeepSeek-R1-BF16"
-# model_name = "/mnt/disk8/deepseek-ai/DeepSeek-V2-Lite-Chat"
 device = "cpu"
 from loguru import logger
 
@@ -572,7 +572,7 @@ python ds_in_v5.py --debug
 </table>
 </details>
 
-We are so lucky, we found the hash diff at the very beginning. Line 5 in v4.57.3 is the counterpart of Line 4 in v5.0, and the input hash shows a difference. Let's check the stack trace for more details with `DebugMode(record_stack_trace=args.record_stack_trace, ...)`.
+Fortunately, we found the hash difference immediately. Line 5 in v4.57.3 corresponds to Line 4 in v5.0, where the input hash differs. Let's examine the stack trace with `DebugMode(record_stack_trace=args.record_stack_trace, ...)` for more details.
 ```bash
     ...
 
@@ -602,7 +602,8 @@ The input to `aten::unsqueeze` differs between versions. Let's check the source 
     ...
 
 ```
-We found that `self.inv_freq` differs between versions. After checking the code, we discovered that `self.inv_freq` is initialized in the `DeepseekV3RotaryEmbedding.__init__` stage. However, in v5, the model is initialized with the `meta` device, which requires post-processing in the `_init_weights` stage. These lines were commented out because they caused significant initialization overhead.
+`self.inv_freq` differs between versions. This value is initialized in `DeepseekV3RotaryEmbedding.__init__`. In v5, the model uses the `meta` device, requiring post-processing in `_init_weights`. These lines were commented out to avoid initialization overhead.
+
 The problem was resolved by uncommenting the `_init_weights` implementation.
  
 ```python
