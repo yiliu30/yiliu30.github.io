@@ -15,6 +15,26 @@ This document tracks the debugging process for accuracy issues encountered when 
 
 This document details the debugging process for accuracy issues encountered when upgrading Transformers from v4.57.3 to v5.0. We use PyTorch debug mode to compare layer-by-layer outputs.
 
+## Summary
+
+When upgrading the Transformers library from version 4.57.3 to 5.0, we encountered severe accuracy degradation in the DeepSeek-V3 model. While v4.57.3 generated coherent outputs, v5.0 produced repetitive and garbled text for the same inputs.
+
+**Debugging Approach:**  
+We employed PyTorch's `DebugMode` to perform layer-by-layer comparison of tensor operations between the two versions. This tool intercepts torch operations and records input/output hashes, allowing precise identification of where numerical divergence begins.
+
+**Root Cause:**  
+The investigation revealed a critical issue at the `unsqueeze` operation in the Rotary Position Embedding (RoPE) layer. In v5.0, the tensor hash value was abnormally large (7.372678e+31 vs. expected ~3.95), indicating uninitialized data. The root cause was:
+
+- Models in v5.0 initialize on the `meta` device for memory efficiency
+- The `_init_weights` method was commented out to reduce initialization overhead  
+- This left the `self.inv_freq` buffer in `DeepseekV3RotaryEmbedding` uninitialized with garbage values
+
+**Solution:**  
+Re-enabling the `_init_weights` implementation properly initializes the RoPE frequency buffer, resolving the accuracy issues.
+
+**Key Takeaway:**  
+This debugging journey demonstrates how PyTorch's DebugMode can trace subtle numerical bugs through complex model architectures. A single uninitialized tensor can cascade into completely incorrect outputs, and systematic layer-by-layer comparison is essential for diagnosing such issues during library upgrades.
+
 ## Full Model Output Comparison
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
