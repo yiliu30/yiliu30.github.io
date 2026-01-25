@@ -2,7 +2,7 @@
 title = 'Debugging Transformers Upgrade with torch DebugMode: v4.57.3 → v5.0'
 date = 2026-01-24T10:00:00+00:00
 draft = false
-tags = ['transformers', 'debugging', 'pytorch', 'deep-learning']
+tags = ['transformers', 'debugging', 'pytorch', 'deep-learning', 'vibe']
 categories = ['Technical']
 +++
 
