@@ -37,22 +37,16 @@ The capital of France is Paris. The capital of France is Paris</pre>
   </div>
 </div>
 
+## One Layer Debug String Comparison
 
+<details>
+<summary><strong>Click to expand detailed layer-by-layer comparison</strong></summary>
 
-
-
-- One Layer Debug string Comparison
-
-
-<table>
-<tr>
-<th style="width: 50%">v4.57.3</th>
-<th style="width: 50%">v5.0.0.dev0</th>
-</tr>
-<tr>
-<td>
-
-```bash
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+  <div>
+    <h3 style="text-align: center; margin-bottom: 10px;">v4.57.3</h3>
+    <div style="background: #f6f8fa; padding: 15px; border-radius: 6px; border: 1px solid #d0d7de; max-height: 600px; overflow-y: auto;">
+      <pre style="margin: 0; font-size: 11px; line-height: 1.4;">```bash
     aten::embedding(t$0: bf16[129280, 7168], t$1: i64[1, 6], 128815)  ->  t$2: bf16[1, 6, 7168]  # {'input_hash': ((27375526.173154227, 16171.0, None), {}), 'hash': 788.8026814290788}
     aten::arange.start(0, 6, device=cpu, pin_memory=False)  ->  t$3: i64[6]  # {'hash': 15.0}
     aten::unsqueeze(t$3: i64[6], 0)  ->  t$4: i64[1, 6]  # {'input_hash': ((15.0, None), {}), 'hash': 15.0}
@@ -238,12 +232,13 @@ CausalLMOutputWithPast(loss=None, logits=tensor([[[ 9.6875e+00, -4.0938e+00,  8.
          [-1.5820e-01,  1.0010e-01,  2.4023e-01,  ...,  1.3281e-01,
            1.3086e-01,  3.8281e-01]]], dtype=torch.bfloat16), past_key_values=DynamicCache(layers=[DynamicLayer]), hidden_states=None, attentions=None)
 
-```
-
-</td>
-<td>
-
-```bash
+```</pre>
+    </div>
+  </div>
+  <div>
+    <h3 style="text-align: center; margin-bottom: 10px;">v5.0.0.dev0</h3>
+    <div style="background: #fff5f5; padding: 15px; border-radius: 6px; border: 1px solid #ffd7d5; max-height: 600px; overflow-y: auto;">
+      <pre style="margin: 0; font-size: 11px; line-height: 1.4;">```bash
     aten::embedding(t$0: bf16[129280, 7168], t$1: i64[1, 6], 128815)  ->  t$2: bf16[1, 6, 7168]  # {'input_hash': ((27375526.173154227, 16171.0, None), {}), 'hash': 788.8026814290788}
     aten::arange(6, device=cpu, pin_memory=False)  ->  t$3: i64[6]  # {'hash': 15.0}
     aten::add.Tensor(t$3: i64[6], 0)  ->  t$4: i64[6]  # {'input_hash': ((15.0, None), {}), 'hash': 15.0}
@@ -429,12 +424,12 @@ CausalLMOutputWithPast(loss=None, logits=tensor([[[ 9.6875e+00, -4.0938e+00,  8.
            9.8145e-02,  6.3281e-01],
          [ 2.3438e-01, -8.7402e-02,  3.1055e-01,  ...,  2.0117e-01,
            1.8848e-01,  4.2383e-01]]], dtype=torch.bfloat16), past_key_values=DynamicCache(layers=[DynamicLayer]), hidden_states=None, attentions=None)
-```
+```</pre>
+    </div>
+  </div>
+</div>
 
-</td>
-</tr>
-</table>
-
+</details>
 
 The 3rd line is diff! Let check the stack trace for more details.
 ```bash
