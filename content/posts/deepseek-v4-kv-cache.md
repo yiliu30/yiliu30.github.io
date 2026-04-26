@@ -16,11 +16,8 @@ post breaks down how three orthogonal techniques combine to make that possible.
 ## The Problem
 
 Standard transformer attention stores one KV vector per token per layer. At 1M
-tokens, 61 layers, and 512-dim MLA vectors (BF16), that's:
+tokens, 61 layers, and 512-dim MLA vectors (BF16), that's: `61 layers × 1,048,576 tokens × 512 × 2 bytes = ~61 GiB`.
 
-```
-61 layers × 1,048,576 tokens × 512 × 2 bytes = ~61 GiB
-```
 
 That's just the KV cache — before model weights, activations, or anything else.
 DeepSeek V4 reduces this to **~9.6 GiB** by combining three techniques.
@@ -112,14 +109,6 @@ KV = 128 × 2 = **256 bytes/slot**.
 | **Total** | | **61** | | | **~9.62 GiB** |
 
 
-### Where the Budget Goes
-
-```
-C4A main KV ████████████████████████████████████ 78.0%  (7.50 GiB)
-C4A indexer ██████████          19.5%  (1.88 GiB)
-C128A       ██                   2.6%  (0.25 GiB)
-SWA         ▏                    0.1%  (0.008 GiB)
-```
 
 **C4A dominates** (~97% of the budget). The indexer adds ~20% overhead on top
 of the main KV — the cost of learned sparse selection. C128A and SWA are nearly
