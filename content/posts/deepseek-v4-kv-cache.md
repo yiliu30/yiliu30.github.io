@@ -110,7 +110,7 @@ KV = 128 × 2 = **256 bytes/slot**.
 
 
 
-**C4A dominates** (~97% of the budget). The indexer adds ~20% overhead on top
+**C4A dominates** (~97% of the budget). The indexer adds ~25% overhead on top
 of the main KV — the cost of learned sparse selection. C128A and SWA are nearly
 free.
 
