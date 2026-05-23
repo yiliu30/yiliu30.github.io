@@ -100,7 +100,9 @@ function getToken() {
 function updatePreview() {
   const html = document.getElementById('htmlEditor').value;
   const iframe = document.getElementById('previewFrame');
-  iframe.srcdoc = html;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  iframe.src = url;
 }
 
 function showStatus(msg, type) {
