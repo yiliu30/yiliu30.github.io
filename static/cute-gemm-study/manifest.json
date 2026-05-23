@@ -1,0 +1,9 @@
+[
+  { "file": "kernel_design_overview.html", "title": "Kernel Design Overview", "date": "2025-05-23" },
+  { "file": "cute_vs_cuda_comparison.html", "title": "CuTe vs CUDA Comparison", "date": "2025-05-23" },
+  { "file": "step1_thread_trace.html", "title": "Step 1: Thread Trace", "date": "2025-05-23" },
+  { "file": "step1_cute_vs_cuda.html", "title": "Step 1: CuTe vs CUDA Deep Dive", "date": "2025-05-23" },
+  { "file": "tv_layout_mma_atom_explained.html", "title": "TV Layout & MMA Atom Explained", "date": "2025-05-23" },
+  { "file": "tv_layout_visualizer.html", "title": "TV Layout Visualizer", "date": "2025-05-23" },
+  { "file": "partition_c_permutation_explained.html", "title": "Partition C Permutation Explained", "date": "2025-05-23" }
+]
