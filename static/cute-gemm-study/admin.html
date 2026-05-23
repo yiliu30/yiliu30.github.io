@@ -115,7 +115,7 @@ async function githubAPI(path, method, body) {
   const resp = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
     method,
     headers: {
-      'Authorization': `token ${token}`,
+      'Authorization': `Bearer ${token}`,
       'Accept': 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
     },
@@ -129,12 +129,19 @@ async function githubAPI(path, method, body) {
 }
 
 async function pushToGitHub() {
+  try {
   const html = document.getElementById('htmlEditor').value;
   const filename = document.getElementById('filenameInput').value.trim();
   const title = document.getElementById('titleInput').value.trim();
 
   if (!html || !filename || !title) {
     showStatus('Please fill in all fields.', 'error');
+    return;
+  }
+
+  const token = getToken();
+  if (!token) {
+    showStatus('No GitHub token set. Open token settings and save one.', 'error');
     return;
   }
 
@@ -175,6 +182,7 @@ async function pushToGitHub() {
     showStatus(`Done! Published at: /cute-gemm-study/${fullFilename}`, 'success');
   } catch (e) {
     showStatus('Error: ' + e.message, 'error');
+    console.error(e);
   }
 }
 
