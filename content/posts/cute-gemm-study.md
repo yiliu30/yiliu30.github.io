@@ -1,6 +1,6 @@
 ---
 title: "Understanding CuTe GEMM: A Visual Study Guide"
-date: 2026-05-23
+date: 2025-05-23
 tags: ["cuda", "cute", "gpu-programming", "cutlass"]
 summary: "A series of interactive visual notes exploring how NVIDIA CuTe builds a GEMM kernel — from layout algebra to thread-level execution traces."
 showtoc: true
