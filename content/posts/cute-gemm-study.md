@@ -40,6 +40,10 @@ A concrete execution trace through the first step of a CuTe DSL GEMM kernel. Fol
 
 A side-by-side comparison of the same GEMM kernel written in CuTe DSL vs raw CUDA. Helps connect CuTe abstractions back to familiar CUDA concepts like `threadIdx`, shared memory indexing, and `__syncthreads()`.
 
+### 7. [Step 1: CuTe vs CUDA Deep Dive](/cute-gemm-study/step1_cute_vs_cuda.html)
+
+A detailed walkthrough comparing the Step 1 naive GEMM implementation in CuTe DSL against its CUDA equivalent — line by line, showing how each CuTe construct maps to concrete CUDA operations.
+
 ## Prerequisites
 
 To get the most out of these notes, you should be comfortable with:
