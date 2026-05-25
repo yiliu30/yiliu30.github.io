@@ -44,6 +44,18 @@ A side-by-side comparison of the same GEMM kernel written in CuTe DSL vs raw CUD
 
 A detailed walkthrough comparing the Step 1 naive GEMM implementation in CuTe DSL against its CUDA equivalent — line by line, showing how each CuTe construct maps to concrete CUDA operations.
 
+### 8. [Step 1: Thread Ownership Visualization](/cute-gemm-study/step1_thread_ownership.html)
+
+Interactive visualization of which threads own which output elements in the Step 1 kernel — showing how CuTe's partition maps thread IDs to matrix coordinates.
+
+### 9. [Partition C Derivation](/cute-gemm-study/partition_c_derivation.html)
+
+Mathematical derivation of how `partition_C` computes thread-to-element ownership from TiledMma layout composition — the algebra behind the partition.
+
+### 10. [Step 2–5: CuTe vs CUDA Progression](/cute-gemm-study/step2_to_step5_cute_vs_cuda.html)
+
+Side-by-side comparison of Steps 2 through 5 (shared memory tiling, async copy, pipelining) in CuTe DSL vs CUDA, showing how each optimization maps between the two worlds.
+
 ## Prerequisites
 
 To get the most out of these notes, you should be comfortable with:
