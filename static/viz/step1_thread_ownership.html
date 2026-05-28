@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Step1 GEMM: Which Thread Owns Which Elements</title>
+<style>
+  :root { --bg: #0d1117; --fg: #c9d1d9; --card: #161b22; --border: #30363d; --dim: #8b949e; --accent: #58a6ff; --green: #3fb950; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'JetBrains Mono', monospace; background: var(--bg); color: var(--fg); padding: 1.5rem; line-height: 1.5; }
+  h1 { color: var(--accent); font-size: 1.5rem; text-align: center; margin-bottom: 0.3rem; }
+  .subtitle { text-align: center; color: var(--dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; margin: 1.2rem 0; }
+  h2 { color: var(--green); font-size: 1.1rem; margin-bottom: 0.6rem; }
+  h3 { color: var(--accent); font-size: 0.95rem; margin: 1rem 0 0.4rem; }
+  .code { background: #0d1117; border: 1px solid var(--border); border-radius: 4px; padding: 0.8rem; font-size: 0.82rem; overflow-x: auto; white-space: pre; }
+  .inline { background: #21262d; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.85rem; }
+  .grid-container { display: flex; flex-direction: column; align-items: center; margin: 1rem 0; }
+  .grid-label { font-size: 0.75rem; color: var(--dim); margin-bottom: 0.3rem; }
+  .c-grid { display: grid; gap: 0px; border: 2px solid var(--border); width: fit-content; }
+  .c-cell { width: 7px; height: 7px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.8rem; font-size: 0.8rem; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 0.3rem; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 2px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+  .zoom-grid { display: grid; gap: 1px; width: fit-content; margin: 0.5rem auto; }
+  .zoom-cell { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; border-radius: 2px; color: #000; font-weight: bold; }
+  .controls { display: flex; gap: 1rem; align-items: center; justify-content: center; margin: 0.8rem 0; flex-wrap: wrap; }
+  .controls label { font-size: 0.8rem; color: var(--dim); }
+  .controls input, .controls select { background: #21262d; color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.8rem; font-family: inherit; }
+  .highlight-box { border: 2px solid #fff; position: relative; }
+  .info-box { background: #1c2333; border: 1px dashed var(--accent); border-radius: 6px; padding: 0.8rem; margin: 0.8rem 0; font-size: 0.85rem; }
+  .eq { text-align: center; font-size: 1rem; padding: 0.5rem; background: #21262d; border-radius: 4px; margin: 0.5rem 0; }
+  table.params { border-collapse: collapse; font-size: 0.82rem; margin: 0.5rem 0; }
+  table.params td, table.params th { padding: 0.3rem 0.7rem; border: 1px solid var(--border); }
+  table.params th { background: #21262d; color: var(--accent); }
+  .arrow { font-size: 1.2rem; color: var(--green); }
+</style>
+</head>
+<body>
+
+<h1>Step1 GEMM: Thread → Element Mapping</h1>
+<p class="subtitle">128×128 output tile, 256 threads, scalar FMA — no algebra, just the picture</p>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>The Setup (3 numbers, that's all)</h2>
+
+<table class="params">
+  <tr><th>What</th><th>Value</th><th>Plain English</th></tr>
+  <tr><td>Output tile</td><td>128 × 128 = 16,384 elements</td><td>One thread block computes this chunk of C</td></tr>
+  <tr><td>Threads per block</td><td>256</td><td>Arranged as a 16×16 grid</td></tr>
+  <tr><td>Elements per thread</td><td>16,384 ÷ 256 = 64</td><td>Each thread accumulates 64 FMA results</td></tr>
+</table>
+
+<h3>The one question: How to distribute 64 elements to each thread?</h3>
+<p style="font-size:0.85rem">There are many valid answers. Step1 uses this particular pattern:</p>
+
+<div class="eq">
+  Thread (tm, tn) owns rows {tm×4 .. tm×4+3, tm×4+64 .. tm×4+67} × cols {tn×4 .. tn×4+3, tn×4+64 .. tn×4+67}
+</div>
+
+<p style="font-size:0.85rem; margin-top:0.5rem">Where: <span class="inline">tm = threadIdx.x / 16</span> (0..15), <span class="inline">tn = threadIdx.x % 16</span> (0..15)</p>
+<p style="font-size:0.85rem">Each thread gets <strong>four 4×4 blocks</strong> = 4 × 16 = 64 elements.</p>
+
+<h3 style="margin-top:1.2rem">The Permutation: The ONE Design Choice</h3>
+<div class="info-box">
+  <p>Everything above comes from a single parameter: the <strong>permutation layout</strong> <span class="inline">(16, 4):(4, 1)</span></p>
+</div>
+
+<div class="two-col" style="margin-top:0.8rem;">
+  <div>
+    <div class="code" style="font-size:0.8rem">permutation = (Groups, Chunk):(group_stride, chunk_stride)
+
+  Groups       = how many groups (one per thread)        (16)
+  Chunk        = elements per group                      (4)
+  group_stride = distance between group starts           (4)
+  chunk_stride = distance between elements in a group    (1)
+
+Thread k, element r → position = k × group_stride + r × chunk_stride
+
+Example: (16, 4):(4, 1)
+  Thread 0: 0×4 + {0,1,2,3}×1 = {0, 1, 2, 3}
+  Thread 1: 1×4 + {0,1,2,3}×1 = {4, 5, 6, 7}
+  Thread 15: 15×4 + {0,1,2,3}×1 = {60,61,62,63}
+
+Covers 16×4 = 64 of 128 → rest = 128/64 = 2
+  → each thread gets a SECOND group at +64:
+  Thread 0 → also positions {64, 65, 66, 67}</div>
+  </div>
+  <div>
+    <div style="background:#161b22; border:1px solid var(--border); border-radius:6px; padding:1rem; font-size:0.82rem;">
+      <p style="font-weight:bold; color:var(--accent); margin-bottom:0.5rem;">Why this matters:</p>
+      <p style="margin-bottom:0.5rem;">The permutation is the <strong>only free parameter</strong> the kernel author picks. Everything else is derived:</p>
+      <table class="params" style="font-size:0.78rem;">
+        <tr><th>Derived from</th><th>Result</th></tr>
+        <tr><td>Permutation + tile size</td><td>Thread ownership pattern</td></tr>
+        <tr><td>Ownership + tensor strides</td><td>Final layout strides</td></tr>
+        <tr><td>Atom TV layout</td><td>V dimension (hardware-fixed)</td></tr>
+      </table>
+      <p style="margin-top:0.8rem; font-weight:bold; color:#d29922;">Alternative permutations (same tile, same thread count):</p>
+      <div class="code" style="font-size:0.75rem; margin-top:0.3rem;">(16,4):(4,1)  → 4 consecutive, no gap         ← step1
+(16,4):(1,16) → 4 elements spaced 16 apart
+(16,8):(8,1)  → 8 consecutive (covers full 128, rest=1)</div>
+      <p style="font-size:0.75rem; color:var(--dim); margin-top:0.3rem;">Constraint: F must be divisible by ThrM (=16). Different permutation → same element count, different access pattern → different performance.</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Intuition: Permutation = Vector Width Choice</h2>
+
+<div class="info-box">
+  <p>The permutation is really just the kernel author answering: <strong>"How many consecutive elements should each thread grab at a time?"</strong></p>
+  <p style="margin-top:0.3rem; font-size:0.85rem;">That's <span class="inline">Chunk</span> with <span class="inline">chunk_stride=1</span>. Everything else is mechanical.</p>
+</div>
+
+<h3 style="margin-top:1rem;">What each part means in hardware terms</h3>
+<table class="params" style="width:100%; font-size:0.8rem; margin-top:0.5rem;">
+  <tr><th>Permutation part</th><th>What it controls</th><th>Hardware mapping</th></tr>
+  <tr>
+    <td><strong>Chunk</strong> (+ chunk_stride=1)</td>
+    <td>Consecutive elements per thread</td>
+    <td>Vector load/store width<br><span style="color:var(--dim)">Chunk=4 → 128-bit (LDG.128/STG.128 for f32)<br>Chunk=8 → 256-bit (two 128-bit ops, or 128-bit for f16)</span></td>
+  </tr>
+  <tr>
+    <td><strong>Groups</strong></td>
+    <td>Number of threads along this dim</td>
+    <td>= ThrM or ThrN (fixed by thread block layout)</td>
+  </tr>
+  <tr>
+    <td><strong>group_stride</strong></td>
+    <td>Spacing between thread starts</td>
+    <td>Usually = Chunk (so threads tile contiguously)</td>
+  </tr>
+  <tr>
+    <td><strong>rest</strong> (derived)</td>
+    <td>How many times pattern repeats</td>
+    <td>= tile_dim / (Groups × Chunk). More rest = more outer-loop iterations</td>
+  </tr>
+</table>
+
+<h3 style="margin-top:1.2rem;">Target hardware op → permutation choice</h3>
+<table class="params" style="width:100%; font-size:0.8rem; margin-top:0.5rem;">
+  <tr><th>Goal</th><th>Chunk</th><th>chunk_stride</th><th>Permutation</th><th>Hardware op</th></tr>
+  <tr>
+    <td>Scalar (simple)</td><td>1</td><td>1</td>
+    <td style="font-family:monospace;">(16,1):(1,1)</td>
+    <td>LDG.32 / STG.32 (one float)</td>
+  </tr>
+  <tr style="color:#58a6ff;">
+    <td><strong>128-bit vectorized (step1)</strong></td><td><strong>4</strong></td><td><strong>1</strong></td>
+    <td style="font-family:monospace;"><strong>(16,4):(4,1)</strong></td>
+    <td>LDG.128 / STG.128 (4×f32)</td>
+  </tr>
+  <tr>
+    <td>256-bit (FP16 tensor core)</td><td>8</td><td>1</td>
+    <td style="font-family:monospace;">(16,8):(8,1)</td>
+    <td>LDG.128 (8×f16 = 128-bit)</td>
+  </tr>
+  <tr>
+    <td>Coalesced but scattered per thread</td><td>4</td><td>16</td>
+    <td style="font-family:monospace;">(16,4):(1,16)</td>
+    <td>Threads adjacent → coalesced warp access, but can't vectorize per-thread</td>
+  </tr>
+</table>
+
+<h3 style="margin-top:1.5rem;">CuTe ↔ Pure CUDA: 1:1 Mapping</h3>
+<p style="font-size:0.82rem; color:var(--dim);">The permutation <span class="inline">(16,4):(4,1)</span> applied to M=128 generates exactly these nested loops:</p>
+
+<div class="two-col" style="margin-top:0.8rem;">
+  <div>
+    <div style="font-size:0.72rem; color:var(--accent); font-weight:bold; margin-bottom:0.3rem;">CuTe (what you write)</div>
+    <div class="code" style="font-size:0.75rem;">permutation_M = (16, 4):(4, 1)
+tile_M = 128
+# CuTe does logical_divide internally:
+#   result = (16, 4, 2):(512, 128, 8192)
+# Then picks thread k's slice → (4, 2) elements</div>
+  </div>
+  <div>
+    <div style="font-size:0.72rem; color:var(--green); font-weight:bold; margin-bottom:0.3rem;">Pure CUDA (what it becomes)</div>
+    <div class="code" style="font-size:0.75rem;">int thrM = threadIdx.x / 16;   // which of 16 M-threads
+for (int rest = 0; rest &lt; 2; rest++) {       // rest=2
+  for (int chunk = 0; chunk &lt; 4; chunk++) {  // Chunk=4
+    int row = thrM*4 + chunk + rest*64;
+    //       ^^^^^^   ^^^^^   ^^^^^^^
+    //       |group   |chunk  |rest offset
+    //       |stride  |stride |(Groups×Chunk=64)
+    //       |=4      |=1
+  }
+}</div>
+  </div>
+</div>
+
+<table class="params" style="width:100%; font-size:0.78rem; margin-top:1rem;">
+  <tr><th>CuTe concept</th><th>Pure CUDA equivalent</th><th>Value in step1</th></tr>
+  <tr><td>Groups</td><td>Number of threads along dim</td><td>16</td></tr>
+  <tr><td>Chunk</td><td>Inner loop count (consecutive elements)</td><td>4</td></tr>
+  <tr><td>group_stride</td><td><span class="inline">thrM * group_stride</span> (thread's start)</td><td>4</td></tr>
+  <tr><td>chunk_stride</td><td><span class="inline">+ chunk * chunk_stride</span> (step between elements)</td><td>1</td></tr>
+  <tr><td>rest (derived)</td><td>Outer loop count</td><td>2 (= 128 / 64)</td></tr>
+  <tr><td>rest offset (derived)</td><td><span class="inline">+ rest * perm_size</span></td><td>64 (= 16 × 4)</td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+  <p><strong>Summary:</strong> In pure CUDA, you manually write the nested loops and index math. In CuTe, you just say <span class="inline">(16,4):(4,1)</span> and it generates the same thing. The permutation IS those loops — compressed into 4 numbers.</p>
+  <p style="margin-top:0.4rem; font-size:0.82rem; color:var(--dim);">The <strong>rest</strong> factor is never specified by the user — CuTe derives it from <span class="inline">tile_size / (Groups × Chunk)</span>. If you change the tile from 128 to 256, rest automatically becomes 4 instead of 2. Same permutation, bigger tile, more repetitions.</p>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>The Full partition_C Pipeline: 4 Steps</h2>
+<p style="font-size:0.82rem; color:var(--dim);">How CuTe goes from "128×128 tile" to "thread k owns these 64 elements." Each step is simple — the magic is in chaining them.</p>
+
+<div style="overflow-x:auto;">
+<table class="params" style="width:100%; font-size:0.78rem; margin-top:0.8rem;">
+  <tr>
+    <th style="width:5%">#</th>
+    <th style="width:18%">CuTe Operation</th>
+    <th style="width:25%">Input → Output (M-dim)</th>
+    <th style="width:25%">Pure CUDA Equivalent</th>
+    <th style="width:12%">User input?</th>
+    <th style="width:15%">Hardware?</th>
+  </tr>
+  <tr style="background:#1c2333;">
+    <td><strong>1</strong></td>
+    <td><span style="color:#58a6ff;">logical_divide</span><br><span style="color:var(--dim);font-size:0.7rem;">tile × permutation</span></td>
+    <td style="font-family:monospace;font-size:0.72rem;">
+      128 → <span style="color:#58a6ff;">(16</span>,<span style="color:#3fb950;">4</span>,<span style="color:#d29922;">2</span>)<br>
+      <span style="color:var(--dim);">(Groups, Chunk, Rest)</span>
+    </td>
+    <td style="font-size:0.72rem;">
+      Determines loop structure:<br>
+      <span class="inline">row = thrM*4 + chunk + rest*64</span>
+    </td>
+    <td style="color:#3fb950;"><strong>YES</strong><br><span style="color:var(--dim);font-size:0.7rem;">permutation (16,4):(4,1)</span></td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td><strong>2</strong></td>
+    <td><span style="color:#58a6ff;">zipped_divide</span><br><span style="color:var(--dim);font-size:0.7rem;">by atom shape (16)</span></td>
+    <td style="font-family:monospace;font-size:0.72rem;">
+      (16,4,2) → inner:<span style="color:#3fb950;">(16)</span> outer:<span style="color:#d29922;">(4,2)</span><br>
+      <span style="color:var(--dim);">(one_atom, repetitions)</span>
+    </td>
+    <td style="font-size:0.72rem;">
+      "How many atoms tile the output?"<br>
+      <span class="inline">for(atom_rep=0; atom_rep&lt;8; ...)</span>
+    </td>
+    <td>No<br><span style="color:var(--dim);font-size:0.7rem;">atom shape from hardware</span></td>
+    <td>No</td>
+  </tr>
+  <tr style="background:#1c2333;">
+    <td><strong>3</strong></td>
+    <td><span style="color:#d29922;">compose</span><br><span style="color:var(--dim);font-size:0.7rem;">with Atom TV layout</span></td>
+    <td style="font-family:monospace;font-size:0.72rem;">
+      (AtomM,AtomN) → <span style="color:#58a6ff;">(Thr</span>,<span style="color:#3fb950;">Val</span>)<br>
+      <span style="color:var(--dim);">(16,16) → (256, 1) for scalar FMA</span>
+    </td>
+    <td style="font-size:0.72rem;">
+      The MMA instruction's thread↔element mapping<br>
+      <span style="color:var(--dim);">scalar: trivial (thread=position)</span><br>
+      <span style="color:var(--dim);">tensor core: complex PTX-defined mapping</span>
+    </td>
+    <td>No<br><span style="color:var(--dim);font-size:0.7rem;">TV layout from MMA atom</span></td>
+    <td style="color:#d29922;"><strong>YES</strong><br><span style="color:var(--dim);font-size:0.7rem;">encodes MMA instruction</span></td>
+  </tr>
+  <tr>
+    <td><strong>4</strong></td>
+    <td><span style="color:#58a6ff;">zipped_divide</span><br><span style="color:var(--dim);font-size:0.7rem;">by thr layout</span></td>
+    <td style="font-family:monospace;font-size:0.72rem;">
+      ((ThrV,FrgV),(RestM,RestN))<br>→ ((<span style="color:#58a6ff;">ThrV,ThrM,ThrN</span>),(<span style="color:#3fb950;">FrgV,RestM,RestN</span>))
+    </td>
+    <td style="font-size:0.72rem;">
+      Flatten all thread dims into one index:<br>
+      <span class="inline">tid = thrV + thrM*V + thrN*V*M</span>
+    </td>
+    <td>No<br><span style="color:var(--dim);font-size:0.7rem;">mechanical grouping</span></td>
+    <td>No</td>
+  </tr>
+</table>
+</div>
+
+<h3 style="margin-top:1.5rem;">Visual: The Pipeline for Step1 (M-dim = 128, atom = 16×16, scalar FMA)</h3>
+
+<div class="code" style="font-size:0.75rem; line-height:1.7;">
+<span style="color:var(--dim);">// Input: flat tile</span>
+M = 128 (flat, one dimension)
+
+<span style="color:#58a6ff;">━━ Step 1: logical_divide(128, perm=(16,4):(4,1)) ━━</span>
+→ (16, 4, 2):(4, 1, 64)
+   <span style="color:var(--dim);">Groups=16 threads, Chunk=4 consecutive, Rest=2 repetitions</span>
+
+<span style="color:#58a6ff;">━━ Step 2: zipped_divide by atom_M=16 ━━</span>
+→ inner: (16)    <span style="color:var(--dim);">← one atom covers 16 positions (first dim consumed)</span>
+  outer: (4, 2)  <span style="color:var(--dim);">← 4×2=8 atoms tile the 128 positions</span>
+  <span style="color:#d29922;">In CUDA: outer = loop bounds over atom repetitions</span>
+
+<span style="color:#58a6ff;">━━ Step 3: compose inner (16,16) with TV layout ━━</span>
+  <span style="color:var(--dim);">Scalar FMA atom: TV layout is identity</span>
+  <span style="color:var(--dim);">16×16 = 256 threads, each owns 1 value per atom invocation</span>
+→ (Thr=256, Val=1)
+  <span style="color:#d29922;">In CUDA: thread k → position k within the 16×16 block (trivial)</span>
+  <span style="color:var(--dim);">For tensor cores this would be the mma.sync thread mapping — NOT trivial!</span>
+
+<span style="color:#58a6ff;">━━ Step 4: zipped_divide — group thread dims ━━</span>
+→ Thread mode: (ThrV=1, ThrM=1, ThrN=1) → combined = threadIdx.x
+  Value mode:  (FrgV=1, RestM=4×2, RestN=4×2) → 1×8×8 = 64 values per thread
+  <span style="color:#d29922;">In CUDA: the nested for(rest_m) for(chunk_m) for(rest_n) for(chunk_n) loops</span>
+
+<span style="color:#3fb950;">Final: each thread owns 64 elements of C ✓</span>
+</div>
+
+<h3 style="margin-top:1.5rem;">Pure CUDA: The Same 4 Steps Written By Hand</h3>
+<div class="two-col" style="margin-top:0.8rem;">
+  <div>
+    <div style="font-size:0.72rem; color:var(--accent); font-weight:bold; margin-bottom:0.3rem;">CuTe (4 operations, automatic)</div>
+    <div class="code" style="font-size:0.72rem;">t_tensor = logical_divide(gC, permutations)
+c_tensor = zipped_divide(t_tensor, atom_shape)
+tv_tensor = c_tensor.compose(AtomLayoutC_TV)
+thr_tensor = zipped_divide(tv_tensor, thr_tile)
+
+# Then just index: thr_tensor(thread_idx, :)
+# gives you all 64 elements for that thread</div>
+  </div>
+  <div>
+    <div style="font-size:0.72rem; color:var(--green); font-weight:bold; margin-bottom:0.3rem;">Pure CUDA (same logic, manual index math)</div>
+    <div class="code" style="font-size:0.72rem;">int thrM = threadIdx.x / 16;   <span style="color:var(--dim);">// Step 4: extract M-thread</span>
+int thrN = threadIdx.x % 16;   <span style="color:var(--dim);">// Step 4: extract N-thread</span>
+
+<span style="color:var(--dim);">// Steps 1+2: loop over atom repetitions</span>
+for (int rm = 0; rm &lt; 2; rm++) {       <span style="color:var(--dim);">// rest_M</span>
+  for (int cm = 0; cm &lt; 4; cm++) {     <span style="color:var(--dim);">// chunk_M</span>
+    int row = thrM*4 + cm + rm*64;     <span style="color:var(--dim);">// Step 1</span>
+    for (int rn = 0; rn &lt; 2; rn++) {   <span style="color:var(--dim);">// rest_N</span>
+      for (int cn = 0; cn &lt; 4; cn++) { <span style="color:var(--dim);">// chunk_N</span>
+        int col = thrN*4 + cn + rn*64; <span style="color:var(--dim);">// Step 1</span>
+        C[row*128+col] += accum[...];  <span style="color:var(--dim);">// Step 3 (trivial)</span>
+      }
+    }
+  }
+}</div>
+  </div>
+</div>
+
+<div class="info-box" style="margin-top:1rem;">
+  <p><strong>Why CuTe's approach matters:</strong></p>
+  <p style="font-size:0.82rem; margin-top:0.3rem;">For scalar FMA (step1), the CUDA version is simple — you could write it by hand in 5 minutes.</p>
+  <p style="font-size:0.82rem; margin-top:0.3rem;">But for <strong>tensor cores</strong> (step4), Step 3's TV layout becomes a nightmare of PTX-defined thread mappings. The CUDA version needs you to look up exactly which lane of the warp owns which fragment of the 16×8×16 MMA output. CuTe encodes this in the atom and applies it automatically.</p>
+  <p style="font-size:0.82rem; margin-top:0.5rem; color:var(--dim);">
+    <strong>zipped_divide</strong> = just splitting & regrouping indices (like divmod)<br>
+    <strong>compose</strong> = applying memory strides OR hardware TV mapping<br>
+    <strong>logical_divide</strong> = the only step with user input (permutation)
+  </p>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Permutation Comparison: What Different Choices Look Like</h2>
+<p style="font-size:0.82rem; color:var(--dim)">Below shows ONE dimension (M=128 positions) distributed among 16 threads. Each row = one permutation choice. Colors = thread ownership.</p>
+
+<div class="controls">
+  <label>Highlight thread:
+    <input type="number" id="perm-thr" min="0" max="15" value="0" style="width:50px">
+  </label>
+  <span style="font-size:0.8rem; color:var(--dim);">(of 16 threads along M-dimension)</span>
+</div>
+
+<div id="perm-compare" style="margin-top:1rem;"></div>
+
+<div class="info-box" style="margin-top:1rem">
+  <p><strong>Key insight:</strong> All permutations give each thread exactly 8 positions (128 ÷ 16 = 8). But the <em>spatial arrangement</em> differs — consecutive elements vs. scattered elements determine cache line utilization, vectorization potential, and bank-conflict behavior.</p>
+</div>
+
+<h3 style="margin-top:1.5rem;">logical_divide Results for Each Permutation</h3>
+<p style="font-size:0.78rem; color:var(--dim);">Applying Step ① <span class="inline">logical_divide(gC_M=128:128, permutation)</span> to the M-dimension. Same process applies to N.</p>
+
+<table class="params" style="margin-top:0.8rem; width:100%; font-size:0.75rem;">
+  <tr>
+    <th>Permutation</th>
+    <th>Perm size (F×R)</th>
+    <th>Rest = 128/(F×R)</th>
+    <th>logical_divide result (M only)</th>
+    <th>Physical meaning of strides</th>
+  </tr>
+  <tr style="color:#58a6ff;">
+    <td style="font-family:monospace;">(16,4):(4,1)</td>
+    <td>64</td>
+    <td>2</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">4</span>, <span style="color:#d29922">2</span>):(<span style="color:#58a6ff">512</span>, <span style="color:#3fb950">128</span>, <span style="color:#d29922">8192</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 thread-groups</span> × <span style="color:#3fb950">4 consecutive rows</span> × <span style="color:#d29922">2 repetitions at +64 rows</span><br>
+      <span style="color:#8b949e">Thread 0 → rows {0,1,2,3, 64,65,66,67}</span>
+    </td>
+  </tr>
+  <tr style="color:#3fb950;">
+    <td style="font-family:monospace;">(16,4):(1,16)</td>
+    <td>64</td>
+    <td>2</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">4</span>, <span style="color:#d29922">2</span>):(<span style="color:#58a6ff">128</span>, <span style="color:#3fb950">2048</span>, <span style="color:#d29922">8192</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 thread-groups</span> × <span style="color:#3fb950">4 rows spaced 16 apart</span> × <span style="color:#d29922">2 repetitions at +64 rows</span><br>
+      <span style="color:#8b949e">Thread 0 → rows {0,16,32,48, 64,80,96,112}</span>
+    </td>
+  </tr>
+  <tr style="color:#d29922;">
+    <td style="font-family:monospace;">(16,8):(8,1)</td>
+    <td>128</td>
+    <td>1</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">8</span>):(<span style="color:#58a6ff">1024</span>, <span style="color:#3fb950">128</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 thread-groups</span> × <span style="color:#3fb950">8 consecutive rows</span> × <span style="color:#d29922">no rest (full coverage)</span><br>
+      <span style="color:#8b949e">Thread 0 → rows {0,1,2,3,4,5,6,7}</span>
+    </td>
+  </tr>
+</table>
+
+<h3 style="margin-top:1.2rem;">How the Strides Are Computed</h3>
+<div class="code" style="font-size:0.78rem;">For M-dimension with base stride = 128 (row-major, 128 cols per row):
+
+<span style="color:#58a6ff">(16,4):(4,1)</span> applied to size 128, stride 128:
+  F=16, stride = sF × base = 4 × 128  = <span style="color:#58a6ff">512</span>     ← thread spacing in memory
+  R=4,  stride = sR × base = 1 × 128  = <span style="color:#3fb950">128</span>     ← element spacing (= 1 row)
+  rest=2, stride = perm_size × base = 64 × 128 = <span style="color:#d29922">8192</span>  ← repetition offset
+
+<span style="color:#3fb950">(16,4):(1,16)</span> applied to size 128, stride 128:
+  F=16, stride = sF × base = 1 × 128  = <span style="color:#58a6ff">128</span>     ← threads are adjacent rows!
+  R=4,  stride = sR × base = 16 × 128 = <span style="color:#3fb950">2048</span>    ← elements skip 16 rows
+  rest=2, stride = 64 × 128            = <span style="color:#d29922">8192</span>    ← same repetition offset
+
+<span style="color:#d29922">(16,8):(8,1)</span> applied to size 128, stride 128:
+  F=16, stride = sF × base = 8 × 128  = <span style="color:#58a6ff">1024</span>    ← thread spacing (8 rows apart)
+  R=8,  stride = sR × base = 1 × 128  = <span style="color:#3fb950">128</span>     ← element spacing (= 1 row)
+  rest=1, no rest dimension (perm covers all 128)</div>
+
+<div class="info-box" style="margin-top:0.8rem;">
+  <p><strong>Pattern:</strong> The stride formula is always <span class="inline">output_stride = permutation_stride × input_base_stride</span>.</p>
+  <p style="margin-top:0.3rem; font-size:0.8rem; color:var(--dim);">The permutation strides (4,1), (1,16), (8,1) get multiplied by the tensor's base stride (128 for M-rows, 1 for N-cols) to produce the physical memory strides in the logical_divide result.</p>
+</div>
+
+<h3 style="margin-top:2rem;">N-Dimension Comparison (base stride = 1)</h3>
+<p style="font-size:0.82rem; color:var(--dim)">Same 3 permutations applied to N=128 columns. Since C is row-major <span class="inline">(M,N):(128,1)</span>, N base stride = 1. Output strides = permutation strides directly (×1).</p>
+
+<div class="controls">
+  <label>Highlight thread:
+    <input type="number" id="perm-n-thr" min="0" max="15" value="0" style="width:50px">
+  </label>
+  <span style="font-size:0.8rem; color:var(--dim);">(of 16 threads along N-dimension)</span>
+</div>
+
+<div id="perm-n-compare" style="margin-top:1rem;"></div>
+
+<table class="params" style="margin-top:0.8rem; width:100%; font-size:0.75rem;">
+  <tr>
+    <th>Permutation</th>
+    <th>Perm size</th>
+    <th>Rest = 128/(F×R)</th>
+    <th>logical_divide result (N only, base_stride=1)</th>
+    <th>Physical meaning</th>
+  </tr>
+  <tr style="color:#58a6ff;">
+    <td style="font-family:monospace;">(16,4):(4,1)</td>
+    <td>64</td>
+    <td>2</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">4</span>, <span style="color:#d29922">2</span>):(<span style="color:#58a6ff">4</span>, <span style="color:#3fb950">1</span>, <span style="color:#d29922">64</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 threads spaced 4 cols apart</span> × <span style="color:#3fb950">4 consecutive cols</span> × <span style="color:#d29922">repeat at +64</span><br>
+      <span style="color:#8b949e">Thread 0 → cols {0,1,2,3, 64,65,66,67}</span>
+    </td>
+  </tr>
+  <tr style="color:#3fb950;">
+    <td style="font-family:monospace;">(16,4):(1,16)</td>
+    <td>64</td>
+    <td>2</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">4</span>, <span style="color:#d29922">2</span>):(<span style="color:#58a6ff">1</span>, <span style="color:#3fb950">16</span>, <span style="color:#d29922">64</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 threads 1 col apart (adjacent!)</span> × <span style="color:#3fb950">4 cols spaced 16 apart</span> × <span style="color:#d29922">repeat at +64</span><br>
+      <span style="color:#8b949e">Thread 0 → cols {0,16,32,48, 64,80,96,112}</span>
+    </td>
+  </tr>
+  <tr style="color:#d29922;">
+    <td style="font-family:monospace;">(16,8):(8,1)</td>
+    <td>128</td>
+    <td>1</td>
+    <td style="font-family:monospace;">
+      (<span style="color:#58a6ff">16</span>, <span style="color:#3fb950">8</span>):(<span style="color:#58a6ff">8</span>, <span style="color:#3fb950">1</span>)
+    </td>
+    <td>
+      <span style="color:#58a6ff">16 threads spaced 8 cols apart</span> × <span style="color:#3fb950">8 consecutive cols</span><br>
+      <span style="color:#8b949e">Thread 0 → cols {0,1,2,3,4,5,6,7}</span>
+    </td>
+  </tr>
+</table>
+
+<div class="info-box" style="margin-top:0.8rem;">
+  <p><strong>Key difference from M-dim:</strong> With base_stride=1, the output strides ARE the permutation strides. No multiplication needed — what you see in the permutation is exactly what you get in memory.</p>
+  <p style="margin-top:0.3rem; font-size:0.8rem; color:var(--dim);">For N, <span class="inline">(16,4):(1,16)</span> means threads ARE adjacent in memory (stride 1 between threads) — this is actually GOOD for coalesced writes, even though the per-thread elements are scattered! This is the opposite intuition from M-dim.</p>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Full 128×128 Tile — All 256 Threads Color-Coded</h2>
+<p style="font-size:0.8rem; color:var(--dim)">Hover over any pixel to see which thread owns it. Click a thread in the controls to highlight it.</p>
+
+<div class="controls">
+  <label>Highlight thread: <input type="number" id="thr-input" min="0" max="255" value="0" style="width:60px"></label>
+  <label>View:
+    <select id="view-mode">
+      <option value="all">All threads (colors)</option>
+      <option value="one" selected>Single thread (highlight)</option>
+      <option value="quadrant">Show 4 blocks</option>
+    </select>
+  </label>
+  <span id="hover-info" style="color:var(--accent); font-size:0.8rem;">—</span>
+</div>
+
+<div class="grid-container">
+  <div class="grid-label">← col 0 ... col 127 →</div>
+  <canvas id="full-grid" width="512" height="512" style="border:1px solid var(--border); cursor:crosshair; image-rendering: pixelated;"></canvas>
+  <div class="grid-label">↕ row 0 ... row 127</div>
+  <div class="grid-label" style="margin-top:0.3rem; color:var(--accent);">⚠ Each colored square = 1 element (one float32 value). Drawn as 4×4 pixels for visibility.</div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="info-box">
+  <p><strong>Scale note:</strong> Each colored square in the grid above = <strong>1 output element</strong> (one C[row][col] value), rendered as a 4×4 pixel block for visibility. The grid is 128×128 elements = 512×512 pixels. No grouping — each pixel-block is one float.</p>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Zoomed In: Thread 0's 64 Elements (Actual Cell View)</h2>
+<p style="font-size:0.82rem; color:var(--dim)">Below we zoom into thread 0's four 4×4 blocks. Each labeled cell = one C[row][col] element = one float = one FMA result.</p>
+
+<div class="two-col">
+  <div>
+    <h3>Block A (top-left): rows 0-3, cols 0-3</h3>
+    <div id="block-a"></div>
+    <h3 style="margin-top:1rem">Block C (bottom-left): rows 64-67, cols 0-3</h3>
+    <div id="block-c"></div>
+  </div>
+  <div>
+    <h3>Block B (top-right): rows 0-3, cols 64-67</h3>
+    <div id="block-b"></div>
+    <h3 style="margin-top:1rem">Block D (bottom-right): rows 64-67, cols 64-67</h3>
+    <div id="block-d"></div>
+  </div>
+</div>
+
+<div class="info-box" style="margin-top:1rem">
+  <p><strong>Total:</strong> 4 blocks × 16 elements/block = <strong>64 elements</strong> = exactly what thread 0 computes and stores.</p>
+  <p style="margin-top:0.3rem">Each cell shows <span class="inline">C[row][col]</span>. The memory offset = row × 128 + col (row-major).</p>
+</div>
+
+<h3>Where these 4 blocks sit in the full 128×128 tile:</h3>
+<div id="zoom-thread0"></div>
+<p style="font-size:0.75rem; color:var(--dim); margin-top:0.3rem">Blue = thread 0's 64 elements (4 tiny squares), dark = other 255 threads' elements. Each blue pixel = 1 element.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>1:1 Mapping — CuTe Layout ↔ Physical Elements</h2>
+<p style="font-size:0.82rem; color:var(--dim)">Left: CuTe's output layout for thread 0. Right: the actual C[row][col] it points to. Click any row to highlight that element in the grid.</p>
+
+<div class="info-box">
+  <p><strong>CuTe layout for thread 0:</strong> <span class="inline">tCgC = (1, (4,2), (4,2)):(0, (128,8192), (1,64))</span></p>
+  <p style="margin-top:0.3rem"><strong>Formula:</strong> <span class="inline">offset = v×0 + m0×128 + m1×8192 + n0×1 + n1×64</span></p>
+  <p style="margin-top:0.3rem"><strong>Then:</strong> row = offset / 128, col = offset % 128</p>
+</div>
+
+<div style="display:flex; gap:1rem; align-items:start; flex-wrap:wrap; margin-top:1rem;">
+  <!-- Left: CuTe index table -->
+  <div style="flex:1; min-width:400px;">
+    <h3>All 64 Elements Enumerated</h3>
+    <p style="font-size:0.75rem; color:var(--dim); margin-bottom:0.5rem">v is always 0 (scalar atom). Showing (m0, m1, n0, n1) → offset → C[row][col]</p>
+    <div id="mapping-table" style="max-height:500px; overflow-y:auto; border:1px solid var(--border); border-radius:4px;"></div>
+  </div>
+  <!-- Middle: visual block diagram with element indices -->
+  <div style="flex:1; min-width:300px;">
+    <h3>Visual: CuTe indices → 2D position</h3>
+    <p style="font-size:0.75rem; color:var(--dim); margin-bottom:0.5rem">Each cell shows its CuTe flat index (0..63). Color = which block (m1, n1).</p>
+    <div id="cute-grid"></div>
+    <div style="margin-top:0.5rem; font-size:0.75rem;">
+      <span style="color:#58a6ff">■ Block A (m1=0,n1=0)</span>&nbsp;
+      <span style="color:#3fb950">■ Block B (m1=0,n1=1)</span>&nbsp;
+      <span style="color:#d29922">■ Block C (m1=1,n1=0)</span>&nbsp;
+      <span style="color:#bc8cff">■ Block D (m1=1,n1=1)</span>
+    </div>
+  </div>
+  <!-- Right: How CuTe derives this layout (partition_C steps) -->
+  <div style="flex:1; min-width:320px;">
+    <h3>How CuTe Derives This Layout</h3>
+    <p style="font-size:0.75rem; color:var(--dim); margin-bottom:0.5rem">The 5 transformation steps that produce (1,(4,2),(4,2)):(0,(128,8192),(1,64))</p>
+
+    <!-- Step 0: Input -->
+    <div style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:var(--dim); margin-bottom:0.2rem;">INPUT — the CTA's output tile</div>
+      <div style="font-size:0.82rem; font-weight:bold; color:#c9d1d9; font-family:monospace;">
+        gC = <span style="color:#58a6ff">(128, 128)</span>:<span style="color:#3fb950">(128, 1)</span>
+      </div>
+      <div style="font-size:0.65rem; color:var(--dim);">128 rows × 128 cols, row-major (stride 128 per row, stride 1 per col)</div>
+    </div>
+
+    <!-- Step 1 -->
+    <div style="border-left:3px solid #58a6ff; padding-left:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:#58a6ff; font-weight:bold;">① logical_divide by permutation (16,4):(4,1)</div>
+      <div style="font-size:0.68rem; color:var(--dim); margin:0.2rem 0;">Split 128 into 64 + rest(2): how 16 threads tile 128 positions</div>
+      <div style="font-size:0.78rem; font-family:monospace; color:#c9d1d9;">
+        → (<span style="color:#58a6ff">(16,4</span>,<span style="color:#d29922">2</span>), <span style="color:#3fb950">(16,4</span>,<span style="color:#d29922">2</span>))<br>
+        &nbsp;&nbsp;:(<span style="color:#58a6ff">(512,128</span>,<span style="color:#d29922">8192</span>), <span style="color:#3fb950">(4,1</span>,<span style="color:#d29922">64</span>))
+      </div>
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.2rem;">
+        <span style="color:#58a6ff">blue=thread-indexing part</span> &nbsp;
+        <span style="color:#d29922">gold=rest (per-thread owned)</span>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div style="border-left:3px solid #3fb950; padding-left:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:#3fb950; font-weight:bold;">② zipped_divide by atom (1,1)</div>
+      <div style="font-size:0.68rem; color:var(--dim); margin:0.2rem 0;">Separate atom footprint from repetitions. Atom=1×1 (trivial for scalar)</div>
+      <div style="font-size:0.78rem; font-family:monospace; color:#c9d1d9;">
+        → ((<span style="color:#f85149">1,1</span>), (16,4,2, 16,4,2))<br>
+        &nbsp;&nbsp;:((<span style="color:#f85149">★,★</span>), (512,128,8192, 4,1,64))
+      </div>
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.2rem;">
+        <span style="color:#f85149">★ = don't-care (atom is size 1)</span>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div style="border-left:3px solid #d29922; padding-left:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:#d29922; font-weight:bold;">③ compose with AtomLayout_TV = (1,1):(0,0)</div>
+      <div style="font-size:0.68rem; color:var(--dim); margin:0.2rem 0;">Relabel atom (M,N) → (Thread, Value). Trivial here (1 thr, 1 val)</div>
+      <div style="font-size:0.78rem; font-family:monospace; color:#c9d1d9;">
+        → ((<span style="color:#f85149">Thr=1</span>,<span style="color:#bc8cff">Val=1</span>), (16,4,2, 16,4,2))<br>
+        &nbsp;&nbsp;:((<span style="color:#f85149">0</span>,<span style="color:#bc8cff">0</span>), (512,128,8192, 4,1,64))
+      </div>
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.2rem;">
+        For tensor cores: TV would be (32,4) — non-trivial!
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div style="border-left:3px solid #bc8cff; padding-left:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:#bc8cff; font-weight:bold;">④ zipped_divide by thread layout (1,(16,16))</div>
+      <div style="font-size:0.68rem; color:var(--dim); margin:0.2rem 0;">Separate "which thread" from "what it owns"</div>
+      <div style="font-size:0.78rem; font-family:monospace; color:#c9d1d9;">
+        → ((<span style="color:#f85149">1,(16,16)</span>), (<span style="color:#bc8cff">1,(4,2),(4,2)</span>))<br>
+        &nbsp;&nbsp;:((<span style="color:#f85149">0,(512,4)</span>), (<span style="color:#bc8cff">0,(128,8192),(1,64)</span>))
+      </div>
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.2rem;">
+        <span style="color:#f85149">mode 0 = thread selector</span> &nbsp;
+        <span style="color:#bc8cff">mode 1 = fragment (per-thread)</span>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div style="border-left:3px solid #f0883e; padding-left:0.6rem; margin-bottom:0.5rem;">
+      <div style="font-size:0.7rem; color:#f0883e; font-weight:bold;">⑤ slice thread 0 → (v=0, tm=0, tn=0)</div>
+      <div style="font-size:0.68rem; color:var(--dim); margin:0.2rem 0;">Plug in thread coords, return fragment layout only</div>
+      <div style="font-size:0.82rem; font-family:monospace; font-weight:bold; color:#f0883e; background:#21262d; padding:0.4rem; border-radius:4px; margin-top:0.3rem;">
+        tCgC = (1,(4,2),(4,2)):(0,(128,8192),(1,64))
+      </div>
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.3rem;">
+        ptr offset = 0×0 + 0×512 + 0×4 = 0 (thread 0 starts at base)<br>
+        shape: V=1 × M=8 × N=8 = <strong>64 elements</strong> ← matches table on left!
+      </div>
+    </div>
+
+    <!-- Connection to physical picture -->
+    <div style="background:#1c2333; border:1px dashed #f0883e; border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+      <strong style="color:#f0883e">Connection to the left:</strong>
+      <ul style="margin:0.3rem 0 0; padding-left:1rem; color:#c9d1d9;">
+        <li><span style="color:#58a6ff">(4,2):(128,8192)</span> → the 8 row indices in the table</li>
+        <li><span style="color:#3fb950">(4,2):(1,64)</span> → the 8 col indices in the table</li>
+        <li>Cross-product of rows × cols = 64 cells shown left</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="info-box" style="margin-top:1rem">
+  <h3 style="margin:0 0 0.3rem">Reading the mapping:</h3>
+  <div class="code" style="font-size:0.8rem">CuTe index (m0=2, m1=0, n0=3, n1=1):
+  offset = 2×128 + 0×8192 + 3×1 + 1×64 = 256 + 0 + 3 + 64 = 323
+  row = 323 / 128 = 2,  col = 323 % 128 = 67
+  → C[2][67]  ✓  (row 2 is in Block A rows, col 67 is in Block B cols → Block B)
+
+CuTe index (m0=1, m1=1, n0=2, n1=0):
+  offset = 1×128 + 1×8192 + 2×1 + 0×64 = 128 + 8192 + 2 + 0 = 8322
+  row = 8322 / 128 = 65,  col = 8322 % 128 = 2
+  → C[65][2]  ✓  (row 65 is in Block C rows, col 2 is in Block A cols → Block C)</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>The Pattern Rule (Plain English)</h2>
+
+<div class="info-box">
+  <p><strong>Think of it as a checkerboard with 4×4 blocks:</strong></p>
+  <ol style="margin-top:0.5rem; padding-left:1.5rem; font-size:0.85rem;">
+    <li>Divide 128 rows into 32 groups of 4 rows each (groups 0..31)</li>
+    <li>Divide 128 cols into 32 groups of 4 cols each (groups 0..31)</li>
+    <li>Thread (tm, tn) owns row-groups <strong>{tm, tm+16}</strong> and col-groups <strong>{tn, tn+16}</strong></li>
+    <li>That's 2 row-groups × 2 col-groups × 4×4 = 64 elements per thread</li>
+  </ol>
+</div>
+
+<h3>Why this specific pattern?</h3>
+<div class="code" style="font-size:0.82rem">Reason 1: Load balancing — every thread gets exactly 64 elements ✓
+Reason 2: Spatial locality — 4 consecutive rows × 4 consecutive cols =
+           16-element blocks that are adjacent in memory
+Reason 3: No bank conflicts — threads in the same warp access
+           different cache lines (stride-4 separation in both dims)</div>
+
+<p style="font-size:0.85rem; margin-top:0.8rem"><strong>Could you use a simpler pattern?</strong> Yes! For example, each thread could own 64 consecutive elements in a row. But that would give terrible cache utilization when loading A and B. The 4×4 block pattern balances across both dimensions.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Equivalent CUDA Code (No CuTe)</h2>
+
+<div class="code">__global__ void gemm_step1(float* C, float* A, float* B, int M, int N, int K) {
+    // --- THE MAPPING (this is what partition_C computes) ---
+    int tm = threadIdx.x / 16;    // my row-group index (0..15)
+    int tn = threadIdx.x % 16;    // my col-group index (0..15)
+
+    // My 8 rows: 4 consecutive + 4 more at offset 64
+    int my_rows[8];
+    for (int i = 0; i < 4; i++) my_rows[i]     = tm * 4 + i;       // rows tm*4 .. tm*4+3
+    for (int i = 0; i < 4; i++) my_rows[4 + i] = tm * 4 + 64 + i;  // rows tm*4+64 .. tm*4+67
+
+    // My 8 cols: same pattern
+    int my_cols[8];
+    for (int i = 0; i < 4; i++) my_cols[i]     = tn * 4 + i;
+    for (int i = 0; i < 4; i++) my_cols[4 + i] = tn * 4 + 64 + i;
+
+    // --- ACCUMULATOR (64 registers) ---
+    float acc[8][8] = {0};
+
+    // --- K-LOOP ---
+    for (int k = 0; k < K; k++) {
+        for (int mi = 0; mi < 8; mi++) {
+            float a_val = A[my_rows[mi] * K + k];
+            for (int ni = 0; ni < 8; ni++) {
+                acc[mi][ni] += a_val * B[my_cols[ni] * K + k];  // B is (N,K) row-major
+            }
+        }
+    }
+
+    // --- STORE ---
+    for (int mi = 0; mi < 8; mi++)
+        for (int ni = 0; ni < 8; ni++)
+            C[my_rows[mi] * N + my_cols[ni]] = acc[mi][ni];
+}</div>
+
+<p style="font-size:0.85rem; margin-top:0.5rem">That's it. The <span class="inline">my_rows</span> and <span class="inline">my_cols</span> arrays ARE what <span class="inline">partition_C</span> computes — just encoded as a layout (strides) instead of explicit arrays.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>CuTe's Layout Encoding: Strides = Compressed Index Arrays</h2>
+
+<h3>Step 1: Understand one dimension — (4, 2):(1, 64)</h3>
+<div class="two-col">
+<div>
+<h3>Explicit indices (what CUDA does)</h3>
+<div class="code" style="font-size:0.8rem">my_rows = [0, 1, 2, 3, 64, 65, 66, 67]
+my_cols = [0, 1, 2, 3, 64, 65, 66, 67]
+
+// To get memory offset for element (mi, ni):
+offset = my_rows[mi] * 128 + my_cols[ni]</div>
+</div>
+<div>
+<h3>Stride encoding (what CuTe does)</h3>
+<div class="code" style="font-size:0.8rem">shape  = (4, 2)  // 4 consecutive, 2 groups
+stride = (1, 64)  // step 1 between consec, jump 64
+
+// row[mi] = (mi%4)*1 + (mi/4)*64
+//   mi=0: 0, mi=1: 1, mi=2: 2, mi=3: 3
+//   mi=4: 64, mi=5: 65, mi=6: 66, mi=7: 67 ✓</div>
+</div>
+</div>
+
+<h3 style="margin-top:1.5rem">Step 2: The full 3-mode layout — (1, (4,2), (4,2)):(0, (128,8192), (1,64))</h3>
+<div class="info-box">
+  <p>CuTe layouts are <strong>hierarchical</strong>: a shape can contain nested tuples. Read it as 3 modes:</p>
+</div>
+
+<div class="code" style="margin-top:0.5rem; font-size:0.82rem">Layout:  (<span style="color:#f85149">1</span>, <span style="color:#58a6ff">(4, 2)</span>, <span style="color:#3fb950">(4, 2)</span>) : (<span style="color:#f85149">0</span>, <span style="color:#58a6ff">(128, 8192)</span>, <span style="color:#3fb950">(1, 64)</span>)
+          <span style="color:#f85149">↑</span>   <span style="color:#58a6ff">↑↑↑↑↑↑</span>    <span style="color:#3fb950">↑↑↑↑↑↑</span>
+         <span style="color:#f85149">Mode 0</span>  <span style="color:#58a6ff">Mode 1</span>     <span style="color:#3fb950">Mode 2</span></div>
+
+<table class="params" style="margin-top:1rem; width:100%;">
+  <tr>
+    <th>Mode</th><th>Name</th><th>Shape</th><th>Stride</th><th>What it means</th><th>Elements generated</th>
+  </tr>
+  <tr style="color:#f85149">
+    <td>0</td><td>V (Value)</td><td>1</td><td>0</td>
+    <td>Values per atom invocation. Scalar FMA → 1 value.<br>Stride=0 means "no movement" (size is 1, so doesn't matter)</td>
+    <td>Just 1 element (no iteration)</td>
+  </tr>
+  <tr style="color:#58a6ff">
+    <td>1</td><td>M (Row)</td><td>(4, 2)</td><td>(128, 8192)</td>
+    <td><strong>4 consecutive rows</strong> (stride 128 = one row in row-major C)<br>
+        <strong>2 groups</strong> (stride 8192 = 64 rows × 128 cols/row)</td>
+    <td>rows: 0,1,2,3,64,65,66,67</td>
+  </tr>
+  <tr style="color:#3fb950">
+    <td>2</td><td>N (Col)</td><td>(4, 2)</td><td>(1, 64)</td>
+    <td><strong>4 consecutive cols</strong> (stride 1 = one column in row-major)<br>
+        <strong>2 groups</strong> (stride 64 = jump 64 columns)</td>
+    <td>cols: 0,1,2,3,64,65,66,67</td>
+  </tr>
+</table>
+
+<h3 style="margin-top:1.5rem">Step 3: How to read nested shape (4, 2) with stride (128, 8192)</h3>
+<div class="code" style="font-size:0.82rem">Shape <span style="color:#58a6ff">(4, 2)</span> means: two levels of iteration, like a nested loop.
+
+<span style="color:#8b949e">// Equivalent Python:</span>
+positions = []
+for i1 in range(2):          <span style="color:#8b949e"># outer shape = 2</span>
+    for i0 in range(4):      <span style="color:#8b949e"># inner shape = 4</span>
+        pos = i0 * 128 + i1 * 8192   <span style="color:#8b949e"># inner_stride=128, outer_stride=8192</span>
+        positions.append(pos)
+
+<span style="color:#8b949e"># Result:</span>
+positions = [0, 128, 256, 384,        <span style="color:#8b949e"># i1=0: rows 0,1,2,3</span>
+             8192, 8320, 8448, 8576]   <span style="color:#8b949e"># i1=1: rows 64,65,66,67</span>
+
+<span style="color:#8b949e"># Convert to row numbers (÷128):</span>
+rows = [0, 1, 2, 3, 64, 65, 66, 67]   <span style="color:#3fb950">✓ matches CUDA my_rows!</span></div>
+
+<h3 style="margin-top:1.5rem">Step 4: Putting all 3 modes together</h3>
+<div class="code" style="font-size:0.82rem"><span style="color:#8b949e">// The full offset formula — just dot-product of indices and strides:</span>
+offset(<span style="color:#f85149">v</span>, (<span style="color:#58a6ff">m0, m1</span>), (<span style="color:#3fb950">n0, n1</span>)) = <span style="color:#f85149">v×0</span> + <span style="color:#58a6ff">m0×128 + m1×8192</span> + <span style="color:#3fb950">n0×1 + n1×64</span>
+
+<span style="color:#8b949e">// Total elements = product of all shapes: 1 × (4×2) × (4×2) = 1 × 8 × 8 = 64</span>
+<span style="color:#8b949e">// This is a 3D tensor of shape [1][8][8] stored with custom strides</span>
+
+<span style="color:#8b949e">// Example: element [0][(2,1)][(3,0)]</span>
+<span style="color:#8b949e">//   v=0, m0=2, m1=1, n0=3, n1=0</span>
+<span style="color:#8b949e">//   offset = 0 + 2×128 + 1×8192 + 3×1 + 0×64 = 0 + 256 + 8192 + 3 + 0 = 8451</span>
+<span style="color:#8b949e">//   row = 8451 / 128 = 66,  col = 8451 % 128 = 3</span>
+<span style="color:#8b949e">//   → C[66][3]  ✓  (row 66 is in group m1=1, col 3 is in group n1=0)</span></div>
+
+<div class="info-box" style="margin-top:1rem">
+  <p><strong>Summary — what each piece tells you:</strong></p>
+  <table class="params" style="margin-top:0.5rem; width:100%;">
+    <tr><th>Layout piece</th><th>Question it answers</th><th>CUDA equivalent</th></tr>
+    <tr><td>Shape (1, (4,2), (4,2))</td><td>How many elements per thread? 1×8×8 = 64</td><td>Loop bounds: <span class="inline">for mi in 0..8, for ni in 0..8</span></td></tr>
+    <tr><td>Stride 0 (mode V)</td><td>N/A — only 1 value per atom</td><td>(doesn't appear in CUDA)</td></tr>
+    <tr><td>Stride (128, 8192) (mode M)</td><td>How far apart are my rows in memory?</td><td><span class="inline">my_rows[i]*N</span> (N=128)</td></tr>
+    <tr><td>Stride (1, 64) (mode N)</td><td>How far apart are my cols in memory?</td><td><span class="inline">my_cols[j]</span></td></tr>
+  </table>
+</div>
+
+<h3 style="margin-top:1.5rem">Step 5: The (V, M, N) Convention — Always This Order</h3>
+<div class="info-box">
+  <p>The output of <span class="inline">partition_C/A/B</span> <strong>always</strong> follows a fixed mode ordering. This is a hard-coded design choice in CuTe, not something that varies:</p>
+</div>
+
+<table class="params" style="margin-top:0.5rem; width:100%;">
+  <tr><th>Function</th><th>Output layout</th><th>Mode 0</th><th>Mode 1</th><th>Mode 2</th></tr>
+  <tr>
+    <td><span class="inline">partition_C(gC)</span></td>
+    <td><strong>(V, M_rest, N_rest)</strong></td>
+    <td style="color:#f85149">V = values per atom</td>
+    <td style="color:#58a6ff">M = rows this thread owns</td>
+    <td style="color:#3fb950">N = cols this thread owns</td>
+  </tr>
+  <tr>
+    <td><span class="inline">partition_A(gA)</span></td>
+    <td><strong>(V, M_rest, K_rest)</strong></td>
+    <td style="color:#f85149">V = values per atom</td>
+    <td style="color:#58a6ff">M = rows this thread owns</td>
+    <td style="color:#d29922">K = reduction positions</td>
+  </tr>
+  <tr>
+    <td><span class="inline">partition_B(gB)</span></td>
+    <td><strong>(V, N_rest, K_rest)</strong></td>
+    <td style="color:#f85149">V = values per atom</td>
+    <td style="color:#3fb950">N = cols this thread owns</td>
+    <td style="color:#d29922">K = reduction positions</td>
+  </tr>
+</table>
+
+<div class="code" style="margin-top:0.8rem; font-size:0.82rem"><span style="color:#8b949e">// Why this matters: cute.gemm() relies on this fixed ordering to know:</span>
+<span style="color:#8b949e">//   - Mode 0 (V): loop over values within one atom invocation</span>
+<span style="color:#8b949e">//   - Mode 2 of A and B (K): the shared dimension to contract over</span>
+<span style="color:#8b949e">//   - Mode 1 of A matches Mode 1 of C (both are M-rows)</span>
+<span style="color:#8b949e">//   - Mode 1 of B matches Mode 2 of C (both are N-cols)</span>
+<span style="color:#8b949e">//</span>
+<span style="color:#8b949e">// cute.gemm(mma, tCrA, tCrB, tCrC):</span>
+<span style="color:#8b949e">//   for k in K_rest:             ← mode 2 of A/B</span>
+<span style="color:#8b949e">//     tCrC[v,m,n] += tCrA[v,m,k] × tCrB[v,n,k]</span></div>
+
+<h3 style="margin-top:1.5rem">Stride Annotation on the Visual Grid</h3>
+<p style="font-size:0.82rem; color:var(--dim)">The grid below shows thread 0's 8×8 elements with <strong>stride arrows</strong> showing what each stride physically means — how far you jump in memory when incrementing each index.</p>
+
+<div id="stride-annotated-grid" style="margin:1rem 0;"></div>
+
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2>Interactive: Pick Any Thread</h2>
+<p style="font-size:0.85rem">Change the thread ID below to see its 4 blocks light up in the grid above.</p>
+<div class="controls">
+  <label>threadIdx.x = <input type="number" id="thr-input2" min="0" max="255" value="0" style="width:60px"></label>
+  <span id="thr-info" style="font-size:0.82rem; color:var(--fg)">tm=0, tn=0 → rows {0..3, 64..67}, cols {0..3, 64..67}</span>
+</div>
+<div id="mini-grid-container" style="display:flex; justify-content:center; margin-top:0.5rem;">
+  <canvas id="mini-grid" width="256" height="256" style="border:1px solid var(--border); image-rendering:pixelated;"></canvas>
+</div>
+</div>
+
+<script>
+// === CORE MAPPING ===
+function threadToBlocks(tid) {
+  const tm = Math.floor(tid / 16);
+  const tn = tid % 16;
+  // 8 rows: tm*4..tm*4+3 and tm*4+64..tm*4+67
+  const rows = [];
+  for (let i = 0; i < 4; i++) rows.push(tm * 4 + i);
+  for (let i = 0; i < 4; i++) rows.push(tm * 4 + 64 + i);
+  // 8 cols
+  const cols = [];
+  for (let i = 0; i < 4; i++) cols.push(tn * 4 + i);
+  for (let i = 0; i < 4; i++) cols.push(tn * 4 + 64 + i);
+  return { tm, tn, rows, cols };
+}
+
+function ownerOf(row, col) {
+  // Inverse: which thread owns (row, col)?
+  // row → tm: row is in group (row/4). If group < 16, tm = group. If group >= 16, tm = group - 16.
+  const rowGroup = Math.floor(row / 4);  // 0..31
+  const tm = rowGroup < 16 ? rowGroup : rowGroup - 16;
+  const colGroup = Math.floor(col / 4);
+  const tn = colGroup < 16 ? colGroup : colGroup - 16;
+  return tm * 16 + tn;
+}
+
+// === COLORS ===
+function threadColor(tid) {
+  // Generate distinct colors for 256 threads using HSL
+  const hue = (tid * 137.5) % 360;
+  const sat = 50 + (tid % 3) * 15;
+  const lit = 35 + (tid % 5) * 5;
+  return `hsl(${hue}, ${sat}%, ${lit}%)`;
+}
+
+// === FULL GRID ===
+const fullCanvas = document.getElementById('full-grid');
+const fullCtx = fullCanvas.getContext('2d');
+const SCALE = 4; // each element = 4×4 pixels on 512×512 canvas
+
+function drawFullGrid(highlightTid = -1, mode = 'all') {
+  const GAP = 1; // 1px gap between elements in highlight mode
+  for (let r = 0; r < 128; r++) {
+    for (let c = 0; c < 128; c++) {
+      const owner = ownerOf(r, c);
+      if (mode === 'all') {
+        fullCtx.fillStyle = threadColor(owner);
+        fullCtx.fillRect(c * SCALE, r * SCALE, SCALE, SCALE);
+      } else if (mode === 'one' || mode === 'quadrant') {
+        if (owner === highlightTid) {
+          // Draw each element with a dark gap so you can COUNT individual cells
+          fullCtx.fillStyle = '#0d1117';
+          fullCtx.fillRect(c * SCALE, r * SCALE, SCALE, SCALE);
+          fullCtx.fillStyle = '#58a6ff';
+          fullCtx.fillRect(c * SCALE + GAP, r * SCALE + GAP, SCALE - GAP, SCALE - GAP);
+        } else {
+          fullCtx.fillStyle = '#161b22';
+          fullCtx.fillRect(c * SCALE, r * SCALE, SCALE, SCALE);
+        }
+      }
+    }
+  }
+  // Draw quadrant boundary at row/col 64
+  if (mode === 'quadrant' || mode === 'one') {
+    fullCtx.strokeStyle = '#f8514966';
+    fullCtx.lineWidth = 2;
+    fullCtx.beginPath();
+    fullCtx.moveTo(0, 64 * SCALE); fullCtx.lineTo(512, 64 * SCALE);
+    fullCtx.moveTo(64 * SCALE, 0); fullCtx.lineTo(64 * SCALE, 512);
+    fullCtx.stroke();
+    // Label the 4 blocks
+    fullCtx.font = '12px monospace';
+    fullCtx.fillStyle = '#f85149';
+    fullCtx.fillText('Block A (4×4)', 4, 14);
+    fullCtx.fillText('Block B (4×4)', 64*SCALE + 4, 14);
+    fullCtx.fillText('Block C (4×4)', 4, 64*SCALE + 14);
+    fullCtx.fillText('Block D (4×4)', 64*SCALE + 4, 64*SCALE + 14);
+    // Add element count
+    fullCtx.font = '11px monospace';
+    fullCtx.fillStyle = '#3fb950';
+    fullCtx.fillText('64 elements total (4 blocks × 4×4)', 150, 506);
+  }
+  // Draw group boundaries every 4 elements (light)
+  if (mode === 'all') {
+    fullCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+    fullCtx.lineWidth = 0.5;
+    for (let i = 4; i < 128; i += 4) {
+      fullCtx.beginPath();
+      fullCtx.moveTo(0, i * SCALE); fullCtx.lineTo(512, i * SCALE);
+      fullCtx.moveTo(i * SCALE, 0); fullCtx.lineTo(i * SCALE, 512);
+      fullCtx.stroke();
+    }
+  }
+}
+
+// === MINI GRID ===
+const miniCanvas = document.getElementById('mini-grid');
+const miniCtx = miniCanvas.getContext('2d');
+const MINI_SCALE = 2;
+
+function drawMiniGrid(tid) {
+  const { rows, cols } = threadToBlocks(tid);
+  const rowSet = new Set(rows);
+  const colSet = new Set(cols);
+  for (let r = 0; r < 128; r++) {
+    for (let c = 0; c < 128; c++) {
+      if (rowSet.has(r) && colSet.has(c)) {
+        miniCtx.fillStyle = '#58a6ff';
+      } else {
+        miniCtx.fillStyle = '#0d1117';
+      }
+      miniCtx.fillRect(c * MINI_SCALE, r * MINI_SCALE, MINI_SCALE, MINI_SCALE);
+    }
+  }
+  // quadrant lines
+  miniCtx.strokeStyle = '#30363d';
+  miniCtx.lineWidth = 1;
+  miniCtx.beginPath();
+  miniCtx.moveTo(0, 64 * MINI_SCALE); miniCtx.lineTo(256, 64 * MINI_SCALE);
+  miniCtx.moveTo(64 * MINI_SCALE, 0); miniCtx.lineTo(64 * MINI_SCALE, 256);
+  miniCtx.stroke();
+}
+
+// === ZOOM THREAD 0 ===
+function drawZoom0() {
+  const container = document.getElementById('zoom-thread0');
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  c.style.border = '1px solid #30363d';
+  c.style.imageRendering = 'pixelated';
+  container.appendChild(c);
+  const ctx = c.getContext('2d');
+  const { rows, cols } = threadToBlocks(0);
+  const rowSet = new Set(rows);
+  const colSet = new Set(cols);
+  for (let r = 0; r < 128; r++) {
+    for (let c2 = 0; c2 < 128; c2++) {
+      if (rowSet.has(r) && colSet.has(c2)) {
+        ctx.fillStyle = '#58a6ff';
+      } else {
+        ctx.fillStyle = '#0d1117';
+      }
+      ctx.fillRect(c2 * 2, r * 2, 2, 2);
+    }
+  }
+  ctx.strokeStyle = '#30363d';
+  ctx.beginPath();
+  ctx.moveTo(0, 128); ctx.lineTo(256, 128);
+  ctx.moveTo(128, 0); ctx.lineTo(128, 256);
+  ctx.stroke();
+}
+
+// === EVENTS ===
+const thrInput = document.getElementById('thr-input');
+const thrInput2 = document.getElementById('thr-input2');
+const viewMode = document.getElementById('view-mode');
+const hoverInfo = document.getElementById('hover-info');
+const thrInfo = document.getElementById('thr-info');
+
+function updateAll() {
+  const tid = parseInt(thrInput.value) || 0;
+  const mode = viewMode.value;
+  drawFullGrid(tid, mode);
+}
+
+function updateMini() {
+  const tid = parseInt(thrInput2.value) || 0;
+  const { tm, tn, rows, cols } = threadToBlocks(tid);
+  thrInfo.textContent = `tm=${tm}, tn=${tn} → rows {${rows[0]}..${rows[3]}, ${rows[4]}..${rows[7]}}, cols {${cols[0]}..${cols[3]}, ${cols[4]}..${cols[7]}}`;
+  drawMiniGrid(tid);
+}
+
+thrInput.addEventListener('input', updateAll);
+viewMode.addEventListener('change', updateAll);
+thrInput2.addEventListener('input', updateMini);
+
+fullCanvas.addEventListener('mousemove', (e) => {
+  const rect = fullCanvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / SCALE);
+  const y = Math.floor((e.clientY - rect.top) / SCALE);
+  if (x >= 0 && x < 128 && y >= 0 && y < 128) {
+    const owner = ownerOf(y, x);
+    const tm = Math.floor(owner / 16);
+    const tn = owner % 16;
+    hoverInfo.textContent = `(row=${y}, col=${x}) → thread ${owner} (tm=${tm}, tn=${tn})`;
+  }
+});
+
+fullCanvas.addEventListener('click', (e) => {
+  const rect = fullCanvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / SCALE);
+  const y = Math.floor((e.clientY - rect.top) / SCALE);
+  if (x >= 0 && x < 128 && y >= 0 && y < 128) {
+    const owner = ownerOf(y, x);
+    thrInput.value = owner;
+    thrInput2.value = owner;
+    viewMode.value = 'one';
+    updateAll();
+    updateMini();
+  }
+});
+
+// Sync inputs
+thrInput.addEventListener('input', () => { thrInput2.value = thrInput.value; updateMini(); });
+thrInput2.addEventListener('input', () => { thrInput.value = thrInput2.value; updateAll(); });
+
+// === ZOOMED BLOCK VIEW (individual elements with labels) ===
+function drawBlock(containerId, rowStart, colStart) {
+  const container = document.getElementById(containerId);
+  const table = document.createElement('table');
+  table.style.borderCollapse = 'collapse';
+  table.style.fontSize = '0.7rem';
+  table.style.margin = '0.3rem 0';
+
+  // Header row with col labels
+  const headerRow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.style.padding = '4px 6px';
+  corner.style.border = '1px solid #30363d';
+  corner.style.background = '#21262d';
+  corner.style.color = '#8b949e';
+  corner.textContent = 'r\\c';
+  headerRow.appendChild(corner);
+  for (let c = colStart; c < colStart + 4; c++) {
+    const th = document.createElement('th');
+    th.style.padding = '4px 8px';
+    th.style.border = '1px solid #30363d';
+    th.style.background = '#21262d';
+    th.style.color = '#58a6ff';
+    th.textContent = c;
+    headerRow.appendChild(th);
+  }
+  table.appendChild(headerRow);
+
+  // Data rows
+  for (let r = rowStart; r < rowStart + 4; r++) {
+    const tr = document.createElement('tr');
+    // Row label
+    const rowLabel = document.createElement('th');
+    rowLabel.style.padding = '4px 8px';
+    rowLabel.style.border = '1px solid #30363d';
+    rowLabel.style.background = '#21262d';
+    rowLabel.style.color = '#58a6ff';
+    rowLabel.textContent = r;
+    tr.appendChild(rowLabel);
+    // Cells
+    for (let c = colStart; c < colStart + 4; c++) {
+      const td = document.createElement('td');
+      td.style.padding = '6px 8px';
+      td.style.border = '1px solid #30363d';
+      td.style.background = '#1a3a5c';
+      td.style.color = '#c9d1d9';
+      td.style.textAlign = 'center';
+      td.style.fontWeight = 'bold';
+      const offset = r * 128 + c;
+      td.textContent = offset;
+      td.title = `C[${r}][${c}] = offset ${offset}`;
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  container.appendChild(table);
+  // Add note below
+  const note = document.createElement('div');
+  note.style.fontSize = '0.7rem';
+  note.style.color = '#8b949e';
+  note.style.marginTop = '0.2rem';
+  note.textContent = `offsets: ${rowStart*128+colStart}..${(rowStart+3)*128+colStart+3} (row-major, stride=128)`;
+  container.appendChild(note);
+}
+
+// === CUTE ↔ PHYSICAL MAPPING TABLE ===
+function buildMappingTable() {
+  const container = document.getElementById('mapping-table');
+  const table = document.createElement('table');
+  table.style.borderCollapse = 'collapse';
+  table.style.fontSize = '0.72rem';
+  table.style.width = '100%';
+
+  // Header
+  const hdr = document.createElement('tr');
+  ['#', 'm0', 'm1', 'n0', 'n1', 'offset formula', 'offset', 'row', 'col', 'block'].forEach(h => {
+    const th = document.createElement('th');
+    th.style.padding = '3px 5px';
+    th.style.border = '1px solid #30363d';
+    th.style.background = '#21262d';
+    th.style.color = '#58a6ff';
+    th.style.position = 'sticky';
+    th.style.top = '0';
+    th.textContent = h;
+    hdr.appendChild(th);
+  });
+  table.appendChild(hdr);
+
+  const blockColors = {
+    'A': '#1a3a5c', 'B': '#1a3a2a', 'C': '#3a2a1a', 'D': '#2a1a3a'
+  };
+  const blockTextColors = {
+    'A': '#58a6ff', 'B': '#3fb950', 'C': '#d29922', 'D': '#bc8cff'
+  };
+
+  let idx = 0;
+  // Iterate in CuTe layout order: v=0, then (m0,m1), then (n0,n1)
+  for (let m1 = 0; m1 < 2; m1++) {
+    for (let m0 = 0; m0 < 4; m0++) {
+      for (let n1 = 0; n1 < 2; n1++) {
+        for (let n0 = 0; n0 < 4; n0++) {
+          const offset = m0 * 128 + m1 * 8192 + n0 * 1 + n1 * 64;
+          const row = Math.floor(offset / 128);
+          const col = offset % 128;
+          const block = (m1 === 0 && n1 === 0) ? 'A' :
+                        (m1 === 0 && n1 === 1) ? 'B' :
+                        (m1 === 1 && n1 === 0) ? 'C' : 'D';
+          const tr = document.createElement('tr');
+          tr.style.background = blockColors[block];
+          tr.style.cursor = 'pointer';
+          tr.title = `Click to highlight C[${row}][${col}]`;
+
+          const formula = `${m0}×128 + ${m1}×8192 + ${n0}×1 + ${n1}×64`;
+
+          [idx, m0, m1, n0, n1, formula, offset, row, col, block].forEach((val, i) => {
+            const td = document.createElement('td');
+            td.style.padding = '3px 5px';
+            td.style.border = '1px solid #30363d';
+            td.style.textAlign = 'center';
+            if (i === 9) td.style.color = blockTextColors[block];
+            if (i === 5) { td.style.fontSize = '0.65rem'; td.style.color = '#8b949e'; }
+            td.textContent = val;
+            tr.appendChild(td);
+          });
+
+          // Click to highlight on canvas
+          tr.addEventListener('click', () => {
+            viewMode.value = 'one';
+            thrInput.value = 0;
+            updateAll();
+            // Flash the specific element
+            fullCtx.strokeStyle = '#f85149';
+            fullCtx.lineWidth = 2;
+            fullCtx.strokeRect(col * SCALE, row * SCALE, SCALE, SCALE);
+          });
+
+          table.appendChild(tr);
+          idx++;
+        }
+      }
+    }
+  }
+  container.appendChild(table);
+}
+
+// === CUTE VISUAL GRID (8×8 showing flat index) ===
+function buildCuteGrid() {
+  const container = document.getElementById('cute-grid');
+
+  // Thread 0's elements in a logical 8-row × 8-col arrangement
+  // Rows: m = (m0, m1) where m0∈[0,4), m1∈[0,2) → 8 M-positions
+  // Cols: n = (n0, n1) where n0∈[0,4), n1∈[0,2) → 8 N-positions
+  // Arranged as: first 4 cols = n1=0, next 4 cols = n1=1
+  //              first 4 rows = m1=0, next 4 rows = m1=1
+
+  const blockBg = [
+    ['#1a3a5c','#1a3a2a'],  // m1=0: A(n1=0), B(n1=1)
+    ['#3a2a1a','#2a1a3a']   // m1=1: C(n1=0), D(n1=1)
+  ];
+  const blockFg = [
+    ['#58a6ff','#3fb950'],
+    ['#d29922','#bc8cff']
+  ];
+
+  const table = document.createElement('table');
+  table.style.borderCollapse = 'collapse';
+  table.style.margin = '0 auto';
+
+  // Column header (n0, n1 labels)
+  const hdr1 = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.style.padding = '2px 4px'; corner.style.border = '1px solid #30363d';
+  corner.style.background = '#21262d'; corner.style.color = '#8b949e'; corner.style.fontSize = '0.65rem';
+  corner.textContent = 'm\\n';
+  hdr1.appendChild(corner);
+  for (let n1 = 0; n1 < 2; n1++) {
+    for (let n0 = 0; n0 < 4; n0++) {
+      const th = document.createElement('th');
+      th.style.padding = '2px 4px'; th.style.border = '1px solid #30363d';
+      th.style.background = '#21262d'; th.style.fontSize = '0.6rem';
+      th.style.color = blockFg[0][n1];
+      th.textContent = `(${n0},${n1})`;
+      hdr1.appendChild(th);
+    }
+  }
+  table.appendChild(hdr1);
+
+  let flatIdx = 0;
+  for (let m1 = 0; m1 < 2; m1++) {
+    for (let m0 = 0; m0 < 4; m0++) {
+      const tr = document.createElement('tr');
+      // Row label
+      const rl = document.createElement('th');
+      rl.style.padding = '2px 6px'; rl.style.border = '1px solid #30363d';
+      rl.style.background = '#21262d'; rl.style.fontSize = '0.6rem';
+      rl.style.color = blockFg[m1][0];
+      rl.textContent = `(${m0},${m1})`;
+      tr.appendChild(rl);
+
+      for (let n1 = 0; n1 < 2; n1++) {
+        for (let n0 = 0; n0 < 4; n0++) {
+          const td = document.createElement('td');
+          td.style.padding = '4px 6px';
+          td.style.border = '1px solid #30363d';
+          td.style.textAlign = 'center';
+          td.style.fontSize = '0.7rem';
+          td.style.fontWeight = 'bold';
+          td.style.background = blockBg[m1][n1];
+          td.style.color = blockFg[m1][n1];
+          td.style.minWidth = '32px';
+
+          const offset = m0 * 128 + m1 * 8192 + n0 * 1 + n1 * 64;
+          const row = Math.floor(offset / 128);
+          const col = offset % 128;
+          // Show flat index on top, C[r][c] below
+          td.innerHTML = `<div style="font-size:0.75rem">${flatIdx}</div><div style="font-size:0.55rem;color:#8b949e">C[${row}][${col}]</div>`;
+          td.title = `CuTe idx ${flatIdx}: (m0=${m0},m1=${m1},n0=${n0},n1=${n1}) → offset=${offset} → C[${row}][${col}]`;
+
+          tr.appendChild(td);
+          flatIdx++;
+        }
+      }
+      table.appendChild(tr);
+    }
+  }
+  container.appendChild(table);
+
+  // Add separator labels
+  const note = document.createElement('div');
+  note.style.fontSize = '0.7rem';
+  note.style.color = '#8b949e';
+  note.style.marginTop = '0.5rem';
+  note.style.textAlign = 'center';
+  note.innerHTML = 'Row headers: (m0, m1) &nbsp;|&nbsp; Col headers: (n0, n1) &nbsp;|&nbsp; Cell: flat index + C[row][col]';
+  container.appendChild(note);
+}
+
+// === STRIDE-ANNOTATED GRID ===
+function buildStrideGrid() {
+  const container = document.getElementById('stride-annotated-grid');
+  const blockBg = {'A':'#1a3a5c','B':'#1a3a2a','C':'#3a2a1a','D':'#2a1a3a'};
+  const blockFg = {'A':'#58a6ff','B':'#3fb950','C':'#d29922','D':'#bc8cff'};
+
+  let html = `
+  <div style="display:grid; grid-template-columns:1fr auto; gap:1.5rem; align-items:start;">
+
+  <!-- LEFT: the grid with annotations -->
+  <div style="overflow-x:auto;">
+    <!-- N-axis top labels -->
+    <div style="display:flex; align-items:center; margin-bottom:4px; padding-left:70px;">
+      <div style="width:200px;text-align:center;position:relative;">
+        <div style="color:#3fb950;font-size:0.75rem;font-weight:bold;">n1 = 0</div>
+        <div style="color:#3fb950;font-size:0.6rem;">cols 0─3</div>
+        <div style="position:absolute;bottom:-2px;left:10%;right:10%;border-bottom:2px solid #3fb95066;"></div>
+      </div>
+      <div style="width:30px;text-align:center;color:#3fb950;font-size:1.2rem;">⟼</div>
+      <div style="width:200px;text-align:center;position:relative;">
+        <div style="color:#3fb950;font-size:0.75rem;font-weight:bold;">n1 = 1</div>
+        <div style="color:#3fb950;font-size:0.6rem;">cols 64─67 (+64 jump)</div>
+        <div style="position:absolute;bottom:-2px;left:10%;right:10%;border-bottom:2px solid #3fb95066;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:stretch;">
+      <!-- M-axis side label -->
+      <div style="display:flex;flex-direction:column;justify-content:center;margin-right:6px;gap:4px;">
+        <div style="text-align:center;padding:4px 2px;">
+          <div style="color:#58a6ff;font-size:0.7rem;font-weight:bold;">m1=0</div>
+          <div style="color:#8b949e;font-size:0.55rem;">rows</div>
+          <div style="color:#8b949e;font-size:0.55rem;">0─3</div>
+        </div>
+        <div style="text-align:center;padding:8px 2px;border:1px dashed #58a6ff44;border-radius:4px;">
+          <div style="color:#58a6ff;font-size:0.8rem;">⬇</div>
+          <div style="color:#58a6ff;font-size:0.6rem;font-weight:bold;">+8192</div>
+          <div style="color:#8b949e;font-size:0.5rem;">(64 rows)</div>
+        </div>
+        <div style="text-align:center;padding:4px 2px;">
+          <div style="color:#58a6ff;font-size:0.7rem;font-weight:bold;">m1=1</div>
+          <div style="color:#8b949e;font-size:0.55rem;">rows</div>
+          <div style="color:#8b949e;font-size:0.55rem;">64─67</div>
+        </div>
+      </div>
+
+      <!-- The actual table -->
+      <table style="border-collapse:collapse; font-size:0.7rem;">
+        <!-- Column headers -->
+        <tr>
+          <th style="padding:5px 8px;border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:0.6rem;"></th>`;
+
+  // Column headers with n0 values
+  for (let n1 = 0; n1 < 2; n1++) {
+    for (let n0 = 0; n0 < 4; n0++) {
+      const col = n0 + n1 * 64;
+      const leftBorder = (n0 === 0 && n1 === 1) ? 'border-left:3px solid #3fb950;' : '';
+      html += `<th style="padding:5px 8px;border:1px solid #30363d;background:#21262d;font-size:0.62rem;${leftBorder}">
+        <div style="color:#3fb950;font-weight:bold;">col ${col}</div>
+        <div style="color:#8b949e;">n0=${n0}</div>
+      </th>`;
+    }
+  }
+  html += '</tr>';
+
+  // Data rows
+  for (let m1 = 0; m1 < 2; m1++) {
+    // Dashed separator row between blocks
+    if (m1 === 1) {
+      html += `<tr>
+        <td colspan="9" style="border:none;padding:0;">
+          <div style="border-top:2px dashed #58a6ff55;margin:6px 0;position:relative;">
+            <span style="position:absolute;left:50%;transform:translateX(-50%);top:-9px;background:#161b22;padding:0 8px;color:#58a6ff;font-size:0.6rem;">⋯ 60 rows (other threads) ⋯</span>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    for (let m0 = 0; m0 < 4; m0++) {
+      const row = m0 + m1 * 64;
+      html += '<tr>';
+
+      // Row header
+      const topBorder = (m0 === 0 && m1 === 1) ? 'border-top:3px solid #58a6ff;' : '';
+      html += `<th style="padding:5px 8px;border:1px solid #30363d;background:#21262d;font-size:0.62rem;${topBorder}">
+        <div style="color:#58a6ff;font-weight:bold;">row ${row}</div>
+        <div style="color:#8b949e;">m0=${m0}</div>
+      </th>`;
+
+      for (let n1 = 0; n1 < 2; n1++) {
+        for (let n0 = 0; n0 < 4; n0++) {
+          const col = n0 + n1 * 64;
+          const offset = row * 128 + col;
+          const block = (m1===0&&n1===0)?'A':(m1===0&&n1===1)?'B':(m1===1&&n1===0)?'C':'D';
+          const leftBorder = (n0 === 0 && n1 === 1) ? 'border-left:3px solid #3fb950;' : '';
+          const topB = (m0 === 0 && m1 === 1) ? 'border-top:3px solid #58a6ff;' : '';
+          html += `<td style="padding:6px 5px;border:1px solid #30363d;background:${blockBg[block]};color:${blockFg[block]};text-align:center;min-width:52px;${leftBorder}${topB}" title="C[${row}][${col}] = offset ${offset}&#10;(m0=${m0}, m1=${m1}, n0=${n0}, n1=${n1})">
+            <div style="font-weight:bold;font-size:0.8rem;">${offset}</div>
+            <div style="font-size:0.58rem;color:#8b949e;margin-top:1px;">C[${row}][${col}]</div>
+          </td>`;
+        }
+      }
+      html += '</tr>';
+
+      // Show stride=128 annotation between first two rows
+      if (m0 === 0 && m1 === 0) {
+        html += `<tr>
+          <td style="border:none;padding:0 8px 0 0;text-align:right;">
+            <div style="color:#58a6ff;font-size:0.55rem;">↕ +128</div>
+          </td>
+          <td colspan="8" style="border:none;padding:0;">
+            <div style="border-top:1px dotted #58a6ff44;"></div>
+          </td>
+        </tr>`;
+      }
+    }
+  }
+
+  html += `</table>
+    </div>
+
+    <!-- N stride annotation between col groups -->
+    <div style="display:flex;align-items:center;margin-top:6px;padding-left:70px;">
+      <div style="width:100px;text-align:right;color:#3fb950;font-size:0.6rem;">n0: +1 each →</div>
+      <div style="width:100px;"></div>
+      <div style="color:#3fb950;font-size:0.7rem;font-weight:bold;padding:0 8px;">← +64 jump →</div>
+      <div style="width:100px;"></div>
+      <div style="width:100px;text-align:left;color:#3fb950;font-size:0.6rem;">← n0: +1 each</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: stride cheat sheet -->
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.2rem;min-width:200px;max-width:240px;">
+    <div style="font-weight:bold;color:#c9d1d9;margin-bottom:1rem;font-size:0.85rem;">Stride Cheat Sheet</div>
+
+    <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #30363d;">
+      <div style="color:#58a6ff;font-weight:bold;font-size:0.85rem;">M (rows) ↕</div>
+      <table style="margin-top:0.4rem;font-size:0.78rem;border-collapse:collapse;width:100%;">
+        <tr>
+          <td style="padding:3px 0;color:#58a6ff;">m0</td>
+          <td style="padding:3px 0;">stride <strong>128</strong></td>
+        </tr>
+        <tr><td colspan="2" style="padding:0 0 2px;color:#8b949e;font-size:0.68rem;">= next row (128 floats/row)</td></tr>
+        <tr>
+          <td style="padding:3px 0;color:#58a6ff;">m1</td>
+          <td style="padding:3px 0;">stride <strong>8192</strong></td>
+        </tr>
+        <tr><td colspan="2" style="padding:0 0 2px;color:#8b949e;font-size:0.68rem;">= jump 64 rows (64×128)</td></tr>
+      </table>
+    </div>
+
+    <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #30363d;">
+      <div style="color:#3fb950;font-weight:bold;font-size:0.85rem;">N (cols) ↔</div>
+      <table style="margin-top:0.4rem;font-size:0.78rem;border-collapse:collapse;width:100%;">
+        <tr>
+          <td style="padding:3px 0;color:#3fb950;">n0</td>
+          <td style="padding:3px 0;">stride <strong>1</strong></td>
+        </tr>
+        <tr><td colspan="2" style="padding:0 0 2px;color:#8b949e;font-size:0.68rem;">= next col (adjacent in memory)</td></tr>
+        <tr>
+          <td style="padding:3px 0;color:#3fb950;">n1</td>
+          <td style="padding:3px 0;">stride <strong>64</strong></td>
+        </tr>
+        <tr><td colspan="2" style="padding:0 0 2px;color:#8b949e;font-size:0.68rem;">= jump 64 cols</td></tr>
+      </table>
+    </div>
+
+    <div>
+      <div style="color:#f85149;font-weight:bold;font-size:0.85rem;">V (value)</div>
+      <table style="margin-top:0.4rem;font-size:0.78rem;border-collapse:collapse;width:100%;">
+        <tr>
+          <td style="padding:3px 0;color:#f85149;">v</td>
+          <td style="padding:3px 0;">stride <strong>0</strong></td>
+        </tr>
+        <tr><td colspan="2" style="padding:0 0 2px;color:#8b949e;font-size:0.68rem;">= scalar, no movement</td></tr>
+      </table>
+    </div>
+
+    <div style="margin-top:1rem;padding-top:0.8rem;border-top:1px solid #30363d;">
+      <div style="color:#c9d1d9;font-weight:bold;font-size:0.75rem;margin-bottom:0.4rem;">Verify any cell:</div>
+      <div style="font-size:0.72rem;color:#8b949e;font-family:monospace;">
+        offset = m0×<span style="color:#58a6ff">128</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ m1×<span style="color:#58a6ff">8192</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ n0×<span style="color:#3fb950">1</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ n1×<span style="color:#3fb950">64</span>
+      </div>
+      <div style="margin-top:0.5rem;font-size:0.68rem;color:#8b949e;">
+        Ex: row 65, col 2<br>
+        m0=1,m1=1,n0=2,n1=0<br>
+        = 128+8192+2+0 = <strong style="color:#c9d1d9">8322</strong> ✓
+      </div>
+    </div>
+  </div>
+
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+// === PERMUTATION COMPARISON ===
+function buildPermCompare() {
+  const container = document.getElementById('perm-compare');
+  const ThrM = 16;
+  const TILE = 128;
+
+  // Define permutations: each has a name, formula for position(f, r), shape info
+  const perms = [
+    {
+      name: '(16, 4):(4, 1)',
+      desc: '4 consecutive per thread, threads spaced 4 apart',
+      note: 'Step1 uses this. Good for 4-element vectorized loads. 2 groups (rest=2) separated by 64.',
+      F: 16, R: 4, sF: 4, sR: 1,
+      color: '#58a6ff'
+    },
+    {
+      name: '(16, 4):(1, 16)',
+      desc: '4 elements each spaced 16 apart',
+      note: 'Scattered pattern — impossible to vectorize, but threads access interleaved positions.',
+      F: 16, R: 4, sF: 1, sR: 16,
+      color: '#3fb950'
+    },
+    {
+      name: '(16, 8):(8, 1)',
+      desc: '8 consecutive per thread, covers all 128 (no rest)',
+      note: 'Simplest pattern: thread k owns positions [k×8 .. k×8+7]. Best vectorization but poor A/B reuse.',
+      F: 16, R: 8, sF: 8, sR: 1,
+      color: '#d29922'
+    },
+  ];
+
+  // For each permutation, compute which positions each thread owns
+  function getPositions(perm, thrIdx) {
+    const { F, R, sF, sR } = perm;
+    const permSize = F * R; // 64
+    const rest = TILE / permSize; // 2
+
+    // Step 1: permutation maps (f, r) → position = f*sF + r*sR
+    // Step 4: F divided by ThrM → thread k owns f-values where (f % ThrM == k) or (f / (F/ThrM))...
+    // Actually: zipped_divide of F by ThrM gives (ThrM, F/ThrM)
+    // Thread k picks the k-th slice → gets f-values {k, k+ThrM, k+2*ThrM, ...} if F > ThrM
+    // No — zipped_divide tiles: thread k owns f in [k*(F/ThrM) .. (k+1)*(F/ThrM) - 1]
+    // Actually the way logical_divide + complement works:
+    // The F positions are just divided into ThrM tiles of size F/ThrM each.
+    // Thread k takes tile k.
+    const groupSize = F / ThrM; // 1 for first two, 2 for third
+    const positions = [];
+
+    for (let restIdx = 0; restIdx < rest; restIdx++) {
+      for (let g = 0; g < groupSize; g++) {
+        const f = thrIdx * groupSize + g;
+        for (let r = 0; r < R; r++) {
+          const posInPerm = f * sF + r * sR;
+          const pos = posInPerm + restIdx * permSize;
+          if (pos < TILE) positions.push(pos);
+        }
+      }
+    }
+    return positions.sort((a, b) => a - b);
+  }
+
+  function render(highlightThr) {
+    let html = '';
+
+    perms.forEach((perm, pi) => {
+      // Compute ownership for all 16 threads
+      const ownership = new Array(TILE).fill(-1);
+      for (let t = 0; t < ThrM; t++) {
+        const pos = getPositions(perm, t);
+        pos.forEach(p => { if (p < TILE) ownership[p] = t; });
+      }
+
+      const highlightPositions = getPositions(perm, highlightThr);
+
+      html += `<div style="margin-bottom:1.5rem;">`;
+      html += `<div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:0.4rem;">`;
+      html += `<span style="font-family:monospace;font-size:0.85rem;font-weight:bold;color:${perm.color};">${perm.name}</span>`;
+      html += `<span style="font-size:0.75rem;color:var(--dim);">${perm.desc}</span>`;
+      html += `</div>`;
+
+      // The 128-position strip
+      html += `<div style="display:flex;flex-wrap:wrap;gap:0px;margin-bottom:0.3rem;">`;
+      for (let p = 0; p < TILE; p++) {
+        const owner = ownership[p];
+        const isHighlight = owner === highlightThr;
+        const hue = (owner * 137.5) % 360;
+        let bg, border;
+        if (isHighlight) {
+          bg = perm.color;
+          border = `2px solid #fff`;
+        } else {
+          bg = `hsl(${hue}, 30%, 20%)`;
+          border = `1px solid #30363d`;
+        }
+        // Add separator every 4 positions for readability
+        const marginLeft = (p > 0 && p % 4 === 0) ? '1px' : '0';
+        const marginLeftBig = (p > 0 && p % 64 === 0) ? '4px' : marginLeft;
+        html += `<div style="width:6px;height:24px;background:${bg};border:${border};margin-left:${marginLeftBig};border-radius:1px;" title="pos ${p} → thread ${owner}"></div>`;
+      }
+      html += `</div>`;
+
+      // Thread's positions listed
+      html += `<div style="font-size:0.7rem;color:${perm.color};margin-top:0.2rem;">`;
+      html += `Thread ${highlightThr} owns: {${highlightPositions.join(', ')}}`;
+      html += ` <span style="color:var(--dim);">(${highlightPositions.length} positions)</span>`;
+      html += `</div>`;
+
+      // Note
+      html += `<div style="font-size:0.68rem;color:var(--dim);margin-top:0.2rem;font-style:italic;">${perm.note}</div>`;
+
+      html += `</div>`;
+    });
+
+    // Add position ruler
+    html += `<div style="font-size:0.6rem;color:var(--dim);display:flex;margin-top:0.5rem;">`;
+    html += `<span style="width:0px;">0</span>`;
+    html += `<span style="margin-left:${6*16-5}px;">16</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">32</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">48</span>`;
+    html += `<span style="margin-left:${6*17-10}px;">64</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">80</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">96</span>`;
+    html += `<span style="margin-left:${6*16-12}px;">112</span>`;
+    html += `<span style="margin-left:${6*14-4}px;">127</span>`;
+    html += `</div>`;
+
+    container.innerHTML = html;
+  }
+
+  // Initial render
+  render(0);
+
+  // Event listener
+  document.getElementById('perm-thr').addEventListener('input', (e) => {
+    const t = Math.max(0, Math.min(15, parseInt(e.target.value) || 0));
+    render(t);
+  });
+}
+
+// === PERMUTATION N-DIM COMPARISON ===
+function buildPermNCompare() {
+  const container = document.getElementById('perm-n-compare');
+  const ThrN = 16;
+  const TILE = 128;
+
+  const perms = [
+    { name: '(16, 4):(4, 1)', desc: '4 consecutive cols per thread, threads spaced 4 apart', note: 'Same as M-dim. Thread 0 → cols {0,1,2,3, 64,65,66,67}. Good for vectorized stores.', F: 16, R: 4, sF: 4, sR: 1, color: '#58a6ff' },
+    { name: '(16, 4):(1, 16)', desc: '4 cols each spaced 16 apart, threads adjacent', note: 'Threads are adjacent cols (stride 1) → perfect for 128-byte coalesced WRITES. But each thread\'s 4 elements are scattered.', F: 16, R: 4, sF: 1, sR: 16, color: '#3fb950' },
+    { name: '(16, 8):(8, 1)', desc: '8 consecutive cols per thread, covers all 128', note: 'Simplest: thread k owns cols [k×8..k×8+7]. 8-wide vectorized store. No rest.', F: 16, R: 8, sF: 8, sR: 1, color: '#d29922' },
+  ];
+
+  function getPositions(perm, thrIdx) {
+    const { F, R, sF, sR } = perm;
+    const permSize = F * R;
+    const rest = TILE / permSize;
+    const groupSize = F / ThrN;
+    const positions = [];
+    for (let restIdx = 0; restIdx < rest; restIdx++) {
+      for (let g = 0; g < groupSize; g++) {
+        const f = thrIdx * groupSize + g;
+        for (let r = 0; r < R; r++) {
+          const pos = f * sF + r * sR + restIdx * permSize;
+          if (pos < TILE) positions.push(pos);
+        }
+      }
+    }
+    return positions.sort((a, b) => a - b);
+  }
+
+  function render(highlightThr) {
+    let html = '';
+    perms.forEach((perm) => {
+      const ownership = new Array(TILE).fill(-1);
+      for (let t = 0; t < ThrN; t++) {
+        getPositions(perm, t).forEach(p => { if (p < TILE) ownership[p] = t; });
+      }
+      const highlightPositions = getPositions(perm, highlightThr);
+
+      html += `<div style="margin-bottom:1.5rem;">`;
+      html += `<div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:0.4rem;">`;
+      html += `<span style="font-family:monospace;font-size:0.85rem;font-weight:bold;color:${perm.color};">${perm.name}</span>`;
+      html += `<span style="font-size:0.75rem;color:var(--dim);">${perm.desc}</span>`;
+      html += `</div>`;
+
+      // 128-column strip (horizontal = columns)
+      html += `<div style="display:flex;flex-wrap:wrap;gap:0px;margin-bottom:0.3rem;">`;
+      for (let p = 0; p < TILE; p++) {
+        const owner = ownership[p];
+        const isHighlight = owner === highlightThr;
+        const hue = (owner * 137.5) % 360;
+        let bg, border;
+        if (isHighlight) { bg = perm.color; border = '2px solid #fff'; }
+        else { bg = `hsl(${hue}, 30%, 20%)`; border = '1px solid #30363d'; }
+        const marginLeft = (p > 0 && p % 4 === 0) ? '1px' : '0';
+        const marginLeftBig = (p > 0 && p % 64 === 0) ? '4px' : marginLeft;
+        html += `<div style="width:6px;height:24px;background:${bg};border:${border};margin-left:${marginLeftBig};border-radius:1px;" title="col ${p} → thread ${owner}"></div>`;
+      }
+      html += `</div>`;
+
+      html += `<div style="font-size:0.7rem;color:${perm.color};margin-top:0.2rem;">`;
+      html += `Thread ${highlightThr} owns cols: {${highlightPositions.join(', ')}}`;
+      html += ` <span style="color:var(--dim);">(${highlightPositions.length} columns)</span>`;
+      html += `</div>`;
+      html += `<div style="font-size:0.68rem;color:var(--dim);margin-top:0.2rem;font-style:italic;">${perm.note}</div>`;
+      html += `</div>`;
+    });
+
+    // Column ruler
+    html += `<div style="font-size:0.6rem;color:var(--dim);display:flex;margin-top:0.5rem;">`;
+    html += `<span style="width:0px;">col 0</span>`;
+    html += `<span style="margin-left:${6*16-15}px;">16</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">32</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">48</span>`;
+    html += `<span style="margin-left:${6*17-10}px;">64</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">80</span>`;
+    html += `<span style="margin-left:${6*16-10}px;">96</span>`;
+    html += `<span style="margin-left:${6*16-12}px;">112</span>`;
+    html += `<span style="margin-left:${6*14-4}px;">127</span>`;
+    html += `</div>`;
+
+    container.innerHTML = html;
+  }
+
+  render(0);
+  document.getElementById('perm-n-thr').addEventListener('input', (e) => {
+    const t = Math.max(0, Math.min(15, parseInt(e.target.value) || 0));
+    render(t);
+  });
+}
+
+// === INIT ===
+drawFullGrid(0, 'one');
+drawMiniGrid(0);
+drawZoom0();
+drawBlock('block-a', 0, 0);
+drawBlock('block-b', 0, 64);
+drawBlock('block-c', 64, 0);
+drawBlock('block-d', 64, 64);
+buildMappingTable();
+buildCuteGrid();
+buildStrideGrid();
+buildPermCompare();
+buildPermNCompare();
+</script>
+
+</body>
+</html>
