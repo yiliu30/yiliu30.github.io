@@ -56,7 +56,13 @@ theme = 'PaperMod'
     name = "Posts"
     url = "/posts/"
     weight = 10
-  
+
+  [[menu.main]]
+    identifier = "viz"
+    name = "Viz"
+    url = "/viz/"
+    weight = 15
+
   [[menu.main]]
     identifier = "tags"
     name = "Tags"

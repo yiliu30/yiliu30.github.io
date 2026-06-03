@@ -1,0 +1,34 @@
+{{- define "main" }}
+<header class="page-header">
+  <h1>{{ .Title }}</h1>
+  {{ with .Content }}<div class="post-content">{{ . }}</div>{{ end }}
+</header>
+
+<ul class="viz-list">
+  {{- $dir := "static/viz" }}
+  {{- range (readDir $dir) }}
+    {{- $name := .Name }}
+    {{- if strings.HasSuffix $name ".html" }}
+      {{- $path := printf "%s/%s" $dir $name }}
+      {{- $raw := os.ReadFile $path }}
+      {{- $title := $name }}
+      {{- $m := findRE "(?is)<title[^>]*>(.*?)</title>" $raw 1 }}
+      {{- with $m }}
+        {{- $inner := index . 0 }}
+        {{- $title = $inner | replaceRE "(?is)<title[^>]*>" "" | replaceRE "(?is)</title>" "" | htmlUnescape | strings.TrimSpace }}
+      {{- end }}
+      <li class="viz-entry">
+        <a href="{{ printf "/viz/%s" $name | relURL }}">{{ $title }}</a>
+        <span class="viz-file">{{ $name }}</span>
+      </li>
+    {{- end }}
+  {{- end }}
+</ul>
+
+<style>
+  .viz-list { list-style: none; padding: 0; }
+  .viz-entry { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .viz-entry a { font-size: 18px; font-weight: 600; }
+  .viz-file { display: block; font-size: 13px; opacity: 0.6; margin-top: 2px; }
+</style>
+{{- end }}
