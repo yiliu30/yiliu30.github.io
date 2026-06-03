@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viz - Add New Page</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+h1 { margin-bottom: 20px; color: #64ffda; }
+.container { display: grid; grid-template-columns: 1fr 4fr; gap: 20px; height: calc(100vh - 160px); }
+.editor-panel, .preview-panel { display: flex; flex-direction: column; }
+.editor-panel textarea { flex: 1; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: 'Fira Code', monospace; font-size: 13px; resize: none; }
+.preview-panel iframe { flex: 1; border: 1px solid #30363d; border-radius: 6px; background: white; }
+.controls { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.controls input { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px 12px; color: #c9d1d9; font-size: 14px; }
+.controls input[name="filename"] { width: 250px; }
+.controls input[name="token"] { width: 300px; }
+button { background: #238636; color: white; border: none; border-radius: 6px; padding: 10px 20px; font-size: 14px; cursor: pointer; font-weight: 600; }
+button:hover { background: #2ea043; }
+button:disabled { background: #555; cursor: not-allowed; }
+button.preview-btn { background: #1f6feb; }
+button.preview-btn:hover { background: #388bfd; }
+.file-label { background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; padding: 10px 20px; font-size: 14px; cursor: pointer; font-weight: 600; }
+.file-label:hover { background: #3c444d; }
+.file-label input { display: none; }
+.status { margin-top: 12px; padding: 10px; border-radius: 4px; display: none; }
+.status.success { display: block; background: #0d2818; border: 1px solid #238636; color: #3fb950; }
+.status.error { display: block; background: #2d1b1b; border: 1px solid #da3633; color: #f85149; }
+.status.info { display: block; background: #0d1b2e; border: 1px solid #1f6feb; color: #58a6ff; }
+label { font-size: 12px; color: #8b949e; margin-bottom: 4px; display: block; }
+.field { display: flex; flex-direction: column; }
+.token-section { margin-bottom: 16px; padding: 12px; background: #0d1117; border-radius: 6px; border: 1px solid #30363d; }
+.token-section summary { cursor: pointer; color: #8b949e; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Viz - Add New Page</h1>
+
+<details class="token-section" id="tokenSection">
+<summary>GitHub Token Settings</summary>
+<div style="margin-top:10px">
+<div class="field">
+<label>Personal Access Token (stored in localStorage only)</label>
+<input type="password" name="token" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx">
+</div>
+<button onclick="saveToken()" style="margin-top:8px; background:#1f6feb;">Save Token</button>
+</div>
+</details>
+
+<div class="controls">
+<label class="file-label">Choose File<input type="file" id="fileInput" accept=".html,text/html"></label>
+<div class="field">
+<label>Filename (without .html)</label>
+<input name="filename" id="filenameInput" placeholder="e.g. attention_flow">
+</div>
+<button class="preview-btn" onclick="updatePreview()">Preview</button>
+<button onclick="pushToGitHub()">Push to GitHub</button>
+</div>
+
+<div class="container">
+<div class="editor-panel">
+<textarea id="htmlEditor" placeholder="Choose a file or paste your HTML here..."></textarea>
+</div>
+<div class="preview-panel">
+<iframe id="previewFrame"></iframe>
+</div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+const REPO = 'yiliu30/yiliu30.github.io';
+const PATH_PREFIX = 'static/viz/';
+
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('github_pat');
+  if (saved) {
+    document.getElementById('tokenInput').value = saved;
+    document.getElementById('tokenSection').removeAttribute('open');
+  } else {
+    document.getElementById('tokenSection').setAttribute('open', '');
+  }
+});
+
+function saveToken() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (token) {
+    localStorage.setItem('github_pat', token);
+    showStatus('Token saved to localStorage.', 'success');
+  }
+}
+
+function getToken() {
+  return localStorage.getItem('github_pat') || document.getElementById('tokenInput').value.trim();
+}
+
+function updatePreview() {
+  const html = document.getElementById('htmlEditor').value;
+  const iframe = document.getElementById('previewFrame');
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  iframe.src = url;
+}
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('htmlEditor').value = reader.result;
+    const filenameInput = document.getElementById('filenameInput');
+    if (!filenameInput.value.trim()) {
+      filenameInput.value = file.name.replace(/\.html?$/i, '');
+    }
+    updatePreview();
+  };
+  reader.readAsText(file);
+});
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+async function githubAPI(path, method, body) {
+  const token = getToken();
+  if (!token) throw new Error('No GitHub token set');
+  const resp = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.message || resp.statusText);
+  }
+  return resp.json();
+}
+
+async function pushToGitHub() {
+  try {
+    const html = document.getElementById('htmlEditor').value;
+    const filename = document.getElementById('filenameInput').value.trim();
+
+    if (!html || !filename) {
+      showStatus('Please provide HTML content and a filename.', 'error');
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      showStatus('No GitHub token set. Open token settings and save one.', 'error');
+      return;
+    }
+
+    const fullFilename = filename.endsWith('.html') ? filename : filename + '.html';
+    const filePath = PATH_PREFIX + fullFilename;
+
+    showStatus('Pushing HTML file...', 'info');
+
+    await githubAPI(filePath, 'PUT', {
+      message: `Add ${fullFilename} to viz`,
+      content: btoa(unescape(encodeURIComponent(html))),
+    });
+
+    showStatus(`Done! Published at: /viz/${fullFilename}`, 'success');
+  } catch (e) {
+    showStatus('Error: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+// Live preview on ctrl+enter
+document.getElementById('htmlEditor').addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'Enter') updatePreview();
+});
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
   {{- $dir := "static/viz" }}
   {{- range (readDir $dir) }}
     {{- $name := .Name }}
-    {{- if strings.HasSuffix $name ".html" }}
+    {{- if and (strings.HasSuffix $name ".html") (ne $name "admin.html") }}
       {{- $path := printf "%s/%s" $dir $name }}
       {{- $raw := os.ReadFile $path }}
       {{- $title := $name }}
