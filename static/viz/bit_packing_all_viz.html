@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>1–8 Bit Packing Patterns — Humming Generic Template</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 24px; }
+h1 { text-align: center; margin-bottom: 8px; font-size: 1.5em; }
+.subtitle { text-align: center; color: #aaa; margin-bottom: 24px; font-size: 0.85em; }
+.subtitle a { color: #7ecfff; }
+.container { max-width: 1300px; margin: 0 auto; }
+.section { margin-bottom: 28px; background: #16213e; border-radius: 12px; padding: 20px; }
+.section h2 { font-size: 1.05em; margin-bottom: 12px; color: #7ecfff; }
+.controls { display: flex; gap: 8px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
+.btn { padding: 8px 18px; border-radius: 6px; cursor: pointer; background: #0f3460; color: #aaa; font-size: 0.85em; font-weight: bold; border: 1px solid #2a3a5e; transition: all 0.2s; }
+.btn.active { background: #1a3a6e; color: #7ecfff; border-color: #7ecfff; }
+.btn:hover { border-color: #5a8abf; }
+.word-row { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }
+.word-label { width: 65px; font-weight: bold; font-size: 0.8em; color: #888; flex-shrink: 0; }
+.bit-container { display: flex; flex-wrap: nowrap; gap: 0; }
+.bit-group { display: flex; position: relative; border-radius: 3px; overflow: hidden; margin-right: 1px; }
+.bit-group.spanning { border: 2px solid #ff6b6b; border-radius: 4px; }
+.bit-group.carry { border: 2px solid #50c878; border-radius: 4px; }
+.bit { height: 28px; display: flex; align-items: center; justify-content: center; font-size: 0.55em; font-weight: bold; border-right: 1px solid rgba(0,0,0,0.15); min-width: 8px; }
+.bit:last-child { border-right: none; }
+.weight-label { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); font-size: 0.55em; white-space: nowrap; color: #bbb; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+.info { background: #0f3460; border-radius: 8px; padding: 14px; margin-top: 14px; font-size: 0.82em; line-height: 1.6; }
+.info code { background: #1a1a2e; padding: 2px 5px; border-radius: 3px; font-family: 'Fira Code', monospace; font-size: 0.9em; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+.stat-card { background: #0f3460; border-radius: 8px; padding: 12px; text-align: center; }
+.stat-value { font-size: 1.4em; font-weight: bold; color: #7ecfff; }
+.stat-label { font-size: 0.75em; color: #888; margin-top: 4px; }
+.summary-table { width: 100%; border-collapse: collapse; font-size: 0.82em; margin-top: 16px; }
+.summary-table th, .summary-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #2a3a5e; }
+.summary-table th { color: #7ecfff; background: #0f3460; }
+.summary-table td { color: #ddd; }
+.summary-table tr:hover td { background: #1a2a4e; }
+.summary-table .clean { color: #50c878; }
+.summary-table .spanning { color: #ff6b6b; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.7em; font-weight: bold; }
+.badge-clean { background: #1b5e20; color: #a5d6a7; }
+.badge-span { background: #b71c1c; color: #ffcdd2; }
+.formula { background: #0f3460; border-radius: 8px; padding: 12px 16px; margin: 12px 0; font-family: 'Fira Code', monospace; font-size: 0.75em; line-height: 1.8; overflow-x: auto; }
+#viz-container { min-height: 200px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Bit Packing Patterns (1–8 bit) — Humming Generic Template</h1>
+<p class="subtitle">
+  <code>common_pack_weight&lt;kNumBits&gt;</code> — one algorithm handles all bit widths<br>
+  Source: <a href="file:///home/yiliu7/workspace/humming/humming/include/humming/kernel/pack_weight.cuh">humming/include/humming/kernel/pack_weight.cuh</a>
+</p>
+
+<!-- Bit width selector -->
+<div class="controls" id="bit-selector"></div>
+
+<!-- Stats -->
+<div class="stats" id="stats"></div>
+
+<!-- Visualization -->
+<div class="section">
+  <h2 id="viz-title">Packing Layout</h2>
+  <div id="viz-container"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#4a9eff"></div> Full weight (fits in one word)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ff6b6b"></div> Split: low bits (end of word)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#50c878"></div> Split: high bits (start of next word)</div>
+  </div>
+</div>
+
+<!-- Algorithm -->
+<div class="section">
+  <h2>The Universal Algorithm</h2>
+  <div class="formula">
+<span style="color:#e8a04a">template &lt;uint32_t kNumBits&gt;</span>
+void common_pack_weight(uint32_t *in_arr, uint32_t *out_arr) {
+  constexpr uint32_t mask = (1 << kNumBits) - 1;
+
+  for (uint32_t i = 0; i < 32; i++) {
+    uint32_t index     = i * kNumBits;        <span style="color:#666">// absolute bit position in output stream</span>
+    uint32_t word_idx  = index / 32;          <span style="color:#666">// which int32 word</span>
+    uint32_t bit_offset = index % 32;         <span style="color:#666">// position within that word</span>
+
+    uint32_t val = in_arr[i] & mask;
+    out_arr[word_idx] |= (val << bit_offset); <span style="color:#666">// place low part</span>
+
+    if (bit_offset + kNumBits > 32) {         <span style="color:#666">// spans word boundary?</span>
+      uint32_t part1_bits = 32 - bit_offset;
+      out_arr[word_idx + 1] |= (val >> part1_bits); <span style="color:#666">// place high part in next word</span>
+    }
+  }
+}
+
+<span style="color:#7ecfff">// Boundary spanning occurs when: 32 % kNumBits ≠ 0</span>
+<span style="color:#7ecfff">// Clean packing (no spans): 1, 2, 4, 8 bit (powers of 2 that divide 32)</span>
+<span style="color:#7ecfff">// Spanning required: 3, 5, 6, 7 bit</span>
+  </div>
+</div>
+
+<!-- Summary table -->
+<div class="section">
+  <h2>All Bit Widths at a Glance</h2>
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Bits</th>
+        <th>Words / 32 weights</th>
+        <th>Weights / word</th>
+        <th>32 % bits</th>
+        <th>Spanning weights</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="summary-body"></tbody>
+  </table>
+  <div class="info" style="margin-top:16px">
+    <p><strong>Rule:</strong> If <code>32 % bits == 0</code>, packing is clean (no weight spans a word boundary). Otherwise, some weights will be split across two adjacent int32 words. The number of spanning weights = number of positions where <code>(i * bits) % 32 + bits > 32</code>.</p>
+    <p style="margin-top:8px"><strong>AutoRound comparison:</strong> AutoRound's <code>pack_248_bits</code> handles 2/4/8-bit (all clean), and has a separate <code>pack_3bits</code> for 3-bit. It does not support 5/6/7-bit in the GPTQ export path. Humming handles all uniformly with one template.</p>
+  </div>
+</div>
+
+</div>
+
+<script>
+// Color palette for weight indices (cycling)
+const weightColors = [
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8','#3d8fd4','#6bc1ff','#2e7bbf',
+  '#4a9eff','#5ba3e8',
+];
+
+function computePacking(bits) {
+  const words = bits; // 32 weights * bits / 32
+  const result = []; // per word: array of segments
+  for (let w = 0; w < words; w++) result.push([]);
+
+  for (let i = 0; i < 32; i++) {
+    const index = i * bits;
+    const wordIdx = Math.floor(index / 32);
+    const bitOffset = index % 32;
+    const spans = (bitOffset + bits) > 32;
+
+    if (spans) {
+      const part1 = 32 - bitOffset;
+      const part2 = bits - part1;
+      result[wordIdx].push({ label: `w${i}[0:${part1-1}]`, bits: part1, color: '#ff6b6b', weightIdx: i, type: 'low' });
+      result[wordIdx + 1].push({ label: `w${i}[${part1}:${bits-1}]`, bits: part2, color: '#50c878', weightIdx: i, type: 'high' });
+    } else {
+      result[wordIdx].push({ label: `w${i}`, bits: bits, color: '#4a9eff', weightIdx: i, type: 'full' });
+    }
+  }
+  return result;
+}
+
+function getSpanningWeights(bits) {
+  const spanning = [];
+  for (let i = 0; i < 32; i++) {
+    const index = i * bits;
+    const bitOffset = index % 32;
+    if (bitOffset + bits > 32) {
+      const part1 = 32 - bitOffset;
+      const part2 = bits - part1;
+      spanning.push({ idx: i, word: Math.floor(index/32), part1, part2 });
+    }
+  }
+  return spanning;
+}
+
+function renderViz(bits) {
+  const container = document.getElementById('viz-container');
+  container.innerHTML = '';
+  const packing = computePacking(bits);
+  const bitWidth = Math.max(8, Math.min(22, Math.floor(700 / 32)));
+
+  packing.forEach((segments, wordIdx) => {
+    const row = document.createElement('div');
+    row.className = 'word-row';
+
+    const label = document.createElement('div');
+    label.className = 'word-label';
+    label.textContent = `Word ${wordIdx}`;
+    row.appendChild(label);
+
+    const bitContainer = document.createElement('div');
+    bitContainer.className = 'bit-container';
+
+    let bitPos = 0;
+    segments.forEach(seg => {
+      const group = document.createElement('div');
+      group.className = 'bit-group' + (seg.type === 'low' ? ' spanning' : '') + (seg.type === 'high' ? ' carry' : '');
+      group.style.position = 'relative';
+
+      for (let b = 0; b < seg.bits; b++) {
+        const bit = document.createElement('div');
+        bit.className = 'bit';
+        bit.style.background = seg.color;
+        bit.style.width = bitWidth + 'px';
+        bit.style.fontSize = bitWidth < 14 ? '0.45em' : '0.55em';
+        bit.textContent = bitPos;
+        bitPos++;
+        group.appendChild(bit);
+      }
+
+      // Only show label if there's enough space
+      if (bits <= 5 || seg.bits >= 3) {
+        const wlabel = document.createElement('div');
+        wlabel.className = 'weight-label';
+        wlabel.textContent = seg.label;
+        group.appendChild(wlabel);
+      }
+
+      bitContainer.appendChild(group);
+    });
+
+    row.appendChild(bitContainer);
+    container.appendChild(row);
+  });
+
+  document.getElementById('viz-title').textContent =
+    `${bits}-bit Packing: 32 weights → ${bits} int32 words (${bits * 32} bits)`;
+}
+
+function renderStats(bits) {
+  const spanning = getSpanningWeights(bits);
+  const isClean = spanning.length === 0;
+  const statsEl = document.getElementById('stats');
+  statsEl.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${bits}</div>
+      <div class="stat-label">int32 words per 32 weights</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${(32/bits).toFixed(bits % 2 === 0 || bits === 1 || bits === 4 || bits === 8 ? 0 : 2)}</div>
+      <div class="stat-label">weights per int32 word</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: ${isClean ? '#50c878' : '#ff6b6b'}">${spanning.length}</div>
+      <div class="stat-label">boundary-spanning weights</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${32 % bits}</div>
+      <div class="stat-label">32 % ${bits} (0 = clean)</div>
+    </div>
+  `;
+}
+
+function selectBits(bits) {
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + bits).classList.add('active');
+  renderViz(bits);
+  renderStats(bits);
+}
+
+// Build buttons
+const selector = document.getElementById('bit-selector');
+for (let b = 1; b <= 8; b++) {
+  const btn = document.createElement('div');
+  btn.className = 'btn' + (b === 3 ? ' active' : '');
+  btn.id = 'btn-' + b;
+  btn.textContent = `${b}-bit`;
+  const spanning = getSpanningWeights(b);
+  if (spanning.length > 0) {
+    btn.textContent += ` (${spanning.length} spans)`;
+    btn.style.borderLeftColor = '#ff6b6b';
+    btn.style.borderLeftWidth = '3px';
+  } else {
+    btn.textContent += ' (clean)';
+    btn.style.borderLeftColor = '#50c878';
+    btn.style.borderLeftWidth = '3px';
+  }
+  btn.onclick = () => selectBits(b);
+  selector.appendChild(btn);
+}
+
+// Build summary table
+const tbody = document.getElementById('summary-body');
+for (let b = 1; b <= 8; b++) {
+  const spanning = getSpanningWeights(b);
+  const isClean = spanning.length === 0;
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td><strong>${b}</strong></td>
+    <td>${b}</td>
+    <td>${(32/b).toFixed(b === 3 || b === 5 || b === 6 || b === 7 ? 2 : 0)}</td>
+    <td class="${isClean ? 'clean' : 'spanning'}">${32 % b}</td>
+    <td>${spanning.length > 0 ? spanning.map(s => `w${s.idx}`).join(', ') : '—'}</td>
+    <td><span class="badge ${isClean ? 'badge-clean' : 'badge-span'}">${isClean ? 'CLEAN' : `${spanning.length} SPANS`}</span></td>
+  `;
+  tbody.appendChild(row);
+}
+
+// Initial render
+renderViz(3);
+renderStats(3);
+</script>
+</body>
+</html>
