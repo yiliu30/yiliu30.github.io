@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sparse Attention for Video Generation — Trends & Key Insights</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#141925; --panel2:#1b2233; --ink:#e6e9f0; --muted:#9aa6bd;
+    --line:#2a3346;
+    --time:#5b8cff;      /* sparse-attention / TIME branch */
+    --time2:#8aa9ff;
+    --space:#2dd4bf;     /* quantization / SPACE branch */
+    --space2:#5eead4;
+    --gold:#f5b942;      /* the shared centroid primitive */
+    --gold2:#ffd27a;
+    --rose:#fb7185;
+    --good:#34d399;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:radial-gradient(1200px 700px at 70% -10%, #18203a 0%, var(--bg) 55%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:40px 22px 90px}
+  header.hero{margin-bottom:14px}
+  .kicker{letter-spacing:.18em; text-transform:uppercase; font-size:12px; color:var(--muted); font-weight:700}
+  h1{font-size:38px; line-height:1.12; margin:8px 0 10px; font-weight:800;
+     background:linear-gradient(92deg,#fff, #b9c6e8 60%, var(--time2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{color:var(--muted); font-size:17px; max-width:820px}
+  h2{font-size:24px; margin:6px 0 4px; font-weight:750; display:flex; align-items:center; gap:10px}
+  h2 .num{font-size:13px; color:var(--bg); background:var(--time); width:26px; height:26px; border-radius:8px;
+          display:inline-flex; align-items:center; justify-content:center; font-weight:800}
+  .section{margin-top:46px}
+  .lead{color:var(--muted); max-width:880px; margin:2px 0 20px}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; margin:18px 0 2px; font-size:13px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+
+  /* ---------- Primitive hub ---------- */
+  .hub{display:grid; grid-template-columns:1.1fr 1fr; gap:26px; align-items:center;
+       background:linear-gradient(180deg,var(--panel),#10141d); border:1px solid var(--line);
+       border-radius:18px; padding:26px; }
+  .hub p{margin:0 0 12px}
+  .uses{display:grid; gap:12px}
+  .use{display:flex; gap:13px; align-items:flex-start; background:var(--panel2); border:1px solid var(--line);
+       border-left:4px solid var(--gold); border-radius:12px; padding:13px 15px}
+  .use b{display:block; font-size:14.5px}
+  .use small{color:var(--muted); font-size:13px}
+  .use .tag{margin-left:auto; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; white-space:nowrap}
+  .tag.t{background:rgba(91,140,255,.16); color:var(--time2); border:1px solid rgba(91,140,255,.4)}
+  .tag.s{background:rgba(45,212,191,.14); color:var(--space2); border:1px solid rgba(45,212,191,.4)}
+
+  /* ---------- Evolution timeline ---------- */
+  .flow{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  .flow2{grid-template-columns:repeat(2,1fr); max-width:580px}
+  .lineagelabel{font-size:12.5px; font-weight:800; letter-spacing:.04em; color:var(--muted);
+    border-left:4px solid var(--line); padding:6px 0 6px 12px; margin:6px 0 12px}
+  .pcard.pcard-train{border-color:var(--gold); box-shadow:0 0 0 1px rgba(245,185,66,.25), 0 8px 30px -12px rgba(245,185,66,.5)}
+  .metric-big{color:var(--gold2)!important; background:rgba(245,185,66,.14)!important; border-color:rgba(245,185,66,.5)!important; font-size:13px!important}
+  .pcard{position:relative; background:linear-gradient(180deg,var(--panel),#10141d);
+         border:1px solid var(--line); border-radius:16px; padding:16px 15px; overflow:hidden;
+         transition:transform .15s ease, border-color .15s ease}
+  .pcard:hover{transform:translateY(-4px); border-color:var(--time)}
+  .pcard::before{content:""; position:absolute; inset:0 0 auto 0; height:4px;}
+  .pcard.b-time::before{background:linear-gradient(90deg,var(--time),var(--time2))}
+  .pcard.b-space::before{background:linear-gradient(90deg,var(--space),var(--space2))}
+  .pcard .yr{font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--muted)}
+  .pcard h3{margin:6px 0 2px; font-size:18px}
+  .pcard .role{font-size:12px; font-weight:700; margin-bottom:9px}
+  .b-time .role{color:var(--time2)} .b-space .role{color:var(--space2)}
+  .pcard .shift{font-size:13px; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
+                border-radius:10px; padding:9px 10px; margin-bottom:8px}
+  .pcard .shift em{color:var(--gold2); font-style:normal; font-weight:700}
+  .pcard ul{margin:6px 0 0; padding-left:16px; color:var(--muted); font-size:12.5px}
+  .pcard li{margin:3px 0}
+  .metric{display:inline-block; margin-top:10px; font-size:12px; font-weight:800; color:var(--good);
+          background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.35); padding:3px 9px; border-radius:999px}
+  .arrowrow{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:6px}
+  .arrowrow div{text-align:center; color:var(--time); font-size:20px; opacity:.7}
+
+  /* ---------- Three axes ---------- */
+  .axes{display:grid; gap:16px}
+  .axis{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px}
+  .axis .h{font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:800; margin-bottom:12px}
+  .steps{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .step{display:flex; align-items:center; gap:10px}
+  .pill{background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:7px 14px; font-size:13.5px; font-weight:600; white-space:nowrap}
+  .step .pill:last-child{}
+  .axis .step:last-child .pill{border-color:var(--gold); color:var(--gold2); background:rgba(245,185,66,.08)}
+  .chev{color:var(--muted); font-size:18px}
+  .axisnote{color:var(--muted); font-size:12.5px; margin-top:10px}
+
+  /* ---------- Merge diagram ---------- */
+  .merge{background:linear-gradient(180deg,var(--panel),#10141d); border:1px solid var(--line); border-radius:18px; padding:8px}
+  .merge svg{width:100%; height:auto; display:block}
+  .mlabel{font:600 13px -apple-system,Segoe UI,Roboto,sans-serif}
+  .msmall{font:500 11.5px -apple-system,Segoe UI,Roboto,sans-serif}
+
+  /* ---------- Fork section ---------- */
+  .forkgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  .forkcard{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px}
+  .forkcard.ff{border-top:4px solid var(--good)}
+  .forkcard.ft{border-top:4px solid var(--gold)}
+  .forkhead{font-size:17px; font-weight:800; display:flex; align-items:center; gap:9px}
+  .forkdot{width:12px; height:12px; border-radius:50%; display:inline-block}
+  .forksub{font-size:12px; color:var(--muted); margin:3px 0 12px; font-weight:600; letter-spacing:.03em}
+  .forkcard ul{margin:0; padding-left:17px}
+  .forkcard li{color:var(--muted); font-size:13.5px; margin:7px 0}
+  .forkwin{margin-top:13px; font-size:12.5px; color:var(--ink); background:var(--panel2);
+    border:1px solid var(--line); border-radius:10px; padding:9px 11px}
+  .bridge{margin-top:16px; text-align:center; font-size:13.5px; color:var(--muted);
+    background:linear-gradient(90deg,rgba(52,211,153,.08),rgba(245,185,66,.08));
+    border:1px dashed var(--line); border-radius:12px; padding:13px 16px}
+  .bridge b{color:var(--ink)}
+
+  /* ---------- generic cards grid ---------- */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 17px}
+  .card h4{margin:0 0 8px; font-size:15.5px; display:flex; align-items:center; gap:9px}
+  .card p,.card li{color:var(--muted); font-size:13.5px; margin:6px 0}
+  .card ul{padding-left:17px; margin:6px 0 0}
+  .badge{font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; border:1px solid}
+  .badge.k{color:var(--gold2); border-color:rgba(245,185,66,.4); background:rgba(245,185,66,.1)}
+  .badge.f{color:var(--good); border-color:rgba(52,211,153,.4); background:rgba(52,211,153,.1)}
+  .ico{width:18px;height:18px;flex:none}
+  .tens h4{color:var(--rose)}
+  .head h4{color:var(--time2)}
+
+  footer{margin-top:54px; color:var(--muted); font-size:12.5px; border-top:1px solid var(--line); padding-top:16px}
+  .myth{display:flex; gap:14px; background:rgba(251,113,133,.07); border:1px solid rgba(251,113,133,.3);
+        border-radius:14px; padding:15px 17px; margin-top:18px}
+  .myth .x{color:var(--rose); font-weight:900; font-size:20px; line-height:1}
+  .myth b{color:var(--ink)} .myth p{margin:4px 0 0; color:var(--muted); font-size:13.5px}
+  @media(max-width:900px){
+    .hub{grid-template-columns:1fr} .flow{grid-template-columns:1fr 1fr} .arrowrow{display:none}
+    .grid2,.grid3,.forkgrid{grid-template-columns:1fr} .flow2{max-width:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">Video Diffusion · Efficiency Research · 6 papers, 2 lineages</div>
+    <h1>One Goal, Two Lineages, a Fork at the End</h1>
+    <p class="sub">Six papers chase one goal — <b style="color:var(--gold2)">cheaply predict which attention blocks matter, then skip the rest</b>. The video-specialized <b style="color:var(--time2)">SVG line</b> predicts with clustering centroids; the universal <b style="color:var(--space2)">Sparge line</b> predicts with a fast attention-map approximation. The newest paper forks the field: training-free vs. trainable.</p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--time)"></i> SVG line — video-specialized, centroid-based</span>
+      <span><i class="dot" style="background:var(--space)"></i> Sparge line — universal, prediction/mask-based</span>
+      <span><i class="dot" style="background:var(--gold)"></i> Shared primitive — predict importance, skip</span>
+    </div>
+  </header>
+
+  <!-- ============ 1. THE PRIMITIVE ============ -->
+  <section class="section">
+    <h2><span class="num">1</span> The Unifying Primitive — and Where It Splits</h2>
+    <p class="lead">Within the <b style="color:var(--time2)">SVG line</b>, video latents are deeply redundant — neighboring frames and regions produce near-identical tokens — so one trick (cluster → centroid) is mined four different ways. The <b style="color:var(--space2)">Sparge line</b> reaches the same "predict importance cheaply" goal with a different estimator, so the centroid is the SVG line's signature, not a universal law.</p>
+    <div class="hub">
+      <div>
+        <svg viewBox="0 0 420 300" role="img" aria-label="Clustering produces centroids that feed four uses">
+          <defs>
+            <radialGradient id="g1" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stop-color="#ffd27a"/><stop offset="100%" stop-color="#f5b942"/>
+            </radialGradient>
+            <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#6b7795"/>
+            </marker>
+          </defs>
+          <!-- scattered tokens -->
+          <g fill="#41506e">
+            <circle cx="34" cy="60" r="6"/><circle cx="52" cy="84" r="6"/><circle cx="30" cy="104" r="6"/>
+            <circle cx="58" cy="120" r="6"/><circle cx="40" cy="146" r="6"/><circle cx="66" cy="168" r="6"/>
+            <circle cx="36" cy="196" r="6"/><circle cx="60" cy="220" r="6"/><circle cx="44" cy="244" r="6"/>
+          </g>
+          <text x="46" y="30" fill="#9aa6bd" font-size="12" text-anchor="middle">redundant</text>
+          <text x="46" y="44" fill="#9aa6bd" font-size="12" text-anchor="middle">tokens</text>
+          <path d="M86,150 C120,150 120,150 150,150" stroke="#6b7795" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+          <!-- hub -->
+          <circle cx="210" cy="150" r="58" fill="url(#g1)"/>
+          <text x="210" y="144" text-anchor="middle" font-size="15" font-weight="800" fill="#3a2a06">K-means</text>
+          <text x="210" y="164" text-anchor="middle" font-size="13" font-weight="700" fill="#3a2a06">→ centroid</text>
+          <!-- spokes -->
+          <g stroke="#6b7795" stroke-width="2" fill="none">
+            <path d="M268,120 C320,96 330,78 360,70" marker-end="url(#ar)"/>
+            <path d="M270,138 C325,128 330,124 360,122" marker-end="url(#ar)"/>
+            <path d="M270,164 C325,176 330,180 360,182" marker-end="url(#ar)"/>
+            <path d="M268,182 C320,206 330,224 360,234" marker-end="url(#ar)"/>
+          </g>
+          <g font-size="11.5" fill="#cdd5e6" font-weight="700">
+            <text x="366" y="72">criticality</text>
+            <text x="366" y="124">error route</text>
+            <text x="366" y="184">compensate</text>
+            <text x="366" y="236">2-bit residual</text>
+          </g>
+        </svg>
+      </div>
+      <div class="uses">
+        <div class="use"><div><b>Estimate criticality</b><small>centroid ≈ cheap proxy for a block's attention score</small></div><span class="tag t">SVG2</span></div>
+        <div class="use"><div><b>Estimate &amp; route by error</b><small>compare centroid-vs-exact to find blocks that reconstruct worst</small></div><span class="tag t">EAR</span></div>
+        <div class="use"><div><b>Compensate skipped blocks</b><small>replace dropped keys/values with the centroid — parameter-free</small></div><span class="tag t">EAR</span></div>
+        <div class="use"><div><b>Quantize the residual</b><small>subtract centroid → tiny leftover squeezes to 2 bits</small></div><span class="tag s">QVG</span></div>
+        <div class="use" style="border-left-color:var(--space)"><div><b>Different estimator entirely</b><small>Sparge line skips clustering — predicts the attention map directly (v1) or learns a mask (v2)</small></div><span class="tag s">Sparge</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. EVOLUTION ============ -->
+  <section class="section">
+    <h2><span class="num">2</span> Two Lineages, Each Re-Aiming Its Own Machinery</h2>
+    <p class="lead">Not one story but two parallel ones. The <b style="color:var(--time2)">SVG line</b> keeps refining the centroid; the <b style="color:var(--space2)">Sparge line</b> keeps refining direct prediction. The <em style="color:var(--gold2);font-style:normal;font-weight:700">shift</em> is what each paper newly contributes.</p>
+
+    <div class="lineagelabel" style="border-color:var(--time)"><span style="color:var(--time2)">▌ SVG LINE</span> · video-specialized · centroid-based · training-free</div>
+    <div class="flow">
+      <div class="pcard b-time">
+        <div class="yr">ICML 2025</div><h3>SVG&nbsp;1</h3><div class="role">Sparse attention · bidirectional</div>
+        <div class="shift">Sparsity <em>exists &amp; has structure</em></div>
+        <ul><li>Heads are spatial (within frame) or temporal (across frames)</li><li>Online profiling on ~1% of rows</li><li>Layout transform → tensor-core friendly</li></ul>
+        <span class="metric">~2.3× faster</span>
+      </div>
+      <div class="pcard b-time">
+        <div class="yr">NeurIPS 2025</div><h3>SVG&nbsp;2</h3><div class="role">Sparse attention · bidirectional</div>
+        <div class="shift">Structure is <em>semantic, not positional</em></div>
+        <ul><li>K-means clusters replace position blocks</li><li>Lossless permutation → dense blocks</li><li>Centroid cache: K-means 76× cheaper</li></ul>
+        <span class="metric">~2.3× faster</span>
+      </div>
+      <div class="pcard b-time">
+        <div class="yr">2026</div><h3>SVG-EAR</h3><div class="role">Sparse attention + compensation</div>
+        <div class="shift">Optimize <em>reconstruction error, not score</em></div>
+        <ul><li>Route by expected error, not attention mass</li><li>Don't drop skipped blocks — compensate</li><li>Has a theoretical MSE bound</li></ul>
+        <span class="metric">1.6–1.9× faster</span>
+      </div>
+      <div class="pcard b-space">
+        <div class="yr">ICML 2026</div><h3>Quant VideoGen</h3><div class="role">KV-cache quant · autoregressive</div>
+        <div class="shift">Same atom solves <em>memory, not compute</em></div>
+        <ul><li>Centroid-subtract → 2-bit residuals</li><li>Progressive recursive quantization</li><li>8B model on a single RTX 4090</li></ul>
+        <span class="metric">~7× smaller</span>
+      </div>
+    </div>
+
+    <div class="lineagelabel" style="border-color:var(--space); margin-top:22px"><span style="color:var(--space2)">▌ SPARGE LINE</span> · universal (any model) · prediction/mask-based · the training-free→trainable fork</div>
+    <div class="flow flow2">
+      <div class="pcard b-space">
+        <div class="yr">ICML 2025</div><h3>SpargeAttention</h3><div class="role">Universal sparse attn · any model</div>
+        <div class="shift">Predict the map, skip — <em>no clustering, no fixed pattern</em></div>
+        <ul><li>Stage 1: fast attention-map prediction</li><li>Stage 2: no-overhead softmax-aware filter</li><li>Sparse <i>and</i> quantized; still training-free</li></ul>
+        <span class="metric">universal · training-free</span>
+      </div>
+      <div class="pcard b-space pcard-train">
+        <div class="yr">2026</div><h3>SpargeAttention2</h3><div class="role">Trainable sparse attn · the fork</div>
+        <div class="shift">Make the mask <em>trainable</em> — break training-free for a higher ceiling</div>
+        <ul><li>Hybrid Top-k + Top-p mask (covers diffuse tail)</li><li>Distillation fine-tune from a dense teacher</li><li>Trades zero-cost adoption for performance</li></ul>
+        <span class="metric metric-big">95% sparse · 16.2×</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. THREE AXES ============ -->
+  <section class="section">
+    <h2><span class="num">3</span> Three Axes Advancing in Parallel</h2>
+    <p class="lead">Read across the lineage and three independent dials are each turning. The endpoint of every dial (highlighted) is the current frontier.</p>
+    <div class="axes">
+      <div class="axis">
+        <div class="h">What gets grouped — the selection unit</div>
+        <div class="steps">
+          <div class="step"><span class="pill">head-type (spatial / temporal)</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">semantic token cluster</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">error-weighted cluster</span></div>
+        </div>
+      </div>
+      <div class="axis">
+        <div class="h">How you decide what to keep — the criterion</div>
+        <div class="steps">
+          <div class="step"><span class="pill">positional heuristic</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">attention score / top-p</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">reconstruction error / cost ratio</span></div>
+        </div>
+      </div>
+      <div class="axis">
+        <div class="h">What happens to the discarded mass</div>
+        <div class="steps">
+          <div class="step"><span class="pill">drop entirely</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">drop entirely</span><span class="chev">›</span></div>
+          <div class="step"><span class="pill">compensate with centroid</span></div>
+        </div>
+        <div class="axisnote">SVG1 fixed the <b>what</b> · SVG2 fixed the <b>where</b> · EAR fixed the <b>why</b> and the <b>leftovers</b>.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. THE MERGE ============ -->
+  <section class="section">
+    <h2><span class="num">4</span> Where It's Heading — Merging the Two Branches</h2>
+    <p class="lead">The two branches save different resources but share the same costly first step. The obvious next move: cluster once, then let one decision drive both savings.</p>
+    <div class="merge">
+      <svg viewBox="0 0 920 360" role="img" aria-label="Two branches sharing one clustering step and merging">
+        <defs>
+          <marker id="a2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#7d89a6"/></marker>
+          <linearGradient id="gt" x1="0" x2="1"><stop offset="0" stop-color="#5b8cff"/><stop offset="1" stop-color="#8aa9ff"/></linearGradient>
+          <linearGradient id="gs" x1="0" x2="1"><stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#5eead4"/></linearGradient>
+        </defs>
+
+        <!-- shared top -->
+        <rect x="330" y="22" width="260" height="58" rx="14" fill="url(#g1)"/>
+        <text x="460" y="47" text-anchor="middle" class="mlabel" fill="#3a2a06">Cluster once → centroids</text>
+        <text x="460" y="66" text-anchor="middle" class="msmall" fill="#3a2a06">the one expensive step, shared</text>
+
+        <!-- split arrows -->
+        <path d="M400,80 C360,108 280,112 235,138" stroke="#7d89a6" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+        <path d="M520,80 C560,108 640,112 685,138" stroke="#7d89a6" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+
+        <!-- TIME branch -->
+        <rect x="60" y="140" width="350" height="92" rx="14" fill="#141925" stroke="#2a3346"/>
+        <rect x="60" y="140" width="350" height="6" rx="3" fill="url(#gt)"/>
+        <text x="80" y="172" class="mlabel" fill="#8aa9ff">SPARSE ATTENTION  ·  saves TIME</text>
+        <text x="80" y="194" class="msmall" fill="#cdd5e6">skip the token comparisons that don't matter</text>
+        <text x="80" y="214" class="msmall" fill="#9aa6bd">centroid = criticality proxy + cheap stand-in</text>
+
+        <!-- SPACE branch -->
+        <rect x="510" y="140" width="350" height="92" rx="14" fill="#141925" stroke="#2a3346"/>
+        <rect x="510" y="140" width="350" height="6" rx="3" fill="url(#gs)"/>
+        <text x="530" y="172" class="mlabel" fill="#5eead4">QUANTIZATION  ·  saves SPACE</text>
+        <text x="530" y="194" class="msmall" fill="#cdd5e6">store the KV-cache history in low precision</text>
+        <text x="530" y="214" class="msmall" fill="#9aa6bd">centroid = baseline to subtract → tiny residual</text>
+
+        <!-- converge -->
+        <path d="M235,232 C300,280 360,286 430,292" stroke="#7d89a6" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+        <path d="M685,232 C620,280 560,286 490,292" stroke="#7d89a6" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+        <rect x="300" y="292" width="320" height="50" rx="14" fill="#10202a" stroke="#2dd4bf"/>
+        <text x="460" y="312" text-anchor="middle" class="mlabel" fill="#eafdfa">One judgment → two savings</text>
+        <text x="460" y="330" text-anchor="middle" class="msmall" fill="#9fe7dd">"unimportant" = skip the math AND keep only the average</text>
+      </svg>
+    </div>
+    <div class="grid3" style="margin-top:16px">
+      <div class="card head"><h4>Level 1 · Thrift</h4><p>Run clustering a single time; both machines feed off the same centroids instead of paying for it twice.</p></div>
+      <div class="card head"><h4>Level 2 · Elegance</h4><p>One "important / not" label governs both budgets — skipping a block <i>and</i> collapsing it to its average are the same decision.</p></div>
+      <div class="card head"><h4>The catch</h4><p>Different model types (bidirectional vs. streaming) and two stacked approximations whose errors compound — manage one combined quality budget.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ 4B. THE FORK ============ -->
+  <section class="section">
+    <h2><span class="num">5</span> The Fork: Training-Free vs. Trainable</h2>
+    <p class="lead">The newest paper forces the biggest revision. With only the first papers in view, "everything is training-free" looked like a law. SpargeAttention2 shows it was just phase one — fine-tuning the mask buys a far higher ceiling, at a cost.</p>
+    <div class="forkgrid">
+      <div class="forkcard ff">
+        <div class="forkhead"><span class="forkdot" style="background:var(--good)"></span> Training-Free Track</div>
+        <div class="forksub">SVG1/2/EAR · QVG · SpargeAttention</div>
+        <ul>
+          <li><b>Adopt cost:</b> zero — drop into a pretrained model</li>
+          <li><b>Ceiling:</b> modest (~1.6–2.3× end-to-end)</li>
+          <li><b>Sells:</b> convenience, instant deployment</li>
+          <li><b>Risk:</b> quality gets fragile at high sparsity</li>
+        </ul>
+        <div class="forkwin">Best for: accelerating an off-the-shelf model <b>today</b></div>
+      </div>
+      <div class="forkcard ft">
+        <div class="forkhead"><span class="forkdot" style="background:var(--gold)"></span> Trainable Track</div>
+        <div class="forksub">SpargeAttention2</div>
+        <ul>
+          <li><b>Adopt cost:</b> one-time distillation fine-tune</li>
+          <li><b>Ceiling:</b> high — <b style="color:var(--gold2)">95% sparse, 16.2×</b></li>
+          <li><b>Sells:</b> raw performance ceiling</li>
+          <li><b>Risk:</b> fine-tuning cost + per-model effort</li>
+        </ul>
+        <div class="forkwin">Best for: a provider shipping a flagship who can afford a fine-tune</div>
+      </div>
+    </div>
+    <div class="bridge">↘ likely future ↙ &nbsp; <b>Hybridize:</b> use a training-free method to <i>initialize</i> the mask, then fine-tune briefly — most of the ceiling at a fraction of the training cost.</div>
+  </section>
+
+  <!-- ============ 5. THE CONSTANTS ============ -->
+  <section class="section">
+    <h2><span class="num">6</span> One Constant, One Broken Assumption</h2>
+    <div class="grid2">
+      <div class="card">
+        <h4><span class="badge k">STILL MANDATORY</span> System–Algorithm Co-Design</h4>
+        <p>An algorithm-only contribution is not viable in <b>either</b> lineage. Each ships systems pieces:</p>
+        <ul>
+          <li><b>Centroid cache</b> (SVG line) — warm-start K-means from the previous step/chunk. Cuts clustering cost 76× (SVG2), 3× (QVG). The Sparge line has no clustering, so instead leans on its no-overhead Stage-2 filter.</li>
+          <li><b>Custom kernel</b> (both) — turn scattered sparsity into contiguous tensor-core tiles. Layout transform (SVG1) · dynamic block-sparse (SVG2) · fused routing (EAR) · fused dequant (QVG) · SageAttention kernels (Sparge).</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(245,185,66,.45)">
+        <h4><span class="badge k">BROKEN by paper 6</span> Training-Free Is No Longer a Law</h4>
+        <p>Papers 1–5 all drop into a <b>pretrained</b> model with no fine-tuning — the original analysis called this the field's permanent signature.</p>
+        <p><b>SpargeAttention2 breaks it:</b> a <b>trainable</b> mask + distillation fine-tune reaches <b>95% sparsity / 16.2×</b>, far past the training-free ceiling. The field has <b>forked</b> into two tracks — see section 6.</p>
+      </div>
+    </div>
+
+    <div class="myth">
+      <div class="x">✗</div>
+      <div>
+        <b>Common misread: "K-means runs once for the whole video."</b>
+        <p>In the SVG line it runs <b>every denoising step × every layer × every head</b> (SVG2) or <b>every frame-chunk</b> (QVG) — thousands of times per video. It only feels free because each run <i>warm-starts</i> from the last and converges in a few iterations. The tell: the cache gives a <b>finite</b> 76× speedup, not the infinite one a true compute-once would. (The Sparge line has no K-means at all.)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. HEADING + TENSIONS ============ -->
+  <section class="section">
+    <h2><span class="num">7</span> Trajectory &amp; Open Tensions</h2>
+    <div class="grid2">
+      <div class="card head">
+        <h4>Where it's heading</h4>
+        <ul>
+          <li><b>Unify attention + quant</b> in one pipeline — cluster once, spend on both.</li>
+          <li><b>"Error-aware everything"</b> — route quantization bit-allocation by error too.</li>
+          <li><b>Adaptive budgets</b> (top-p, top-k, per-head density) replacing fixed sparsity ratios.</li>
+          <li><b>The field forks</b> — training-free (convenience) vs. trainable (95% ceiling) now coexist; hybrids likely.</li>
+        </ul>
+      </div>
+      <div class="card tens">
+        <h4>Tensions &amp; open questions</h4>
+        <ul>
+          <li><b>Rests on the centroid cache</b> — breaks if steps stop resembling each other (long / fast-changing content, fewer sampler steps).</li>
+          <li><b>Thin theory</b> — only EAR offers a bound; the rest are empirical.</li>
+          <li><b>High-sparsity quality is fragile</b> — PSNR still drops (Wan2.2-T2V ≈ 25).</li>
+          <li><b>Hyperparameter zoo</b> — cluster count, per-head vs. shared, top-p are tuned, not derived.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Sources: Sparse VideoGen (ICML 2025) · Sparse VideoGen 2 (NeurIPS 2025) · SVG-EAR (2026) · Quant VideoGen (ICML 2026) · SpargeAttention (ICML 2025) · SpargeAttention2 (2026).
+    Built from the six summaries in <code>knowledge/</code>. Companion to <code>trend_analysis.md</code>.
+  </footer>
+
+</div>
+</body>
+</html>
