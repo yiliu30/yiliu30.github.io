@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SignRound / AutoRound Algorithm Visualization</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#111832;
+    --panel2:#0f172a;
+    --card:#17213f;
+    --muted:#94a3b8;
+    --text:#e5e7eb;
+    --white:#fff;
+    --blue:#60a5fa;
+    --cyan:#22d3ee;
+    --green:#34d399;
+    --amber:#fbbf24;
+    --red:#fb7185;
+    --purple:#a78bfa;
+    --border:rgba(148,163,184,.22);
+    --shadow:0 18px 60px rgba(0,0,0,.35);
+    --radius:22px;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:radial-gradient(circle at 12% 0%, rgba(96,165,250,.25), transparent 32%),
+               radial-gradient(circle at 88% 18%, rgba(167,139,250,.22), transparent 30%),
+               linear-gradient(180deg,#09111f 0%, var(--bg) 38%, #070b14 100%);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.5;
+  }
+  .wrap{max-width:1200px; margin:0 auto; padding:34px 22px 60px;}
+  header{
+    display:grid; grid-template-columns:1.35fr .65fr; gap:22px; align-items:stretch; margin-bottom:22px;
+  }
+  .hero,.mini-card,.section,.panel{
+    background:linear-gradient(180deg, rgba(23,33,63,.88), rgba(15,23,42,.92));
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .hero{padding:34px; position:relative; overflow:hidden; min-height:290px;}
+  .hero:before{
+    content:""; position:absolute; inset:-1px; background:
+      linear-gradient(110deg, transparent 0%, rgba(96,165,250,.12) 35%, transparent 55%),
+      radial-gradient(circle at 80% 10%, rgba(34,211,238,.14), transparent 28%);
+    pointer-events:none;
+  }
+  .hero > *{position:relative}
+  .eyebrow{display:inline-flex; gap:9px; align-items:center; color:#bae6fd; font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:12px; margin-bottom:18px;}
+  .dot{width:9px;height:9px;border-radius:99px;background:var(--cyan);box-shadow:0 0 20px var(--cyan)}
+  h1{margin:0; font-size:clamp(32px, 5vw, 58px); line-height:1.02; letter-spacing:-.055em;}
+  h1 span{color:#93c5fd}
+  .sub{max-width:760px; color:#cbd5e1; font-size:18px; margin:20px 0 0;}
+  .side{display:grid; gap:14px;}
+  .mini-card{padding:22px;}
+  .mini-card h3{margin:0 0 10px; font-size:17px; color:#dbeafe;}
+  .kpi{display:flex; align-items:baseline; gap:8px; margin-top:12px;}
+  .kpi strong{font-size:32px; letter-spacing:-.03em;}
+  .kpi small{color:var(--muted)}
+  .section{padding:26px; margin:22px 0;}
+  .section h2{margin:0 0 16px; font-size:26px; letter-spacing:-.03em;}
+  .section p{color:#cbd5e1; margin:8px 0 0;}
+  .grid{display:grid; gap:16px;}
+  .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .flow{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; margin-top:18px;}
+  .step{
+    background:rgba(15,23,42,.65); border:1px solid var(--border); border-radius:18px; padding:16px; min-height:150px; position:relative; overflow:hidden;
+  }
+  .step:after{content:"→"; position:absolute; right:-6px; top:50%; transform:translateY(-50%); color:rgba(148,163,184,.48); font-size:28px;}
+  .step:last-child:after{display:none}
+  .num{width:28px; height:28px; border-radius:10px; background:rgba(96,165,250,.18); color:#bfdbfe; display:flex; align-items:center; justify-content:center; font-weight:800; margin-bottom:10px;}
+  .step h3{font-size:15px; margin:0 0 8px;}
+  .step p{font-size:13px; color:#a8b4c8; margin:0;}
+  .equation{font-family:var(--mono); background:#070b14; color:#e0f2fe; border:1px solid var(--border); border-radius:14px; padding:14px; overflow:auto; font-size:14px;}
+  .compare{display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:stretch; margin-top:14px;}
+  .compare-card{padding:18px; border-radius:18px; background:rgba(15,23,42,.7); border:1px solid var(--border);}
+  .compare-card h3{margin:0 0 10px;}
+  .bad{color:#fecdd3}.good{color:#bbf7d0}.arrow{display:flex;align-items:center;color:#94a3b8;font-size:28px}
+  .sim{display:grid; grid-template-columns: 1.05fr .95fr; gap:18px; align-items:start;}
+  .controls{display:flex; flex-wrap:wrap; gap:10px; margin:16px 0;}
+  button, input[type=range]{accent-color:#60a5fa}
+  button{
+    border:1px solid var(--border); color:var(--text); background:linear-gradient(180deg,#2563eb,#1d4ed8); border-radius:999px; padding:10px 16px; font-weight:800; cursor:pointer;
+    box-shadow:0 8px 22px rgba(37,99,235,.22);
+  }
+  button.secondary{background:rgba(15,23,42,.8); box-shadow:none; color:#dbeafe}
+  button:active{transform:translateY(1px)}
+  .sliders{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:12px;}
+  label{display:block; color:#cbd5e1; font-size:13px; font-weight:700;}
+  input[type=range]{width:100%;}
+  .value{font-family:var(--mono); color:#bae6fd; font-size:12px;}
+  .matrix-wrap{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:16px;}
+  .matrix-card{background:rgba(2,6,23,.55); border:1px solid var(--border); border-radius:18px; padding:14px; overflow:auto;}
+  .matrix-card h4{margin:0 0 10px; display:flex; justify-content:space-between; gap:8px; align-items:center; font-size:14px; color:#dbeafe;}
+  table.matrix{border-collapse:separate; border-spacing:5px; font-family:var(--mono); width:100%; table-layout:fixed;}
+  .matrix td{padding:8px 6px; text-align:center; border-radius:10px; background:rgba(30,41,59,.85); border:1px solid rgba(148,163,184,.12); font-size:13px; min-width:50px;}
+  .matrix td.hot{background:rgba(251,191,36,.20); border-color:rgba(251,191,36,.55); color:#fde68a;}
+  .matrix td.cool{background:rgba(96,165,250,.18); border-color:rgba(96,165,250,.40); color:#bfdbfe;}
+  .matrix td.goodcell{background:rgba(52,211,153,.18); border-color:rgba(52,211,153,.45); color:#bbf7d0;}
+  .matrix td.badcell{background:rgba(251,113,133,.18); border-color:rgba(251,113,133,.45); color:#fecdd3;}
+  .metrics{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:16px;}
+  .metric{background:rgba(2,6,23,.55); border:1px solid var(--border); border-radius:16px; padding:14px;}
+  .metric span{display:block; color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;}
+  .metric strong{display:block; margin-top:5px; font-size:22px; font-family:var(--mono); color:#f8fafc;}
+  .ruler{margin-top:18px; padding:16px; border:1px solid var(--border); border-radius:18px; background:rgba(2,6,23,.45);}
+  .bar{height:16px; background:linear-gradient(90deg,rgba(251,113,133,.45),rgba(251,191,36,.55),rgba(52,211,153,.55)); border-radius:999px; position:relative; margin:24px 10px 10px;}
+  .threshold{position:absolute; left:50%; top:-8px; width:2px; height:32px; background:#fff; opacity:.8;}
+  .marker{position:absolute; top:50%; transform:translate(-50%,-50%); width:24px; height:24px; border-radius:50%; background:#0ea5e9; border:3px solid #e0f2fe; box-shadow:0 0 0 6px rgba(14,165,233,.16);}
+  .ruler-text{display:flex; justify-content:space-between; color:#94a3b8; font-family:var(--mono); font-size:12px;}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; color:#cbd5e1; font-size:12px;}
+  .legend span{display:inline-flex; align-items:center; gap:6px; background:rgba(15,23,42,.7); border:1px solid var(--border); border-radius:999px; padding:6px 9px;}
+  .swatch{width:10px;height:10px;border-radius:99px;display:inline-block}.swatch.b{background:var(--blue)}.swatch.g{background:var(--green)}.swatch.a{background:var(--amber)}.swatch.r{background:var(--red)}
+  .callout{border-left:4px solid var(--cyan); padding:14px 16px; background:rgba(34,211,238,.09); border-radius:14px; color:#dbeafe; margin-top:14px;}
+  .timeline{display:grid; gap:10px; margin-top:16px;}
+  .row{display:grid; grid-template-columns:140px 1fr; gap:12px; align-items:center;}
+  .track{height:14px;background:rgba(30,41,59,.9);border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+  .fill{height:100%;width:0%;background:linear-gradient(90deg,#60a5fa,#34d399);border-radius:999px;transition:width .25s ease}
+  .row b{font-size:13px;color:#dbeafe}.row small{color:#94a3b8}
+  .pseudo{font-family:var(--mono); background:#020617; color:#c4b5fd; border:1px solid var(--border); border-radius:18px; padding:16px; font-size:13px; overflow:auto;}
+  .pseudo .kw{color:#93c5fd}.pseudo .cm{color:#64748b}.pseudo .fn{color:#bbf7d0}.pseudo .hi{color:#fde68a}
+  footer{color:#94a3b8; font-size:13px; padding:14px 4px 0;}
+  a{color:#93c5fd}
+  @media (max-width: 980px){
+    header,.sim,.grid.cols-2,.grid.cols-3,.compare{grid-template-columns:1fr;}
+    .flow{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .step:after{display:none}
+    .metrics{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width: 620px){
+    .wrap{padding:20px 12px 40px}.hero,.section{padding:20px}.flow,.matrix-wrap,.sliders,.metrics{grid-template-columns:1fr}.row{grid-template-columns:1fr}.hero{min-height:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hero">
+      <div class="eyebrow"><span class="dot"></span>Algorithm visualization</div>
+      <h1>SignRound / AutoRound: <span>learn the rounding</span>, not the model</h1>
+      <p class="sub">A visual walkthrough of low-bit weight-only quantization: start from FP weights, add trainable rounding offsets <b>V</b> and clipping scalars <b>α, β</b>, reconstruct each block output, and update only those quantization parameters with SignSGD.</p>
+    </div>
+    <div class="side">
+      <div class="mini-card">
+        <h3>What is optimized?</h3>
+        <p>Only quantization parameters: rounding offset <b>V</b>, upper clip <b>α</b>, lower clip <b>β</b>.</p>
+      </div>
+      <div class="mini-card">
+        <h3>Inference cost</h3>
+        <div class="kpi"><strong>0</strong><small>extra ops</small></div>
+        <p>After tuning, export normal INT weights + scale/zero-point.</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="section">
+    <h2>1. Big picture</h2>
+    <p>RTN rounds each weight independently. SignRound instead uses calibration data to make the quantized block output match the FP block output.</p>
+    <div class="compare">
+      <div class="compare-card">
+        <h3 class="bad">RTN path</h3>
+        <div class="equation">W → scale / zero-point → round(W / s + zp) → W_int</div>
+        <p>Fast, but each weight is rounded locally. It does not look at how the block output changes.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="compare-card">
+        <h3 class="good">SignRound path</h3>
+        <div class="equation">W̃ = s · clip(round(W / s + zp + V), n, m)</div>
+        <p>Train <b>V, α, β</b> so <code>W̃X</code> reconstructs <code>WX</code> for calibration inputs.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2. Pipeline</h2>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><h3>Collect calibration X</h3><p>Feed a few samples through the FP model and cache the input to the current block.</p></div>
+      <div class="step"><div class="num">2</div><h3>FP forward</h3><p>Compute the reference output: <code>Y_fp = W X</code>.</p></div>
+      <div class="step"><div class="num">3</div><h3>QDQ with V, α, β</h3><p>Quantize + dequantize weights using trainable rounding and clipping.</p></div>
+      <div class="step"><div class="num">4</div><h3>Quant forward</h3><p>Compute <code>Y_q = W̃ X</code> through the same block.</p></div>
+      <div class="step"><div class="num">5</div><h3>Reconstruction loss</h3><p>Minimize <code>||Y_fp - Y_q||²</code>, not the direct weight error.</p></div>
+      <div class="step"><div class="num">6</div><h3>SignSGD update</h3><p>Move by the sign of the gradient and save the best parameters.</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>3. Interactive toy example</h2>
+    <p>This demo uses a tiny 4×4 weight matrix and a small calibration input. The update is a simplified SignSGD-style reconstruction loop to show the mechanism; real LLM quantization applies the same idea block by block at large scale.</p>
+    <div class="sim">
+      <div class="panel" style="padding:18px">
+        <h3 style="margin:0 0 6px">Run the optimizer</h3>
+        <div class="controls">
+          <button id="playBtn">▶ Run</button>
+          <button class="secondary" id="stepBtn">One step</button>
+          <button class="secondary" id="resetBtn">Reset</button>
+        </div>
+        <div class="sliders">
+          <div><label>Learning rate for V: <span class="value" id="lrLabel"></span></label><input id="lr" type="range" min="0.005" max="0.08" step="0.005" value="0.03"></div>
+          <div><label>Visible speed: <span class="value" id="speedLabel"></span></label><input id="speed" type="range" min="1" max="10" step="1" value="4"></div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span>Step</span><strong id="stepNum">0</strong></div>
+          <div class="metric"><span>RTN loss</span><strong id="rtnLoss">-</strong></div>
+          <div class="metric"><span>Current loss</span><strong id="curLoss">-</strong></div>
+          <div class="metric"><span>Best loss</span><strong id="bestLoss">-</strong></div>
+        </div>
+        <div class="ruler">
+          <b>Selected rounding offset V[0,0]</b>
+          <div class="bar"><div class="threshold"></div><div class="marker" id="marker"></div></div>
+          <div class="ruler-text"><span>-0.5</span><span>0: RTN</span><span>+0.5</span></div>
+          <p style="font-size:13px;color:#a8b4c8;margin:10px 0 0">Crossing the center threshold can change the final integer rounding decision. SignSGD only needs the direction, not the exact gradient magnitude.</p>
+        </div>
+      </div>
+      <div class="panel" style="padding:18px">
+        <h3 style="margin:0 0 6px">What the update does</h3>
+        <div class="equation">θ<sub>t+1</sub> = θ<sub>t</sub> − lr · sign(∂loss / ∂θ), &nbsp; θ ∈ {V, α, β}</div>
+        <div class="callout">The goal is not to recover the exact FP weights. The goal is to choose integer weights that make the block output close to the FP block output.</div>
+        <div class="timeline">
+          <div class="row"><b>Rounding V</b><div><div class="track"><div class="fill" id="vFill"></div></div><small id="vText"></small></div></div>
+          <div class="row"><b>Clip α</b><div><div class="track"><div class="fill" id="aFill"></div></div><small id="aText"></small></div></div>
+          <div class="row"><b>Clip β</b><div><div class="track"><div class="fill" id="bFill"></div></div><small id="bText"></small></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="matrix-wrap">
+      <div class="matrix-card"><h4>FP weights W <span>fixed</span></h4><table class="matrix" id="wTable"></table></div>
+      <div class="matrix-card"><h4>Rounding offsets V <span>trained</span></h4><table class="matrix" id="vTable"></table></div>
+      <div class="matrix-card"><h4>Integer weights W_int <span>exported</span></h4><table class="matrix" id="qTable"></table></div>
+      <div class="matrix-card"><h4>Dequantized weights W̃ <span>used for loss</span></h4><table class="matrix" id="dqTable"></table></div>
+    </div>
+    <div class="legend"><span><i class="swatch b"></i>Quantized integer</span><span><i class="swatch g"></i>Good reconstruction</span><span><i class="swatch a"></i>Offset near rounding threshold</span><span><i class="swatch r"></i>Larger local error</span></div>
+  </section>
+
+  <section class="section grid cols-2">
+    <div>
+      <h2>4. Pseudocode</h2>
+      <div class="pseudo"><span class="kw">initialize</span> V = 0, α = 1, β = 1, best_loss = ∞
+<span class="kw">for</span> step in 1..T:
+    X = <span class="fn">block_input</span>(calibration_batch)
+    Y_fp = <span class="fn">forward</span>(W, X)                 <span class="cm"># reference</span>
+    W̃ = <span class="fn">quant_dequant</span>(W, V, α, β)       <span class="cm"># QDQ weight</span>
+    Y_q = <span class="fn">forward</span>(W̃, X)                <span class="cm"># quantized block</span>
+    loss = <span class="fn">mse</span>(Y_q, Y_fp)              <span class="cm"># reconstruction</span>
+    <span class="kw">if</span> loss &lt; best_loss: save V, α, β
+    V, α, β = V, α, β - lr · <span class="hi">sign</span>(gradient)
+<span class="kw">export</span> W_int, scale, zero_point</div>
+    </div>
+    <div>
+      <h2>5. Why this works</h2>
+      <p><b>Rounding is threshold-based.</b> For a weight near a rounding border, a small shift in <code>V</code> can flip the integer choice.</p>
+      <p><b>Output reconstruction is block-aware.</b> Some local weight errors matter less if the block output remains close.</p>
+      <p><b>SignSGD is lightweight.</b> It ignores gradient magnitude and only follows the direction, which is enough for bounded rounding/clipping parameters.</p>
+      <p><b>Serving stays simple.</b> The tuned parameters are folded into the final quantized checkpoint.</p>
+    </div>
+  </section>
+
+  <footer>
+    Source concept: “Optimize Weight Rounding via Signed Gradient Descent for the Quantization of LLMs”, Findings of EMNLP 2024. This page is an educational visualization, not the official implementation.
+  </footer>
+</div>
+<script>
+const W = [
+  [ 0.6, -0.3, -5.6,  1.2],
+  [-0.8,  1.0,  0.2, -1.9],
+  [ 1.9,  0.7, -6.4, -2.3],
+  [-0.2,  0.3,  0.5, -0.9]
+];
+const X = [
+  [ 0.8, -0.4,  0.3],
+  [-0.2,  0.9,  0.1],
+  [ 0.5,  0.1, -0.7],
+  [ 0.3, -0.6,  0.8]
+];
+const bits = 4, qmin = 0, qmax = Math.pow(2,bits)-1;
+let V, alpha, beta, step, bestLoss, bestState, timer=null;
+function deepCopy(a){return JSON.parse(JSON.stringify(a));}
+function zerosLike(A){return A.map(r=>r.map(()=>0));}
+function flatten(A){return A.flat();}
+function clamp(x,lo,hi){return Math.max(lo, Math.min(hi, x));}
+function matmul(A,B){
+  const out = Array.from({length:A.length},()=>Array(B[0].length).fill(0));
+  for(let i=0;i<A.length;i++) for(let k=0;k<B.length;k++) for(let j=0;j<B[0].length;j++) out[i][j]+=A[i][k]*B[k][j];
+  return out;
+}
+function mse(A,B){
+  let s=0,n=0; for(let i=0;i<A.length;i++) for(let j=0;j<A[0].length;j++){const d=A[i][j]-B[i][j]; s+=d*d; n++;} return s/n;
+}
+function transpose(A){return A[0].map((_,i)=>A.map(r=>r[i]));}
+function qdq(Vcur=V, acur=alpha, bcur=beta){
+  const vals=flatten(W), maxW=Math.max(...vals), minW=Math.min(...vals);
+  const hi=maxW*acur, lo=minW*bcur;
+  const s=(hi-lo)/(qmax-qmin);
+  const zp=clamp(Math.round(qmin - lo/s), qmin, qmax);
+  let Q=[], DQ=[];
+  for(let i=0;i<W.length;i++){
+    Q[i]=[]; DQ[i]=[];
+    for(let j=0;j<W[0].length;j++){
+      const q=clamp(Math.round(W[i][j]/s + zp + Vcur[i][j]), qmin, qmax);
+      Q[i][j]=q; DQ[i][j]=s*(q-zp);
+    }
+  }
+  return {Q,DQ,s,zp,hi,lo};
+}
+const Yfp = matmul(W,X);
+function lossOf(Vc=V, ac=alpha, bc=beta){return mse(matmul(qdq(Vc,ac,bc).DQ,X),Yfp);}
+function steGradV(){
+  const state=qdq();
+  const Yq=matmul(state.DQ,X);
+  const rows=Yq.length, cols=Yq[0].length;
+  const E=Yq.map((r,i)=>r.map((v,j)=>2*(v-Yfp[i][j])/(rows*cols)));
+  const dW=matmul(E, transpose(X));
+  return dW.map((r,i)=>r.map((g,j)=>{
+    const q=state.Q[i][j];
+    const active=(q>qmin && q<qmax) ? 1 : 0.25;
+    return g*state.s*active;
+  }));
+}
+function signFiniteParam(param){
+  const eps=0.015;
+  let l1,l2;
+  if(param==='alpha'){
+    l1=lossOf(V, clamp(alpha+eps,.5,1), beta); l2=lossOf(V, clamp(alpha-eps,.5,1), beta);
+  } else {
+    l1=lossOf(V, alpha, clamp(beta+eps,.5,1)); l2=lossOf(V, alpha, clamp(beta-eps,.5,1));
+  }
+  const g=(l1-l2)/(2*eps);
+  return Math.sign(g);
+}
+function doStep(){
+  const lr=parseFloat(document.getElementById('lr').value);
+  const gradV=steGradV();
+  for(let i=0;i<V.length;i++) for(let j=0;j<V[0].length;j++){
+    let s=Math.sign(gradV[i][j]);
+    // Mild deterministic jitter helps the tiny demo show threshold movement.
+    if(s===0) s=((i+j+step)%2===0)?1:-1;
+    V[i][j]=clamp(V[i][j] - lr*s, -0.5, 0.5);
+  }
+  const lrClip=lr*0.25;
+  alpha=clamp(alpha - lrClip*signFiniteParam('alpha'), .5, 1);
+  beta=clamp(beta - lrClip*signFiniteParam('beta'), .5, 1);
+  step++;
+  const L=lossOf();
+  if(L < bestLoss){bestLoss=L; bestState={V:deepCopy(V), alpha, beta, step};}
+  render();
+}
+function reset(){
+  V=zerosLike(W); alpha=1; beta=1; step=0; bestLoss=lossOf(); bestState={V:deepCopy(V),alpha,beta,step};
+  stop(); render();
+}
+function stop(){ if(timer){clearInterval(timer); timer=null; document.getElementById('playBtn').textContent='▶ Run';}}
+function play(){
+  if(timer){stop();return;}
+  document.getElementById('playBtn').textContent='⏸ Pause';
+  const tick=()=>{ for(let i=0;i<Math.ceil(parseInt(document.getElementById('speed').value)/3);i++) doStep(); if(step>=200) stop(); };
+  timer=setInterval(tick, 220);
+}
+function cellClass(v, kind){
+  if(kind==='v' && Math.abs(v)>.38) return 'hot';
+  if(kind==='q') return 'cool';
+  if(kind==='dq') return Math.abs(v)<1 ? 'goodcell' : (Math.abs(v)>4 ? 'badcell' : '');
+  return '';
+}
+function table(id,A,fmt,kind){
+  const el=document.getElementById(id); el.innerHTML='';
+  for(let i=0;i<A.length;i++){
+    const tr=document.createElement('tr');
+    for(let j=0;j<A[i].length;j++){
+      const td=document.createElement('td'); td.textContent=fmt(A[i][j]); td.className=cellClass(A[i][j],kind); tr.appendChild(td);
+    }
+    el.appendChild(tr);
+  }
+}
+function render(){
+  const state=qdq();
+  table('wTable',W,x=>x.toFixed(1),'w');
+  table('vTable',V,x=>(x>=0?'+':'')+x.toFixed(2),'v');
+  table('qTable',state.Q,x=>String(x),'q');
+  table('dqTable',state.DQ,x=>(x>=0?'+':'')+x.toFixed(2),'dq');
+  const rtn=lossOf(zerosLike(W),1,1), cur=lossOf();
+  document.getElementById('stepNum').textContent=step;
+  document.getElementById('rtnLoss').textContent=rtn.toFixed(4);
+  document.getElementById('curLoss').textContent=cur.toFixed(4);
+  document.getElementById('bestLoss').textContent=bestLoss.toFixed(4);
+  document.getElementById('lrLabel').textContent=parseFloat(document.getElementById('lr').value).toFixed(3);
+  document.getElementById('speedLabel').textContent=document.getElementById('speed').value + '×';
+  const mpos=(V[0][0]+0.5)*100; document.getElementById('marker').style.left=mpos+'%';
+  const avgAbsV=flatten(V).reduce((a,b)=>a+Math.abs(b),0)/flatten(V).length;
+  const vPct=clamp(avgAbsV/0.5*100,0,100), aPct=(alpha-.5)/.5*100, bPct=(beta-.5)/.5*100;
+  document.getElementById('vFill').style.width=vPct+'%'; document.getElementById('aFill').style.width=aPct+'%'; document.getElementById('bFill').style.width=bPct+'%';
+  document.getElementById('vText').textContent='mean |V| = '+avgAbsV.toFixed(3)+' / 0.500';
+  document.getElementById('aText').textContent='α = '+alpha.toFixed(3)+'; controls upper clipping scale';
+  document.getElementById('bText').textContent='β = '+beta.toFixed(3)+'; controls lower clipping scale';
+}
+document.getElementById('playBtn').addEventListener('click',play);
+document.getElementById('stepBtn').addEventListener('click',doStep);
+document.getElementById('resetBtn').addEventListener('click',reset);
+document.getElementById('lr').addEventListener('input',render);
+document.getElementById('speed').addEventListener('input',render);
+reset();
+</script>
+</body>
+</html>
