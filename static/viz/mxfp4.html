@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MXFP4 / MXFP8 Quantization Visualizer</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a2f;
+      --panel2:#17223d;
+      --text:#ecf2ff;
+      --muted:#aab7d4;
+      --line:#2b3a61;
+      --accent:#7cc7ff;
+      --accent2:#b98cff;
+      --good:#8ae6b4;
+      --warn:#ffd37c;
+      --bad:#ff8e8e;
+      --chip:#223052;
+      --shadow:0 18px 50px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background:radial-gradient(circle at 20% 0%, #1b2c59 0%, transparent 35%), radial-gradient(circle at 90% 10%, #34215f 0%, transparent 35%), var(--bg);
+      color:var(--text);
+      line-height:1.5;
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:34px 22px 60px}
+    header{padding:36px 0 24px}
+    h1{font-size:clamp(34px,5vw,58px);line-height:1.05;margin:0 0 16px;letter-spacing:-.04em}
+    h2{font-size:28px;margin:42px 0 16px;letter-spacing:-.025em}
+    h3{font-size:20px;margin:0 0 12px}
+    p{color:var(--muted);margin:0 0 14px}
+    .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:stretch}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:22px;box-shadow:var(--shadow)}
+    .eq{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;background:#081024;border:1px solid var(--line);border-radius:16px;padding:16px;color:#dce9ff;overflow:auto}
+    .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .chip{background:var(--chip);border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:8px 12px;color:#dce7ff;font-size:13px}
+    .format-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+    .format-card{position:relative;overflow:hidden}
+    .format-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+    .badge{font-size:12px;color:#07111f;background:var(--accent);border-radius:999px;padding:6px 10px;font-weight:700;white-space:nowrap}
+    .badge.purple{background:var(--accent2);color:#110b1d}
+    .bits{display:flex;gap:4px;align-items:center;margin:12px 0 18px}
+    .bit{height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#06101f;box-shadow:inset 0 -8px 18px rgba(0,0,0,.12)}
+    .s{background:#8ae6b4;flex:1}.e{background:#7cc7ff}.m{background:#ffd37c}.scale{background:#b98cff;flex:2}
+    .e4{flex:4}.e5{flex:5}.m1{flex:1}.m2{flex:2}.m3{flex:3}.e8{flex:8}
+    table{width:100%;border-collapse:collapse;font-size:14px;overflow:hidden;border-radius:14px}
+    th,td{border-bottom:1px solid rgba(255,255,255,.08);padding:10px 9px;text-align:left;color:#dce7ff}
+    th{color:#ffffff;background:rgba(255,255,255,.06);font-weight:700}
+    tr:last-child td{border-bottom:none}
+    .small{font-size:13px;color:var(--muted)}
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:18px}
+    .step{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;min-height:140px;position:relative}
+    .step .num{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;background:#26375f;color:#dce7ff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+    .step strong{display:block;margin:4px 36px 8px 0}
+    .controls{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:18px 0}
+    .toggle{display:flex;gap:8px;background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:6px}
+    button{border:0;border-radius:12px;padding:10px 14px;background:transparent;color:var(--muted);font-weight:800;cursor:pointer}
+    button.active{background:linear-gradient(180deg,#2b7cc5,#245e9b);color:white}
+    .metrics{display:flex;gap:10px;flex-wrap:wrap}
+    .metric{background:#101a32;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:10px 12px;min-width:136px}
+    .metric span{display:block;color:var(--muted);font-size:12px}.metric b{font-size:18px}
+    .bars{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-top:18px}
+    .barcard{background:#0e1730;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:10px;min-height:142px}
+    .bar-title{display:flex;justify-content:space-between;gap:6px;color:#cbd8f7;font-size:12px;margin-bottom:8px}
+    .bararea{height:76px;position:relative;border-left:1px solid rgba(255,255,255,.12);border-right:1px solid rgba(255,255,255,.12);background:linear-gradient(90deg,transparent 49.5%,rgba(255,255,255,.16) 49.5%,rgba(255,255,255,.16) 50.5%,transparent 50.5%);border-radius:9px;overflow:hidden}
+    .hbar{height:14px;border-radius:999px;position:absolute;left:50%;top:16px;transform-origin:left center;opacity:.95}
+    .orig{background:var(--accent)}
+    .deq{background:var(--warn);top:44px}
+    .hbar.neg{transform-origin:right center;left:auto;right:50%}
+    .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:13px}
+    .dot{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:6px}.dot.o{background:var(--accent)}.dot.d{background:var(--warn)}
+    .table-wrap{overflow:auto;border-radius:16px;border:1px solid rgba(255,255,255,.08);margin-top:16px}
+    .quant-table{min-width:900px;background:#0e1730}
+    .quant-table td,.quant-table th{text-align:right}.quant-table td:first-child,.quant-table th:first-child{text-align:center}.quant-table td:nth-child(2),.quant-table th:nth-child(2){text-align:right}
+    .callout{border-left:4px solid var(--accent);background:rgba(124,199,255,.08);padding:16px 18px;border-radius:16px;margin:18px 0}
+    .warn{border-left-color:var(--warn);background:rgba(255,211,124,.08)}
+    .diagram{display:grid;grid-template-columns:160px 1fr;gap:14px;align-items:center;margin-top:18px}
+    .scale-box{border:2px dashed var(--accent2);border-radius:16px;padding:16px;text-align:center;background:rgba(185,140,255,.09)}
+    .elems{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+    .elem{height:34px;border-radius:9px;background:#162541;border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;color:#dce7ff;font-size:12px}
+    footer{margin-top:44px;color:var(--muted);font-size:13px;border-top:1px solid rgba(255,255,255,.10);padding-top:18px}
+    a{color:#9dd7ff}
+    @media (max-width:900px){.hero,.format-grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}.bars{grid-template-columns:repeat(4,1fr)}.diagram{grid-template-columns:1fr}.elems{grid-template-columns:repeat(4,1fr)}}
+    @media (max-width:560px){.flow,.bars{grid-template-columns:1fr}.wrap{padding:22px 14px}.card{padding:17px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="card">
+        <h1>MXFP4 / MXFP8 Quantization</h1>
+        <p>MX means <b>microscaling</b>: one small block of values shares one scale, while every value keeps its own low-bit floating-point element.</p>
+        <div class="eq">For one MX block:<br/>real_value[i] = X × P[i]<br/><br/>X = shared E8M0 power-of-two scale<br/>P[i] = private FP4 or FP8 element</div>
+        <div class="chips">
+          <span class="chip">Block size k = 32</span>
+          <span class="chip">Scale = E8M0, 8 bits</span>
+          <span class="chip">No explicit zero point</span>
+          <span class="chip">Power-of-two scaling</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>One block layout</h3>
+        <div class="diagram">
+          <div class="scale-box"><b>X</b><br/><span class="small">shared scale<br/>8-bit E8M0</span></div>
+          <div class="elems" id="miniElems"></div>
+        </div>
+        <p class="small" style="margin-top:14px">The visual shows 32 private elements. In memory, the spec does not prescribe the exact physical layout.</p>
+      </div>
+    </header>
+
+    <section>
+      <h2>1. Format layout</h2>
+      <div class="format-grid">
+        <div class="card format-card">
+          <div class="format-title"><h3>MXFP4</h3><span class="badge purple">4.25 bits / value</span></div>
+          <p>Each private element is FP4 E2M1: 1 sign bit, 2 exponent bits, 1 mantissa bit. A block stores 32 such elements plus one 8-bit E8M0 scale.</p>
+          <div class="bits" title="FP4 E2M1 element"><div class="bit s">S</div><div class="bit e e4" style="flex:2">E E</div><div class="bit m m1">M</div></div>
+          <table>
+            <tr><th>Property</th><th>Value</th></tr>
+            <tr><td>Element type</td><td>FP4 E2M1</td></tr>
+            <tr><td>Element max normal</td><td>±6.0</td></tr>
+            <tr><td>Min normal / subnormal</td><td>±1.0 / ±0.5</td></tr>
+            <tr><td>Block storage</td><td>8 + 32×4 = 136 bits</td></tr>
+          </table>
+        </div>
+        <div class="card format-card">
+          <div class="format-title"><h3>MXFP8</h3><span class="badge">8.25 bits / value</span></div>
+          <p>MXFP8 uses FP8 private elements. The spec allows E4M3 or E5M2. This example uses E4M3, which is common when precision matters more than very large range.</p>
+          <div class="bits" title="FP8 E4M3 element"><div class="bit s">S</div><div class="bit e e4">E E E E</div><div class="bit m m3">M M M</div></div>
+          <table>
+            <tr><th>Property</th><th>E4M3</th><th>E5M2</th></tr>
+            <tr><td>Exponent bias</td><td>7</td><td>15</td></tr>
+            <tr><td>Max normal</td><td>±448</td><td>±57,344</td></tr>
+            <tr><td>Min normal</td><td>±2⁻⁶</td><td>±2⁻¹⁴</td></tr>
+            <tr><td>Block storage</td><td colspan="2">8 + 32×8 = 264 bits</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Scale and zero point</h2>
+      <div class="card">
+        <div class="callout">
+          <b>Scale in MXFP4/MXFP8</b><br/>
+          The scale is an 8-bit E8M0 value. It stores only an exponent, so the scale is a power of two: <code>X = 2^(encoded_exponent − 127)</code>. Multiplying by X is conceptually the same as shifting the exponent of each private element.
+        </div>
+        <div class="callout warn">
+          <b>Zero point in MXFP4/MXFP8</b><br/>
+          There is <b>no explicit zero point</b>. Classic affine INT quantization uses <code>real = scale × (q − zero_point)</code>. MX floating formats use <code>real = X × P</code>. Zero is represented by the FP element zero itself, so no stored zero-point field is needed.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Worked example: quantize one 32-value block</h2>
+      <div class="card">
+        <p>Assume these are 32 weights from one linear layer block. We use the same source block for MXFP4 and MXFP8, then compare the reconstructed values.</p>
+        <div class="flow">
+          <div class="step"><div class="num">1</div><strong>Source block</strong><span class="small">32 FP32/BF16-like values. Here max absolute value is <b>2.90</b>.</span></div>
+          <div class="step"><div class="num">2</div><strong>Choose X</strong><span class="small">Use a power-of-two scale based on amax and the largest power-of-two representable by the element type.</span></div>
+          <div class="step"><div class="num">3</div><strong>Normalize</strong><span class="small">Compute <code>V[i] / X</code>, so values fit the local FP4/FP8 element range.</span></div>
+          <div class="step"><div class="num">4</div><strong>Round</strong><span class="small">Round normalized values to FP4 E2M1 or FP8 E4M3 elements.</span></div>
+          <div class="step"><div class="num">5</div><strong>Dequantize</strong><span class="small">Recover approximate values with <code>X × P[i]</code>.</span></div>
+        </div>
+        <div class="controls">
+          <div class="toggle"><button id="btn4" class="active">MXFP4</button><button id="btn8">MXFP8 E4M3</button></div>
+          <div class="metrics">
+            <div class="metric"><span>Shared scale X</span><b id="scaleVal">0.5</b></div>
+            <div class="metric"><span>E8M0 bits</span><b id="scaleBits">01111110</b></div>
+            <div class="metric"><span>Mean abs error</span><b id="maeVal">0.1266</b></div>
+            <div class="metric"><span>Max abs error</span><b id="maxErrVal">0.4500</b></div>
+          </div>
+        </div>
+        <div class="eq" id="scaleFormula"></div>
+        <div class="legend"><span><i class="dot o"></i>Original</span><span><i class="dot d"></i>Dequantized</span><span>Bars are scaled to the largest magnitude in the source block.</span></div>
+        <div class="bars" id="bars"></div>
+        <div class="table-wrap">
+          <table class="quant-table" id="qtable"></table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. What to remember</h2>
+      <div class="format-grid">
+        <div class="card">
+          <h3>MXFP4</h3>
+          <p>Very compact. The shared scale gives each 32-value block a local range, but FP4 E2M1 still has only a few representable levels. Small values can become zero, and medium values can move to coarse buckets.</p>
+        </div>
+        <div class="card">
+          <h3>MXFP8</h3>
+          <p>Less compact but much more accurate. With 8 element bits, the same shared-scale idea gives better local precision and usually much smaller reconstruction error.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Based on OCP Microscaling Formats (MX) Specification v1.0, Sep 2023. This page uses a simplified educational quantizer for visualization: nearest representable element value and the spec's power-of-two shared scale rule.
+    </footer>
+  </div>
+
+<script>
+const DATA = {"values": [0.03, -0.07, 0.11, -0.18, 0.25, -0.31, 0.42, -0.55, 0.64, -0.72, 0.83, -0.91, 1.02, -1.16, 1.28, -1.42, 1.55, -1.68, 1.82, -1.95, 2.1, -2.25, 2.4, -2.55, 2.7, -2.85, 2.75, -2.9, 0.88, -0.44, 0.15, -0.05], "scales": {"mxfp4": {"scale": 0.5, "e8m0_exp": 126, "e8m0_bits": "01111110", "largest_pow2_elem": 4}, "mxfp8": {"scale": 0.0078125, "e8m0_exp": 120, "e8m0_bits": "01111000", "largest_pow2_elem": 256}}, "rows": [{"i": 1, "original": 0.03, "scaled_fp4": 0.06, "elem_fp4": 0.0, "deq_fp4": 0.0, "err4": -0.03, "scaled_fp8": 3.84, "elem_fp8": 3.75, "deq_fp8": 0.029296875, "err8": -0.0007031249999999989}, {"i": 2, "original": -0.07, "scaled_fp4": -0.14, "elem_fp4": 0.0, "deq_fp4": 0.0, "err4": 0.07, "scaled_fp8": -8.96, "elem_fp8": -9.0, "deq_fp8": -0.0703125, "err8": -0.00031249999999999334}, {"i": 3, "original": 0.11, "scaled_fp4": 0.22, "elem_fp4": 0.0, "deq_fp4": 0.0, "err4": -0.11, "scaled_fp8": 14.08, "elem_fp8": 14.0, "deq_fp8": 0.109375, "err8": -0.0006250000000000006}, {"i": 4, "original": -0.18, "scaled_fp4": -0.36, "elem_fp4": -0.5, "deq_fp4": -0.25, "err4": -0.07, "scaled_fp8": -23.04, "elem_fp8": -24.0, "deq_fp8": -0.1875, "err8": -0.007500000000000007}, {"i": 5, "original": 0.25, "scaled_fp4": 0.5, "elem_fp4": 0.5, "deq_fp4": 0.25, "err4": 0.0, "scaled_fp8": 32.0, "elem_fp8": 32.0, "deq_fp8": 0.25, "err8": 0.0}, {"i": 6, "original": -0.31, "scaled_fp4": -0.62, "elem_fp4": -0.5, "deq_fp4": -0.25, "err4": 0.06, "scaled_fp8": -39.68, "elem_fp8": -40.0, "deq_fp8": -0.3125, "err8": -0.0025000000000000022}, {"i": 7, "original": 0.42, "scaled_fp4": 0.84, "elem_fp4": 1.0, "deq_fp4": 0.5, "err4": 0.08000000000000002, "scaled_fp8": 53.76, "elem_fp8": 52.0, "deq_fp8": 0.40625, "err8": -0.013749999999999984}, {"i": 8, "original": -0.55, "scaled_fp4": -1.1, "elem_fp4": -1.0, "deq_fp4": -0.5, "err4": 0.050000000000000044, "scaled_fp8": -70.4, "elem_fp8": -72.0, "deq_fp8": -0.5625, "err8": -0.012499999999999956}, {"i": 9, "original": 0.64, "scaled_fp4": 1.28, "elem_fp4": 1.5, "deq_fp4": 0.75, "err4": 0.10999999999999999, "scaled_fp8": 81.92, "elem_fp8": 80.0, "deq_fp8": 0.625, "err8": -0.015000000000000013}, {"i": 10, "original": -0.72, "scaled_fp4": -1.44, "elem_fp4": -1.5, "deq_fp4": -0.75, "err4": -0.030000000000000027, "scaled_fp8": -92.16, "elem_fp8": -96.0, "deq_fp8": -0.75, "err8": -0.030000000000000027}, {"i": 11, "original": 0.83, "scaled_fp4": 1.66, "elem_fp4": 1.5, "deq_fp4": 0.75, "err4": -0.07999999999999996, "scaled_fp8": 106.24, "elem_fp8": 104.0, "deq_fp8": 0.8125, "err8": -0.01749999999999996}, {"i": 12, "original": -0.91, "scaled_fp4": -1.82, "elem_fp4": -2.0, "deq_fp4": -1.0, "err4": -0.08999999999999997, "scaled_fp8": -116.48, "elem_fp8": -120.0, "deq_fp8": -0.9375, "err8": -0.02749999999999997}, {"i": 13, "original": 1.02, "scaled_fp4": 2.04, "elem_fp4": 2.0, "deq_fp4": 1.0, "err4": -0.020000000000000018, "scaled_fp8": 130.56, "elem_fp8": 128.0, "deq_fp8": 1.0, "err8": -0.020000000000000018}, {"i": 14, "original": -1.16, "scaled_fp4": -2.32, "elem_fp4": -2.0, "deq_fp4": -1.0, "err4": 0.15999999999999992, "scaled_fp8": -148.48, "elem_fp8": -144.0, "deq_fp8": -1.125, "err8": 0.03499999999999992}, {"i": 15, "original": 1.28, "scaled_fp4": 2.56, "elem_fp4": 3.0, "deq_fp4": 1.5, "err4": 0.21999999999999997, "scaled_fp8": 163.84, "elem_fp8": 160.0, "deq_fp8": 1.25, "err8": -0.030000000000000027}, {"i": 16, "original": -1.42, "scaled_fp4": -2.84, "elem_fp4": -3.0, "deq_fp4": -1.5, "err4": -0.08000000000000007, "scaled_fp8": -181.76, "elem_fp8": -176.0, "deq_fp8": -1.375, "err8": 0.04499999999999993}, {"i": 17, "original": 1.55, "scaled_fp4": 3.1, "elem_fp4": 3.0, "deq_fp4": 1.5, "err4": -0.050000000000000044, "scaled_fp8": 198.4, "elem_fp8": 192.0, "deq_fp8": 1.5, "err8": -0.050000000000000044}, {"i": 18, "original": -1.68, "scaled_fp4": -3.36, "elem_fp4": -3.0, "deq_fp4": -1.5, "err4": 0.17999999999999994, "scaled_fp8": -215.04, "elem_fp8": -208.0, "deq_fp8": -1.625, "err8": 0.05499999999999994}, {"i": 19, "original": 1.82, "scaled_fp4": 3.64, "elem_fp4": 4.0, "deq_fp4": 2.0, "err4": 0.17999999999999994, "scaled_fp8": 232.96, "elem_fp8": 240.0, "deq_fp8": 1.875, "err8": 0.05499999999999994}, {"i": 20, "original": -1.95, "scaled_fp4": -3.9, "elem_fp4": -4.0, "deq_fp4": -2.0, "err4": -0.050000000000000044, "scaled_fp8": -249.6, "elem_fp8": -256.0, "deq_fp8": -2.0, "err8": -0.050000000000000044}, {"i": 21, "original": 2.1, "scaled_fp4": 4.2, "elem_fp4": 4.0, "deq_fp4": 2.0, "err4": -0.10000000000000009, "scaled_fp8": 268.8, "elem_fp8": 256.0, "deq_fp8": 2.0, "err8": -0.10000000000000009}, {"i": 22, "original": -2.25, "scaled_fp4": -4.5, "elem_fp4": -4.0, "deq_fp4": -2.0, "err4": 0.25, "scaled_fp8": -288.0, "elem_fp8": -288.0, "deq_fp8": -2.25, "err8": 0.0}, {"i": 23, "original": 2.4, "scaled_fp4": 4.8, "elem_fp4": 4.0, "deq_fp4": 2.0, "err4": -0.3999999999999999, "scaled_fp8": 307.2, "elem_fp8": 320.0, "deq_fp8": 2.5, "err8": 0.10000000000000009}, {"i": 24, "original": -2.55, "scaled_fp4": -5.1, "elem_fp4": -6.0, "deq_fp4": -3.0, "err4": -0.4500000000000002, "scaled_fp8": -326.4, "elem_fp8": -320.0, "deq_fp8": -2.5, "err8": 0.04999999999999982}, {"i": 25, "original": 2.7, "scaled_fp4": 5.4, "elem_fp4": 6.0, "deq_fp4": 3.0, "err4": 0.2999999999999998, "scaled_fp8": 345.6, "elem_fp8": 352.0, "deq_fp8": 2.75, "err8": 0.04999999999999982}, {"i": 26, "original": -2.85, "scaled_fp4": -5.7, "elem_fp4": -6.0, "deq_fp4": -3.0, "err4": -0.1499999999999999, "scaled_fp8": -364.8, "elem_fp8": -352.0, "deq_fp8": -2.75, "err8": 0.10000000000000009}, {"i": 27, "original": 2.75, "scaled_fp4": 5.5, "elem_fp4": 6.0, "deq_fp4": 3.0, "err4": 0.25, "scaled_fp8": 352.0, "elem_fp8": 352.0, "deq_fp8": 2.75, "err8": 0.0}, {"i": 28, "original": -2.9, "scaled_fp4": -5.8, "elem_fp4": -6.0, "deq_fp4": -3.0, "err4": -0.10000000000000009, "scaled_fp8": -371.2, "elem_fp8": -384.0, "deq_fp8": -3.0, "err8": -0.10000000000000009}, {"i": 29, "original": 0.88, "scaled_fp4": 1.76, "elem_fp4": 2.0, "deq_fp4": 1.0, "err4": 0.12, "scaled_fp8": 112.64, "elem_fp8": 112.0, "deq_fp8": 0.875, "err8": -0.0050000000000000044}, {"i": 30, "original": -0.44, "scaled_fp4": -0.88, "elem_fp4": -1.0, "deq_fp4": -0.5, "err4": -0.06, "scaled_fp8": -56.32, "elem_fp8": -56.0, "deq_fp8": -0.4375, "err8": 0.0025000000000000022}, {"i": 31, "original": 0.15, "scaled_fp4": 0.3, "elem_fp4": 0.5, "deq_fp4": 0.25, "err4": 0.1, "scaled_fp8": 19.2, "elem_fp8": 20.0, "deq_fp8": 0.15625, "err8": 0.0062500000000000056}, {"i": 32, "original": -0.05, "scaled_fp4": -0.1, "elem_fp4": 0.0, "deq_fp4": 0.0, "err4": 0.05, "scaled_fp8": -6.4, "elem_fp8": -6.5, "deq_fp8": -0.05078125, "err8": -0.0007812499999999972}], "metrics": {"mxfp4": {"mae": 0.1265625, "maxerr": 0.4500000000000002}, "mxfp8": {"mae": 0.030700683593749993, "maxerr": 0.10000000000000009}}};
+let mode = 'mxfp4';
+const maxMag = Math.max(...DATA.values.map(Math.abs));
+function fmt(x, n=4){
+  if (Math.abs(x) >= 100) return x.toFixed(1);
+  if (Math.abs(x) >= 10) return x.toFixed(2);
+  if (Math.abs(x) >= 1) return x.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+  return x.toFixed(n).replace(/0+$/,'').replace(/\.$/,'') || '0';
+}
+function setMode(m){
+  mode = m;
+  document.getElementById('btn4').classList.toggle('active', m==='mxfp4');
+  document.getElementById('btn8').classList.toggle('active', m==='mxfp8');
+  render();
+}
+function renderMiniElems(){
+  const mini = document.getElementById('miniElems');
+  mini.innerHTML = '';
+  for(let i=1;i<=32;i++){
+    const e=document.createElement('div');
+    e.className='elem'; e.textContent='P'+i;
+    mini.appendChild(e);
+  }
+}
+function rowKeys(){
+  return mode === 'mxfp4' ? ['scaled_fp4','elem_fp4','deq_fp4','err4'] : ['scaled_fp8','elem_fp8','deq_fp8','err8'];
+}
+function render(){
+  const sc = DATA.scales[mode];
+  const mt = DATA.metrics[mode];
+  document.getElementById('scaleVal').textContent = fmt(sc.scale, 8);
+  document.getElementById('scaleBits').textContent = sc.e8m0_bits;
+  document.getElementById('maeVal').textContent = fmt(mt.mae, 5);
+  document.getElementById('maxErrVal').textContent = fmt(mt.maxerr, 5);
+  const name = mode === 'mxfp4' ? 'MXFP4 / FP4 E2M1' : 'MXFP8 / FP8 E4M3';
+  document.getElementById('scaleFormula').innerHTML = `${name}<br/>amax = 2.90<br/>largest power-of-two element = ${sc.largest_pow2_elem}<br/>X = 2^floor(log2(amax / ${sc.largest_pow2_elem})) = ${fmt(sc.scale,8)}<br/>E8M0 stored exponent = log2(X) + 127 = ${sc.e8m0_exp} = ${sc.e8m0_bits}₂`;
+  const bars = document.getElementById('bars');
+  bars.innerHTML = '';
+  const [scaledKey, elemKey, deqKey, errKey] = rowKeys();
+  DATA.rows.forEach(r => {
+    const deq = r[deqKey];
+    const card = document.createElement('div'); card.className='barcard';
+    const ow = Math.min(50, Math.abs(r.original)/maxMag*50);
+    const dw = Math.min(50, Math.abs(deq)/maxMag*50);
+    const ocls = r.original < 0 ? 'hbar orig neg' : 'hbar orig';
+    const dcls = deq < 0 ? 'hbar deq neg' : 'hbar deq';
+    card.innerHTML = `<div class="bar-title"><span>#${r.i}</span><span>err ${fmt(r[errKey],3)}</span></div>
+      <div class="bararea"><div class="${ocls}" style="width:${ow}%"></div><div class="${dcls}" style="width:${dw}%"></div></div>
+      <div class="small" style="margin-top:7px">v=${fmt(r.original,3)}<br/>q=${fmt(r[elemKey],4)} → ${fmt(deq,4)}</div>`;
+    bars.appendChild(card);
+  });
+  const table = document.getElementById('qtable');
+  table.innerHTML = `<tr><th>i</th><th>Original V</th><th>V / X</th><th>Element P</th><th>Dequant X×P</th><th>Error</th></tr>` +
+    DATA.rows.map(r => `<tr><td>${r.i}</td><td>${fmt(r.original,4)}</td><td>${fmt(r[scaledKey],4)}</td><td>${fmt(r[elemKey],4)}</td><td>${fmt(r[deqKey],5)}</td><td>${fmt(r[errKey],5)}</td></tr>`).join('');
+}
+document.getElementById('btn4').addEventListener('click',()=>setMode('mxfp4'));
+document.getElementById('btn8').addEventListener('click',()=>setMode('mxfp8'));
+renderMiniElems(); render();
+</script>
+</body>
+</html>
