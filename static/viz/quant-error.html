@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Low-Bit Quantization: Error, Scale, and Rounding</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #111827;
+    --panel2: #1f2937;
+    --card: #ffffff;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --blue: #60a5fa;
+    --green: #34d399;
+    --orange: #f59e0b;
+    --red: #fb7185;
+    --purple: #a78bfa;
+    --line: #334155;
+    --dark: #0b1220;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top left, #1e293b, var(--bg) 55%);
+    color: var(--text);
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+
+  .hero {
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, rgba(96,165,250,.15), rgba(167,139,250,.12), rgba(15,23,42,.6));
+    border-radius: 24px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.28);
+  }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+  }
+
+  .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .formula-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 22px;
+  }
+
+  .formula {
+    background: rgba(15, 23, 42, .78);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #dbeafe;
+  }
+
+  .section {
+    background: rgba(17, 24, 39, .92);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 24px;
+    margin: 22px 0;
+    box-shadow: 0 16px 48px rgba(0,0,0,.22);
+  }
+
+  .section-title {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+
+  .badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    color: #06121f;
+    background: var(--blue);
+  }
+
+  .section h2 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .section p {
+    color: var(--muted);
+    margin: 6px 0 0;
+    line-height: 1.5;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .mini-card {
+    background: rgba(31, 41, 55, .9);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px;
+    min-height: 100%;
+  }
+
+  .mini-card h3 {
+    margin: 0 0 10px;
+    font-size: 17px;
+  }
+
+  .caption {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
+  .quant-line {
+    margin: 28px 8px 14px;
+    position: relative;
+    height: 88px;
+  }
+
+  .axis {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 42px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #64748b 8%, #64748b 92%, transparent);
+  }
+
+  .tick {
+    position: absolute;
+    top: 28px;
+    width: 2px;
+    height: 30px;
+    background: #94a3b8;
+  }
+
+  .tick span {
+    position: absolute;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .point {
+    position: absolute;
+    top: 30px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    border: 3px solid var(--dark);
+    z-index: 2;
+  }
+
+  .point.fp { background: var(--orange); }
+  .point.dq { background: var(--green); }
+  .point.clip { background: var(--red); }
+
+  .arrow {
+    position: absolute;
+    top: 6px;
+    height: 24px;
+    border-top: 2px dashed #cbd5e1;
+  }
+
+  .arrow::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: -5px;
+    width: 9px;
+    height: 9px;
+    border-top: 2px solid #cbd5e1;
+    border-right: 2px solid #cbd5e1;
+    transform: rotate(45deg);
+  }
+
+  .label {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 12px;
+    white-space: nowrap;
+    color: #e5e7eb;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .legend-item {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .steps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .step {
+    background: #0b1220;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    min-width: 120px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .step strong {
+    display: block;
+    color: #f8fafc;
+    margin-bottom: 4px;
+  }
+
+  .step small {
+    color: var(--muted);
+  }
+
+  .flow-arrow {
+    color: #94a3b8;
+    font-size: 20px;
+  }
+
+  .scale-track {
+    height: 94px;
+    position: relative;
+    margin: 20px 6px 14px;
+  }
+
+  .range-bar {
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    top: 44px;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--red), var(--blue), var(--green));
+    opacity: .9;
+  }
+
+  .range-label {
+    position: absolute;
+    top: 62px;
+    font-size: 12px;
+    color: var(--muted);
+    transform: translateX(-50%);
+  }
+
+  .small-tick {
+    position: absolute;
+    top: 35px;
+    width: 2px;
+    height: 28px;
+    background: #cbd5e1;
+  }
+
+  .outlier {
+    position: absolute;
+    top: 18px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--red);
+    border: 3px solid #0b1220;
+    transform: translateX(-50%);
+  }
+
+  .normal-dot {
+    position: absolute;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid #0b1220;
+    transform: translateX(-50%);
+  }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    overflow: hidden;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .compare-table th,
+  .compare-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #334155;
+    text-align: left;
+  }
+
+  .compare-table th {
+    background: #0b1220;
+    color: #e2e8f0;
+  }
+
+  .compare-table td {
+    color: var(--muted);
+  }
+
+  .good { color: var(--green) !important; }
+  .bad { color: var(--red) !important; }
+  .warn { color: var(--orange) !important; }
+
+  .gemm-box {
+    background: #0b1220;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+    margin-top: 14px;
+  }
+
+  .vector-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 80px 1fr 110px;
+    gap: 10px;
+    align-items: center;
+    margin: 12px 0;
+  }
+
+  .vector {
+    border-radius: 12px;
+    border: 1px solid #334155;
+    background: #111827;
+    padding: 12px;
+    text-align: center;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+  }
+
+  .result {
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+    font-weight: 800;
+  }
+
+  .result.bad-bg {
+    background: rgba(251, 113, 133, .15);
+    border: 1px solid rgba(251, 113, 133, .45);
+    color: #fecdd3;
+  }
+
+  .result.good-bg {
+    background: rgba(52, 211, 153, .15);
+    border: 1px solid rgba(52, 211, 153, .45);
+    color: #bbf7d0;
+  }
+
+  .callout {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(96, 165, 250, .35);
+    background: rgba(96, 165, 250, .10);
+    color: #dbeafe;
+    line-height: 1.55;
+  }
+
+  .footer-note {
+    margin-top: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  @media (max-width: 900px) {
+    .formula-row, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .vector-row { grid-template-columns: 1fr; }
+    .flow-arrow { display: none; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Why Low-Bit Quantization Is Hard</h1>
+      <p class="subtitle">
+        Three first-principle problems: quantization creates rounding/clipping error, scale controls the error tradeoff, and nearest rounding can be locally correct but globally bad for LLM layers.
+      </p>
+      <div class="formula-row">
+        <div class="formula">Quant:<br/>q = clamp(round(x / s), qmin, qmax)</div>
+        <div class="formula">DeQuant:<br/>x<sub>dq</sub> = q × s</div>
+        <div class="formula">Error:<br/>e = x<sub>dq</sub> − x</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div class="badge">1</div>
+        <div>
+          <h2>Rounding error and clipping error</h2>
+          <p>INT4 only has a small set of grid points. Values inside the range are rounded; values outside the range are clipped.</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini-card">
+          <h3>Rounding: value is inside range</h3>
+          <div class="caption mono">s = 0.1, INT4 range = [-0.7, 0.7]</div>
+          <div class="quant-line">
+            <div class="axis"></div>
+            <div class="tick" style="left: 10%;"><span>-0.7</span></div>
+            <div class="tick" style="left: 30%;"><span>-0.3</span></div>
+            <div class="tick" style="left: 50%;"><span>0</span></div>
+            <div class="tick" style="left: 65%;"><span>0.3</span></div>
+            <div class="tick" style="left: 90%;"><span>0.7</span></div>
+            <div class="point fp" style="left: 63%;"></div>
+            <div class="point dq" style="left: 65%;"></div>
+            <div class="arrow" style="left: 63%; width: 2%;"></div>
+            <div class="label" style="left: 63%; top: 0; color: var(--orange);">x = 0.26</div>
+            <div class="label" style="left: 65%; top: 70px; color: var(--green);">x<sub>dq</sub> = 0.30</div>
+          </div>
+          <div class="steps">
+            <div class="step"><strong>x / s</strong><small>0.26 / 0.1 = 2.6</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="step"><strong>round</strong><small>2.6 → 3</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="step"><strong>dequant</strong><small>3 × 0.1 = 0.3</small></div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <h3>Clipping: value is outside range</h3>
+          <div class="caption mono">s = 0.1, representable max = 7s = 0.7</div>
+          <div class="quant-line">
+            <div class="axis"></div>
+            <div class="tick" style="left: 10%;"><span>-0.7</span></div>
+            <div class="tick" style="left: 50%;"><span>0</span></div>
+            <div class="tick" style="left: 82%;"><span>0.7</span></div>
+            <div class="point clip" style="left: 96%;"></div>
+            <div class="point dq" style="left: 82%;"></div>
+            <div class="arrow" style="left: 82%; width: 14%; transform: rotate(180deg); transform-origin: left center;"></div>
+            <div class="label" style="left: 96%; top: 0; color: var(--red);">x = 1.20</div>
+            <div class="label" style="left: 82%; top: 70px; color: var(--green);">clipped to 0.70</div>
+          </div>
+          <div class="steps">
+            <div class="step"><strong>x / s</strong><small>1.2 / 0.1 = 12</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="step"><strong>clamp</strong><small>12 → 7</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="step"><strong>dequant</strong><small>7 × 0.1 = 0.7</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="dot" style="background: var(--orange);"></span>Original FP value</div>
+        <div class="legend-item"><span class="dot" style="background: var(--green);"></span>Dequantized value</div>
+        <div class="legend-item"><span class="dot" style="background: var(--red);"></span>Out-of-range value</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div class="badge" style="background: var(--purple);">2</div>
+        <div>
+          <h2>Scale selection is a tradeoff</h2>
+          <p>The scale chooses both the grid spacing and the representable range. Large scale protects outliers; small scale preserves normal values.</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini-card">
+          <h3>Large scale: protect outlier</h3>
+          <div class="caption mono">s = 2.0 / 7 ≈ 0.286</div>
+          <div class="scale-track">
+            <div class="range-bar"></div>
+            <div class="small-tick" style="left: 6%;"></div>
+            <div class="small-tick" style="left: 20%;"></div>
+            <div class="small-tick" style="left: 34%;"></div>
+            <div class="small-tick" style="left: 48%;"></div>
+            <div class="small-tick" style="left: 62%;"></div>
+            <div class="small-tick" style="left: 76%;"></div>
+            <div class="small-tick" style="left: 90%;"></div>
+            <div class="normal-dot" style="left: 49%;"></div>
+            <div class="normal-dot" style="left: 50%;"></div>
+            <div class="normal-dot" style="left: 51%;"></div>
+            <div class="outlier" style="left: 90%;"></div>
+            <div class="range-label" style="left: 6%;">-2.0</div>
+            <div class="range-label" style="left: 48%;">0</div>
+            <div class="range-label" style="left: 90%;">2.0</div>
+          </div>
+          <table class="compare-table">
+            <tr><th>Effect</th><th>Result</th></tr>
+            <tr><td>Outlier 2.0</td><td class="good">Preserved</td></tr>
+            <tr><td>Small values 0.05, 0.08, 0.10</td><td class="bad">Collapse to 0</td></tr>
+            <tr><td>Dominant error</td><td class="warn">Rounding error for normal values</td></tr>
+          </table>
+        </div>
+
+        <div class="mini-card">
+          <h3>Small scale: preserve normal values</h3>
+          <div class="caption mono">s = 0.03, representable max = 0.21</div>
+          <div class="scale-track">
+            <div class="range-bar" style="left: 25%; right: 25%;"></div>
+            <div class="small-tick" style="left: 25%;"></div>
+            <div class="small-tick" style="left: 33%;"></div>
+            <div class="small-tick" style="left: 41%;"></div>
+            <div class="small-tick" style="left: 49%;"></div>
+            <div class="small-tick" style="left: 57%;"></div>
+            <div class="small-tick" style="left: 65%;"></div>
+            <div class="small-tick" style="left: 75%;"></div>
+            <div class="normal-dot" style="left: 54%;"></div>
+            <div class="normal-dot" style="left: 57%;"></div>
+            <div class="normal-dot" style="left: 61%;"></div>
+            <div class="outlier" style="left: 96%;"></div>
+            <div class="range-label" style="left: 25%;">-0.21</div>
+            <div class="range-label" style="left: 49%;">0</div>
+            <div class="range-label" style="left: 75%;">0.21</div>
+          </div>
+          <table class="compare-table">
+            <tr><th>Effect</th><th>Result</th></tr>
+            <tr><td>Small values 0.05, 0.08, 0.10</td><td class="good">Preserved well</td></tr>
+            <tr><td>Outlier 2.0</td><td class="bad">Clipped to 0.21</td></tr>
+            <tr><td>Dominant error</td><td class="warn">Clipping error for outliers</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>First-principle view:</strong> scale is the knob that trades <span class="good">precision</span> against <span class="bad">range</span>. In INT4, you only have 16 buckets, so you cannot represent tiny normal values and large outliers perfectly at the same time.
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div class="badge" style="background: var(--orange);">3</div>
+        <div>
+          <h2>Rounding is not always harmless</h2>
+          <p>Nearest rounding minimizes scalar error, but LLM layers care about output error after GEMM: Y = XW.</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini-card">
+          <h3>Nearest rounding: locally correct</h3>
+          <div class="caption mono">x = [1, 1], w = [0.49, 0.49], s = 1.0</div>
+          <div class="gemm-box">
+            <div class="vector-row">
+              <div class="vector">X<br/>[1, 1]</div>
+              <div class="vector">W<sub>fp</sub><br/>[0.49, 0.49]</div>
+              <div class="flow-arrow">→</div>
+              <div class="vector">Y = XW<br/>0.98</div>
+              <div class="result good-bg">Target<br/>0.98</div>
+            </div>
+            <div class="vector-row">
+              <div class="vector">X<br/>[1, 1]</div>
+              <div class="vector">W<sub>q</sub><br/>[0, 0]</div>
+              <div class="flow-arrow">→</div>
+              <div class="vector">Y<sub>q</sub><br/>0</div>
+              <div class="result bad-bg">Error<br/>0.98</div>
+            </div>
+          </div>
+          <p class="caption">Each 0.49 is closer to 0 than 1, so nearest rounding chooses [0, 0]. But the layer output becomes very wrong.</p>
+        </div>
+
+        <div class="mini-card">
+          <h3>Non-nearest rounding: globally better</h3>
+          <div class="caption mono">One value is rounded “wrong” locally</div>
+          <div class="gemm-box">
+            <div class="vector-row">
+              <div class="vector">X<br/>[1, 1]</div>
+              <div class="vector">W<sub>q</sub><br/>[1, 0]</div>
+              <div class="flow-arrow">→</div>
+              <div class="vector">Y<sub>q</sub><br/>1</div>
+              <div class="result good-bg">Error<br/>0.02</div>
+            </div>
+            <div class="vector-row">
+              <div class="vector">Scalar view</div>
+              <div class="vector">0.49 → 1<br/>locally worse</div>
+              <div class="flow-arrow">→</div>
+              <div class="vector">Layer view</div>
+              <div class="result good-bg">globally better</div>
+            </div>
+          </div>
+          <p class="caption">The model does not optimize each weight alone. It cares about whether XW is preserved after quantization.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Key idea:</strong> nearest rounding minimizes <span class="mono">|w − w<sub>q</sub>|</span>, but quantization-aware algorithms care more about <span class="mono">||XW − XW<sub>q</sub>||</span>. That is why methods like GPTQ, AWQ, and AutoRound optimize rounding, clipping, or scaling using calibration data.
+      </div>
+    </section>
+
+    <div class="footer-note">
+      Low-bit quantization is hard because the grid is tiny, scale must balance range and precision, and local scalar decisions can break global model behavior.
+    </div>
+  </main>
+</body>
+</html>
