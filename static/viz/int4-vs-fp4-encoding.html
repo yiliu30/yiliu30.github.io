@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INT4 vs FP4 — Encoding Visualized</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --vllm-blue: #30a2ff;
+    --vllm-blue-dark: #1a7fd4;INT4 vs FP4 Encoding
+    --vllm-blue-light: #e8f4ff;
+    --vllm-blue-10: rgba(48, 162, 255, 0.10);
+    --vllm-blue-20: rgba(48, 162, 255, 0.20);
+    --purple: #8b5cf6;
+    --purple-dark: #6d28d9;
+    --purple-light: #f5f3ff;
+    --purple-10: rgba(139, 92, 246, 0.10);
+    --purple-20: rgba(139, 92, 246, 0.22);
+    --bg: #ffffff;
+    --bg-secondary: #f8f9fb;
+    --surface-muted: #f3f5f8;
+    --text: #1a1f36;
+    --text-secondary: #6b7394;
+    --text-dim: #8f96b3;
+    --border: #e5e8f0;
+    --border-light: #eef1f6;
+    --green: #00c758;
+    --green-text: #0a7c3e;
+    --yellow: #fdb517;
+    --sign-c: #ef4444;
+    --exp-c: #8b5cf6;
+    --man-c: #30a2ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    padding: 32px 24px 64px;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 {
+    font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em;
+    margin-bottom: 6px;
+  }
+  header h1 .int { color: var(--vllm-blue); }
+  header h1 .fp { color: var(--purple); }
+  header p { color: var(--text-secondary); font-size: 1.02rem; }
+  .yellow-bar { width: 56px; height: 4px; background: var(--yellow); border-radius: 2px; margin: 12px auto 0; }
+
+  /* Legend */
+  .legend {
+    display: flex; justify-content: center; gap: 22px; flex-wrap: wrap;
+    margin: 18px 0 26px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.86rem; font-weight: 500; color: var(--text-secondary); }
+  .swatch { width: 16px; height: 16px; border-radius: 4px; }
+  .sw-sign { background: var(--sign-c); }
+  .sw-exp { background: var(--exp-c); }
+  .sw-man { background: var(--man-c); }
+
+  /* Two-column compare */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card.int { border-top: 4px solid var(--vllm-blue); }
+  .card.fp { border-top: 4px solid var(--purple); }
+
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .card-head h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+  .card.int h2 { color: var(--vllm-blue-dark); }
+  .card.fp h2 { color: var(--purple-dark); }
+  .tag {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 3px 10px; border-radius: 20px;
+  }
+  .tag.int { background: var(--vllm-blue-10); color: var(--vllm-blue-dark); }
+  .tag.fp { background: var(--purple-10); color: var(--purple-dark); }
+  .subtitle { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 18px; }
+
+  /* Bit boxes */
+  .bits { display: flex; gap: 6px; margin-bottom: 6px; }
+  .bit {
+    flex: 1; aspect-ratio: 1 / 1; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+    color: #fff; font-size: 1.1rem; position: relative;
+  }
+  .bit small { font-size: 0.6rem; font-weight: 600; opacity: 0.85; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .bit.sign { background: var(--sign-c); }
+  .bit.exp { background: var(--exp-c); }
+  .bit.man { background: var(--man-c); }
+  .bit-groups { display: flex; gap: 6px; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .bit-groups span { text-align: center; }
+
+  .formula-box {
+    background: var(--bg-secondary); border: 1px solid var(--border-light);
+    border-radius: 10px; padding: 12px 16px; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; color: var(--text); margin-bottom: 16px; text-align: center;
+  }
+
+  .stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stat {
+    flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-light);
+    border-radius: 10px; padding: 10px 12px; text-align: center;
+  }
+  .stat .v { font-size: 1.25rem; font-weight: 800; }
+  .card.int .stat .v { color: var(--vllm-blue-dark); }
+  .card.fp .stat .v { color: var(--purple-dark); }
+  .stat .l { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 10px; font-weight: 700; }
+
+  /* Number line */
+  .numline-wrap { margin-bottom: 8px; }
+  .numline {
+    position: relative; height: 70px; margin: 0 6px 4px;
+    border-bottom: 2px solid var(--border);
+  }
+  .tick {
+    position: absolute; bottom: 0; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .tick .dot { width: 9px; height: 9px; border-radius: 50%; margin-bottom: 4px; }
+  .card.int .tick .dot { background: var(--vllm-blue); }
+  .card.fp .tick .dot { background: var(--purple); }
+  .tick .stem { position: absolute; bottom: 0; width: 1px; height: 10px; background: var(--border); }
+  .tick .lbl {
+    position: absolute; top: -20px; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem; color: var(--text-secondary); white-space: nowrap;
+  }
+  .tick.zero .dot { background: var(--text); width: 11px; height: 11px; }
+  .gap-note { font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 10px; }
+
+  .insight {
+    border-radius: 10px; padding: 11px 15px; font-size: 0.84rem; margin-top: 14px;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .card.int .insight { background: var(--vllm-blue-10); color: var(--vllm-blue-dark); }
+  .card.fp .insight { background: var(--purple-10); color: var(--purple-dark); }
+  .insight b { font-weight: 700; }
+
+  /* Overlay comparison */
+  .compare-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+    padding: 26px 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .compare-card h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .compare-card > p.sub { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 22px; }
+
+  .overlay-line { position: relative; height: 130px; margin: 30px 20px 10px; }
+  .axis { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); }
+  .o-tick { position: absolute; top: 50%; transform: translate(-50%, -50%); }
+  .o-tick .mk { width: 2px; border-radius: 1px; }
+  .o-tick.int .mk { background: var(--vllm-blue); height: 26px; }
+  .o-tick.fp .mk { background: var(--purple); height: 26px; }
+  .o-row-int .o-tick .mk { transform: translateY(-26px); }
+  .o-row-fp .o-tick .mk { transform: translateY(0); }
+  .o-tick .val {
+    position: absolute; font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+    left: 50%; transform: translateX(-50%); white-space: nowrap; color: var(--text-secondary);
+  }
+  .o-row-int .o-tick .val { top: -42px; }
+  .o-row-fp .o-tick .val { top: 30px; }
+  .row-label {
+    position: absolute; left: -8px; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; transform: translateX(-100%);
+    padding-right: 12px; white-space: nowrap;
+  }
+  .row-label.int { color: var(--vllm-blue-dark); top: calc(50% - 26px); }
+  .row-label.fp { color: var(--purple-dark); top: calc(50% + 14px); }
+
+  .takeaway {
+    background: linear-gradient(135deg, var(--vllm-blue-10), var(--purple-10));
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 22px; margin-top: 24px; font-size: 0.95rem; color: var(--text);
+  }
+  .takeaway b { color: var(--text); }
+  .takeaway .key { font-weight: 700; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th { background: var(--text); color: #fff; text-align: left; padding: 9px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); }
+  td.lbl { font-weight: 600; color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  td .int-c { color: var(--vllm-blue-dark); font-weight: 600; }
+  td .fp-c { color: var(--purple-dark); font-weight: 600; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  footer { text-align: center; margin-top: 30px; color: var(--text-dim); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1><span class="int">INT4</span> vs <span class="fp">FP4</span> — How 4 Bits Encode a Number</h1>
+    <p>Same 16 codes, very different value placement. Uniform steps vs. floating-point spacing.</p>
+    <div class="yellow-bar"></div>
+  </header>
+
+  <div class="legend">
+    <div class="legend-item"><span class="swatch sw-sign"></span> Sign bit</div>
+    <div class="legend-item"><span class="swatch sw-exp"></span> Exponent bits</div>
+    <div class="legend-item"><span class="swatch sw-man"></span> Mantissa bits</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- INT4 -->
+    <div class="card int">
+      <div class="card-head">
+        <h2>INT4</h2>
+        <span class="tag int">Uniform · Additive</span>
+      </div>
+      <p class="subtitle">Signed integer, symmetric range. Every step is the same size.</p>
+
+      <div class="bits">
+        <div class="bit sign">S<small>sign</small></div>
+        <div class="bit man">b<small>2²</small></div>
+        <div class="bit man">b<small>2¹</small></div>
+        <div class="bit man">b<small>2⁰</small></div>
+      </div>
+      <div class="bit-groups">
+        <span style="flex:1;">1 sign</span>
+        <span style="flex:3;">3 magnitude bits</span>
+      </div>
+
+      <div class="formula-box">value = (−1)<sup>S</sup> × integer × <b>scale</b></div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="v">16</div><div class="l">codes</div></div>
+        <div class="stat"><div class="v">−7…7</div><div class="l">range (×scale)</div></div>
+        <div class="stat"><div class="v">const</div><div class="l">step size</div></div>
+      </div>
+
+      <h3>Representable values (× scale)</h3>
+      <div class="numline-wrap">
+        <div class="numline" id="int-line"></div>
+      </div>
+      <p class="gap-note">Equal spacing everywhere — the gap near 0 equals the gap near the max.</p>
+
+      <div class="insight">
+        <span>📐</span>
+        <div><b>Uniform grid.</b> Great when values are spread evenly. Wastes resolution if most weights cluster near zero.</div>
+      </div>
+    </div>
+
+    <!-- FP4 -->
+    <div class="card fp">
+      <div class="card-head">
+        <h2>FP4 <span style="font-size:0.9rem; font-weight:600; color:var(--text-dim);">(E2M1)</span></h2>
+        <span class="tag fp">Non-uniform · Multiplicative</span>
+      </div>
+      <p class="subtitle">1 sign · 2 exponent · 1 mantissa. Steps grow with magnitude.</p>
+
+      <div class="bits">
+        <div class="bit sign">S<small>sign</small></div>
+        <div class="bit exp">E<small>2¹</small></div>
+        <div class="bit exp">E<small>2⁰</small></div>
+        <div class="bit man">M<small>frac</small></div>
+      </div>
+      <div class="bit-groups">
+        <span style="flex:1;">1 sign</span>
+        <span style="flex:2;">2 exponent</span>
+        <span style="flex:1;">1 mant.</span>
+      </div>
+
+      <div class="formula-box">value = (−1)<sup>S</sup> × 2<sup>E−bias</sup> × (1.M) × <b>scale</b></div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="v">16</div><div class="l">codes</div></div>
+        <div class="stat"><div class="v">±6</div><div class="l">max (×scale)</div></div>
+        <div class="stat"><div class="v">var</div><div class="l">step size</div></div>
+      </div>
+
+      <h3>Representable values (× scale)</h3>
+      <div class="numline-wrap">
+        <div class="numline" id="fp-line"></div>
+      </div>
+      <p class="gap-note">Dense near 0, sparse far out — fine steps where weights actually live.</p>
+
+      <div class="insight">
+        <span>🎯</span>
+        <div><b>Floating grid.</b> More resolution near zero (where most weights are), wider dynamic range with the same 4 bits.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay compare -->
+  <div class="compare-card">
+    <h2>Side by Side — Same Bits, Different Grid</h2>
+    <p class="sub">Both use 16 codes. INT4 ticks (top) are evenly spaced; FP4 ticks (bottom) bunch up near zero.</p>
+
+    <div class="overlay-line">
+      <div class="axis"></div>
+      <div class="row-label int">INT4</div>
+      <div class="row-label fp">FP4</div>
+      <div class="o-row-int" id="o-int"></div>
+      <div class="o-row-fp" id="o-fp"></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Property</th><th>INT4</th><th>FP4 (E2M1)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="lbl">Bit layout</td><td><span class="int-c">1 sign + 3 magnitude</span></td><td><span class="fp-c">1 sign + 2 exp + 1 mantissa</span></td></tr>
+        <tr><td class="lbl">Spacing</td><td>Uniform (additive)</td><td>Non-uniform (multiplicative)</td></tr>
+        <tr><td class="lbl">Step near 0</td><td>Same as everywhere</td><td><span class="fp-c">Small</span> — high resolution</td></tr>
+        <tr><td class="lbl">Step far from 0</td><td>Same as everywhere</td><td><span class="fp-c">Large</span> — coarse</td></tr>
+        <tr><td class="lbl">Dynamic range</td><td>Limited (linear)</td><td><span class="fp-c">Wider</span> (exponential)</td></tr>
+        <tr><td class="lbl">Best when…</td><td>Values spread evenly</td><td>Values cluster near 0 + outliers</td></tr>
+        <tr><td class="lbl">Used in</td><td>W4A16 INT kernels, GPTQ/AWQ</td><td>MXFP4 / NVFP4, next-gen HW</td></tr>
+      </tbody>
+    </table>
+
+    <div class="takeaway">
+      <span class="key">🔑 Key idea:</span> INT spends its 16 codes on an <b>even ruler</b>; FP spends them on a <b>logarithmic ruler</b>.
+      Neural-net weights pile up near zero, so FP4's fine-near-zero grid often fits the distribution better at the same bit-width —
+      which is why <b>MXFP4/NVFP4</b> are gaining traction for low-bit inference.
+    </div>
+  </div>
+
+  <footer>INT4 vs FP4 encoding · companion visual for "Quantization Primitives" · AutoRound deck</footer>
+</div>
+
+<script>
+  // ---- Value sets ----
+  // INT4 symmetric: -7..7 (skip -8 for symmetric weight quant)
+  const intVals = [];
+  for (let i = -7; i <= 7; i++) intVals.push(i);
+
+  // FP4 E2M1 positive magnitudes: 0, 0.5, 1, 1.5, 2, 3, 4, 6
+  const fpMag = [0, 0.5, 1, 1.5, 2, 3, 4, 6];
+  const fpVals = [];
+  fpMag.forEach(m => { if (m === 0) { fpVals.push(0); } else { fpVals.push(-m); fpVals.push(m); } });
+  fpVals.sort((a,b) => a-b);
+
+  // ---- Per-card number lines (own scale) ----
+  function renderLine(id, values, maxAbs) {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    values.forEach(v => {
+      const pct = (v / maxAbs) * 50 + 50; // map [-max,max] -> [0,100]
+      const t = document.createElement('div');
+      t.className = 'tick' + (v === 0 ? ' zero' : '');
+      t.style.left = pct + '%';
+      const showLabel = (v === 0) || Math.abs(v) === maxAbs || values.length <= 16 && (id.includes('fp') ? true : (Math.abs(v) % 1 === 0));
+      t.innerHTML = `<span class="lbl">${(+v.toFixed(2)).toString()}</span><span class="dot"></span>`;
+      el.appendChild(t);
+    });
+  }
+
+  renderLine('int-line', intVals, 7);
+  renderLine('fp-line', fpVals, 6);
+
+  // ---- Overlay (shared normalized 0..max for shape comparison) ----
+  function renderOverlay(id, values, maxAbs, cls) {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    values.forEach(v => {
+      const pct = (v / maxAbs) * 50 + 50;
+      const t = document.createElement('div');
+      t.className = 'o-tick ' + cls;
+      t.style.left = pct + '%';
+      t.innerHTML = `<div class="mk"></div><span class="val">${(+v.toFixed(1)).toString()}</span>`;
+      el.appendChild(t);
+    });
+  }
+  // normalize both to their own max so the SHAPE (spacing pattern) is what differs
+  renderOverlay('o-int', intVals, 7, 'int');
+  renderOverlay('o-fp', fpVals, 6, 'fp');
+</script>
+</body>
+</html>
