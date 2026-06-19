@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantization Granularity Visualizer · 16×64</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #181c2e;
+    --panel-2: #1f2440;
+    --text: #e7e9f3;
+    --muted: #9aa0bd;
+    --accent: #6ea8fe;
+    --border: #2a2f4a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(1200px 700px at 70% -10%, #1b2140 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 28px 20px 48px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px; margin-bottom: 18px;
+  }
+  .controls .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-right: 6px; }
+  button.mode {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; font-size: 13px; cursor: pointer;
+    transition: all .15s ease; font-weight: 600;
+  }
+  button.mode:hover { border-color: var(--accent); transform: translateY(-1px); }
+  button.mode.active { background: var(--accent); color: #0c1020; border-color: var(--accent); }
+
+  .layout { display: grid; grid-template-columns: 1fr auto 280px; gap: 18px; align-items: start; }
+  @media (max-width: 1000px){ .layout { grid-template-columns: 1fr; } }
+
+  .gridcard, .infocard {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+  }
+  .gridwrap { overflow-x: auto; }
+  table.grid { border-collapse: collapse; margin: 0 auto; }
+  table.grid td {
+    width: 15px; height: 15px; padding: 0;
+    border: 0.5px solid rgba(0,0,0,0.35);
+    transition: outline .12s ease;
+  }
+  .axis { color: var(--muted); font-size: 11px; }
+  .axis-x { text-align: center; margin: 0 0 8px; }
+  .legend-row { display:flex; align-items:center; gap:8px; margin-bottom: 14px; }
+  .colbar { display:flex; height: 12px; border-radius: 4px; overflow:hidden; flex:1; }
+  .colbar span { flex:1; }
+
+  .infocard h3 { margin: 0 0 12px; font-size: 15px; }
+  .stat { display:flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+  .stat:last-child { border-bottom: 0; }
+  .stat .k { color: var(--muted); }
+  .stat .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .big { font-size: 26px; color: var(--accent); }
+  .desc { color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .pill { display:inline-block; background: var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:2px 9px; font-size:12px; color:var(--text); margin-top:6px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+  .scaletitle { display:flex; align-items:baseline; justify-content:space-between; margin: 0 0 10px; }
+  .scaletitle h3 { margin: 0; font-size: 15px; }
+  .scaletitle .dim { color: var(--muted); font-size: 12px; }
+  table.scales { border-collapse: collapse; margin: 6px auto 2px; }
+  table.scales td {
+    min-width: 26px; height: 22px; padding: 0 4px;
+    border: 1px solid rgba(0,0,0,0.4);
+    text-align: center; font-size: 10px; font-weight: 700;
+    color: rgba(0,0,0,0.75); font-variant-numeric: tabular-nums;
+  }
+  .scalewrap { overflow-x:auto; }
+  .scalecap { color: var(--muted); font-size: 11px; text-align:center; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quantization Granularity Visualizer</h1>
+  <div class="sub">A <b>16 rows × 64 cols</b> weight tile (1,024 elements). Each colored region shares <b>one scale factor</b>. Pick a granularity to see how many scales are stored.</div>
+
+  <div class="controls">
+    <span class="label">Granularity</span>
+    <button class="mode" data-mode="tensor">Per-tensor</button>
+    <button class="mode active" data-mode="row">Per-row</button>
+    <button class="mode" data-mode="g32">Per-group (32)</button>
+    <button class="mode" data-mode="g64">Per-group (64)</button>
+    <button class="mode" data-mode="block">Per-block (16×16)</button>
+  </div>
+
+  <div class="layout">
+    <div class="gridcard">
+      <h3 style="margin:0 0 12px;font-size:15px;">Elements</h3>
+      <div class="axis axis-x">columns 0 → 63 (input / K dimension)</div>
+      <div class="gridwrap">
+        <table class="grid" id="grid"></table>
+      </div>
+      <div class="hint">Hover a cell to highlight all elements sharing its scale.</div>
+    </div>
+
+    <div class="infocard">
+      <div class="scaletitle">
+        <h3>Scales</h3>
+        <span class="dim" id="scaleDim">16 × 1</span>
+      </div>
+      <div class="scalewrap">
+        <table class="scales" id="scaleGrid"></table>
+      </div>
+      <div class="scalecap">each cell = one stored <code>scale</code> (label = group index)</div>
+    </div>
+
+    <div class="infocard">
+      <h3>Scale storage</h3>
+      <div class="stat"><span class="k">Number of scales</span><span class="v big" id="numScales">16</span></div>
+      <div class="stat"><span class="k">Elements / scale</span><span class="v" id="elemPer">64</span></div>
+      <div class="stat"><span class="k">Tile elements</span><span class="v">1,024</span></div>
+      <div class="stat"><span class="k">Scale overhead</span><span class="v" id="overhead">1.56%</span></div>
+      <div class="pill" id="shapePill">scales: [16, 1]</div>
+      <div class="desc" id="desc"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ROWS = 16, COLS = 64, TOTAL = ROWS * COLS;
+
+// Distinct, evenly-spread hues for group coloring
+function colorFor(id, count) {
+  if (count <= 1) return 'hsl(210 70% 55%)';
+  const hue = (id * 137.508) % 360;          // golden-angle spread
+  const light = 45 + (id % 3) * 7;            // slight variation
+  return `hsl(${hue.toFixed(1)} 65% ${light}%)`;
+}
+
+const MODES = {
+  tensor: {
+    label: 'Per-tensor',
+    groupId: (r, c) => 0,
+    count: 1, elemPer: TOTAL, shape: '[1]',
+    sRows: 1, sCols: 1,
+    desc: 'One single scale for the entire tile. Smallest storage, lowest accuracy — outliers in any element stretch the range for all 1,024 values.'
+  },
+  row: {
+    label: 'Per-row (per-channel)',
+    groupId: (r, c) => r,
+    count: ROWS, elemPer: COLS, shape: `[${ROWS}, 1]`,
+    sRows: ROWS, sCols: 1,
+    desc: 'One scale per output channel (row). Common for weight-only INT8/INT4. Balances accuracy and overhead; aligns naturally with GEMM output channels.'
+  },
+  g32: {
+    label: 'Per-group, group size 32',
+    groupId: (r, c) => r * (COLS / 32) + Math.floor(c / 32),
+    count: ROWS * (COLS / 32), elemPer: 32, shape: `[${ROWS}, ${COLS/32}]`,
+    sRows: ROWS, sCols: COLS / 32,
+    desc: 'Groups of 32 consecutive elements along K share a scale. Finer than per-row → better accuracy for low-bit (e.g. INT4/AWQ/GPTQ) at the cost of more scales.'
+  },
+  g64: {
+    label: 'Per-group, group size 64',
+    groupId: (r, c) => r * (COLS / 64) + Math.floor(c / 64),
+    count: ROWS * (COLS / 64), elemPer: 64, shape: `[${ROWS}, ${COLS/64}]`,
+    sRows: ROWS, sCols: COLS / 64,
+    desc: 'Groups of 64 elements along K. Here the row width is 64, so a group spans the whole row — equivalent to per-row for this tile, but generalizes to wider K.'
+  },
+  block: {
+    label: 'Per-block (16×16)',
+    groupId: (r, c) => Math.floor(r / 16) * (COLS / 16) + Math.floor(c / 16),
+    count: (ROWS / 16) * (COLS / 16), elemPer: 256, shape: `[${ROWS/16}, ${COLS/16}]`,
+    sRows: ROWS / 16, sCols: COLS / 16,
+    desc: '2-D 16×16 blocks share a scale (block-wise / MX-style tiling). Hardware-friendly for tensor-core layouts; trades some accuracy vs. 1-D groups.'
+  }
+};
+
+const grid = document.getElementById('grid');
+const cells = [];
+
+// Build grid once
+for (let r = 0; r < ROWS; r++) {
+  const tr = document.createElement('tr');
+  const rowCells = [];
+  for (let c = 0; c < COLS; c++) {
+    const td = document.createElement('td');
+    td.dataset.r = r; td.dataset.c = c;
+    tr.appendChild(td);
+    rowCells.push(td);
+  }
+  grid.appendChild(tr);
+  cells.push(rowCells);
+}
+
+let current = 'row';
+
+function render(mode) {
+  const m = MODES[mode];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const id = m.groupId(r, c);
+      const td = cells[r][c];
+      td.style.background = colorFor(id, m.count);
+      td.dataset.gid = id;
+      td.style.outline = '';
+    }
+  }
+  document.getElementById('numScales').textContent = m.count.toLocaleString();
+  document.getElementById('elemPer').textContent = m.elemPer.toLocaleString();
+  const overhead = (m.count / TOTAL * 100);
+  document.getElementById('overhead').textContent = overhead.toFixed(2) + '%';
+  document.getElementById('shapePill').textContent = 'scales: ' + m.shape;
+  document.getElementById('desc').textContent = m.desc;
+  document.getElementById('scaleDim').textContent = m.sRows + ' × ' + m.sCols;
+
+  renderScales(m);
+
+  document.querySelectorAll('button.mode').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  current = mode;
+}
+
+const scaleGrid = document.getElementById('scaleGrid');
+
+// Render the scale tensor: one cell per stored scale, colored by group id
+function renderScales(m) {
+  scaleGrid.innerHTML = '';
+  for (let sr = 0; sr < m.sRows; sr++) {
+    const tr = document.createElement('tr');
+    for (let sc = 0; sc < m.sCols; sc++) {
+      const id = sr * m.sCols + sc;
+      const td = document.createElement('td');
+      td.style.background = colorFor(id, m.count);
+      td.dataset.sgid = id;
+      td.textContent = 's' + id;
+      td.title = 'scale[' + sr + ',' + sc + '] · group ' + id;
+      tr.appendChild(td);
+    }
+    scaleGrid.appendChild(tr);
+  }
+}
+
+// Cross-highlight: hovering a scale cell outlines its elements (and vice-versa)
+scaleGrid.addEventListener('mouseover', e => {
+  if (e.target.tagName !== 'TD') return;
+  const gid = e.target.dataset.sgid;
+  for (const row of cells) for (const td of row) {
+    td.style.outline = (td.dataset.gid === gid) ? '1.5px solid #fff' : '';
+    td.style.outlineOffset = '-1.5px';
+  }
+  scaleGrid.querySelectorAll('td').forEach(td => {
+    td.style.outline = (td.dataset.sgid === gid) ? '2px solid #fff' : '';
+    td.style.outlineOffset = '-2px';
+  });
+});
+scaleGrid.addEventListener('mouseleave', () => {
+  for (const row of cells) for (const td of row) td.style.outline = '';
+  scaleGrid.querySelectorAll('td').forEach(td => td.style.outline = '');
+});
+
+// Hover highlight: outline all cells sharing the same scale group
+grid.addEventListener('mouseover', e => {
+  if (e.target.tagName !== 'TD') return;
+  const gid = e.target.dataset.gid;
+  for (const row of cells) for (const td of row) {
+    td.style.outline = (td.dataset.gid === gid) ? '1.5px solid #fff' : '';
+    td.style.outlineOffset = '-1.5px';
+  }
+  scaleGrid.querySelectorAll('td').forEach(td => {
+    td.style.outline = (td.dataset.sgid === gid) ? '2px solid #fff' : '';
+    td.style.outlineOffset = '-2px';
+  });
+});
+grid.addEventListener('mouseleave', () => {
+  for (const row of cells) for (const td of row) td.style.outline = '';
+  scaleGrid.querySelectorAll('td').forEach(td => td.style.outline = '');
+});
+
+document.querySelectorAll('button.mode').forEach(b =>
+  b.addEventListener('click', () => render(b.dataset.mode)));
+
+render('row');
+</script>
+</body>
+</html>
