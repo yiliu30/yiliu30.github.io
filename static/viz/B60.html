@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BMG Hardware Peak and MFU Reference</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #58616d;
+      --line: #d8dde5;
+      --blue: #0b6fcb;
+      --green: #147a52;
+      --amber: #996515;
+      --code: #f1f4f8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 56px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 34px;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    p, li {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 12px 0 18px;
+    }
+
+    th, td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    th {
+      background: #eef3f9;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code, .formula {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: var(--code);
+      border-radius: 5px;
+      color: var(--ink);
+    }
+
+    .lead {
+      max-width: 880px;
+      margin: 0 0 18px;
+      font-size: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .metric {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 4px 0;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .formula {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      white-space: pre;
+      font-size: 14px;
+      line-height: 1.55;
+      margin: 10px 0 16px;
+    }
+
+    .callout {
+      border-left: 4px solid var(--blue);
+      background: #edf6ff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 16px 0;
+    }
+
+    .callout.warning {
+      border-left-color: var(--amber);
+      background: #fff7e5;
+    }
+
+    .ok {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    @media (max-width: 820px) {
+      main {
+        padding: 24px 16px 40px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      th, td {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BMG Hardware Peak and MFU Reference</h1>
+    <p class="lead">
+      This note documents the Intel Arc Pro B60 peak throughput assumptions used by the ARK/Sage benchmark notes,
+      including the source links and formulas behind the FP16, BF16, INT8, and FP32 denominators.
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h3>INT8 XMX Peak</h3>
+        <div class="metric">196.6 TOPS</div>
+        <div class="label">Matches Intel B60 197 peak TOPS spec after rounding.</div>
+      </section>
+      <section class="card">
+        <h3>FP16/BF16 XMX Peak</h3>
+        <div class="metric">98.3 TFLOP/s</div>
+        <div class="label">Half of INT8 because XMX FP16/BF16 ops per cycle are half of INT8.</div>
+      </section>
+      <section class="card">
+        <h3>FP32 Vector Peak</h3>
+        <div class="metric">12.28 TFLOP/s</div>
+        <div class="label">Matches Intel B60 FP32 throughput spec after rounding.</div>
+      </section>
+    </div>
+
+    <section class="callout">
+      <p>
+        For the 75.6k non-causal attention benchmark, use <strong>98.3 TFLOP/s</strong> as the FP16/BF16 XMX
+        denominator and <strong>196.6 TOPS</strong> as the INT8 XMX denominator. The old shorthand
+        <code>FP16 = INT8 / 2</code> is correct for XMX peak, but the comment should say that 196.6 is the INT8
+        dense XMX peak, not the FP16 peak.
+      </p>
+    </section>
+
+    <h2>Source Facts</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Fact</th>
+          <th>Value</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>B60 GPU peak TOPS</td>
+          <td>197 TOPS, INT8 dense XMX workload</td>
+          <td>
+            <a href="https://www.intel.com/content/dam/www/central-libraries/us/en/documents/2026-03/datasheet-b60-gpu.pdf">
+              Intel Arc Pro B60 datasheet
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td>B60 FP32 throughput</td>
+          <td>Up to 12.28 TFLOP/s</td>
+          <td>
+            <a href="https://www.intel.com/content/dam/www/central-libraries/us/en/documents/2026-03/datasheet-b60-gpu.pdf">
+              Intel Arc Pro B60 datasheet
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td>B60 compute resources</td>
+          <td>20 Xe-cores, 160 XMX engines</td>
+          <td>
+            <a href="https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/arc/workstations/b-series/overview.html">
+              Intel Arc Pro B-series overview
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td>Per Xe-core matrix throughput</td>
+          <td>4096 INT8 ops/cycle, 2048 FP16/BF16 ops/cycle</td>
+          <td>
+            <a href="https://www.intel.com/content/www/us/en/docs/oneapi/optimization-guide-gpu/2024-1/xe-arch.html">
+              Intel Xe GPU architecture guide
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td>Per Xe-core vector throughput</td>
+          <td>256 FP32 ops/cycle</td>
+          <td>
+            <a href="https://www.intel.com/content/www/us/en/docs/oneapi/optimization-guide-gpu/2024-1/xe-arch.html">
+              Intel Xe GPU architecture guide
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Formulas</h2>
+    <p>
+      The B60 spec implies a maximum graphics clock around 2.4 GHz because the official INT8 and FP32 peak numbers
+      both solve to that frequency.
+    </p>
+
+    <div class="formula">clock_GHz = official_INT8_TOPS / (Xe_cores * INT8_ops_per_Xe_core_per_cycle)
+          = 197 / (20 * 4096)
+          = 0.002404 TOPS per ops/cycle
+          = 2.404 GHz
+
+clock_GHz = official_FP32_TFLOPS / (Xe_cores * FP32_ops_per_Xe_core_per_cycle)
+          = 12.28 / (20 * 256)
+          = 0.002398 TFLOP/s per ops/cycle
+          = 2.398 GHz</div>
+
+    <p>Using 2.4 GHz for simple benchmark denominators:</p>
+
+    <div class="formula">INT8_XMX_peak_TOPS = 20 Xe-cores * 4096 INT8 ops/cycle/Xe-core * 2.4 GHz
+                   = 196,608 GOPS
+                   = 196.608 TOPS
+                   ~= 196.6 TOPS
+
+FP16_XMX_peak_TFLOPS = 20 Xe-cores * 2048 FP16 ops/cycle/Xe-core * 2.4 GHz
+                    = 98,304 GFLOP/s
+                    = 98.304 TFLOP/s
+                    ~= 98.3 TFLOP/s
+
+BF16_XMX_peak_TFLOPS = 20 Xe-cores * 2048 BF16 ops/cycle/Xe-core * 2.4 GHz
+                    = 98.304 TFLOP/s
+
+FP32_vector_peak_TFLOPS = 20 Xe-cores * 256 FP32 ops/cycle/Xe-core * 2.4 GHz
+                       = 12.288 TFLOP/s
+                       ~= 12.28 TFLOP/s</div>
+
+    <h2>MFU Denominator</h2>
+    <p>
+      Model FLOP utilization is a ratio between the benchmark's counted attention FLOP/s and the device's theoretical
+      peak for the datatype and execution unit used by that kernel.
+    </p>
+
+    <div class="formula">MFU = achieved_TFLOP/s / theoretical_peak_TFLOP/s</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Benchmark path</th>
+          <th>Measured throughput</th>
+          <th>Peak denominator</th>
+          <th>MFU formula</th>
+          <th>MFU</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ARK FP16 SDPA, BMG 75.6k non-causal</td>
+          <td>83.02 TFLOP/s</td>
+          <td>98.3 TFLOP/s FP16 XMX peak</td>
+          <td><code>83.02 / 98.3</code></td>
+          <td class="ok">84.45%</td>
+        </tr>
+        <tr>
+          <td>ARK Sage v1 INT8, BMG 75.6k non-causal</td>
+          <td>98.38 TFLOP/s</td>
+          <td>196.6 TOPS INT8 XMX peak</td>
+          <td><code>98.38 / 196.6</code></td>
+          <td class="ok">50.04%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <section class="callout warning">
+      <p>
+        Do not compare FP16 MFU and INT8 MFU without checking the denominator. INT8 can have better latency and higher
+        absolute achieved throughput while reporting lower MFU because its theoretical XMX peak is twice the FP16/BF16
+        XMX peak on this architecture.
+      </p>
+    </section>
+
+    <h2>Benchmark Interpretation</h2>
+    <ul>
+      <li>
+        The standalone sycl-tla BKC result around <code>82.7 TFLOP/s</code> is plausible: it is about
+        <code>82.7 / 98.3 = 84.1%</code> of B60 FP16/BF16 XMX peak.
+      </li>
+      <li>
+        The PyTorch XPU SDPA result around <code>55.9 TFLOP/s</code> is about <code>55.9 / 98.3 = 56.9%</code> of
+        B60 FP16/BF16 XMX peak, so the gap is a backend/kernel efficiency issue rather than a hardware peak mismatch.
+      </li>
+      <li>
+        The Sage v1 INT8 result around <code>98.4 TOPS</code> is about half of INT8 dense XMX peak, but it is already
+        roughly equal to the full FP16/BF16 XMX theoretical peak. That is why raw TFLOP/s and MFU tell different stories.
+      </li>
+    </ul>
+  </main>
+</body>
+</html>
