@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Top-K Methods Comparison: Real vs Approx Top-K</title>
+<style>
+:root{--bg:#0b1020;--ink:#eef3ff;--muted:#aeb9d6;--line:rgba(255,255,255,.12);--accent:#72d2ff;--green:#9ef0b5;--yellow:#ffd37a;--red:#ff9595;--purple:#c7a7ff}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:radial-gradient(circle at top left,#18264f 0,var(--bg) 42%)}
+.page{width:min(1240px,100vw);margin:0 auto;padding:24px}
+.hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+h1{margin:0 0 8px;font-size:34px;letter-spacing:-.04em}
+h2{margin:0 0 12px;font-size:20px;letter-spacing:-.02em}
+h3{margin:0 0 10px;font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.subtitle{margin:0;color:var(--muted);line-height:1.5;font-size:15px;max-width:900px}
+.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.06);white-space:nowrap;color:var(--ink);font-size:13px;font-weight:700}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-bottom:16px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 18px 55px rgba(0,0,0,.24)}
+.note{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.5;border-left:3px solid rgba(114,210,255,.6);padding-left:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+th{color:var(--muted);font-size:12px;font-weight:700}
+.chip{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;border-radius:999px;font-size:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);white-space:nowrap}
+.good,.exact,.real{background:rgba(158,240,181,.14);color:var(--green);border-color:rgba(158,240,181,.3)}
+.mid,.depends{background:rgba(255,211,122,.14);color:var(--yellow);border-color:rgba(255,211,122,.3)}
+.bad{background:rgba(255,149,149,.14);color:var(--red);border-color:rgba(255,149,149,.3)}
+.special{background:rgba(199,167,255,.14);color:var(--purple);border-color:rgba(199,167,255,.3)}
+.steps{display:grid;gap:10px}
+.step{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.04)}
+.num{width:34px;height:34px;border-radius:10px;background:rgba(114,210,255,.16);color:var(--accent);display:grid;place-items:center;font-weight:800}
+.step b{display:block;margin-bottom:3px}.step span{color:var(--muted);font-size:13px;line-height:1.42}
+.method-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.method{border:1px solid var(--line);border-radius:16px;padding:12px;background:rgba(255,255,255,.04)}
+.method .name{font-weight:800;margin-bottom:6px}.method .tiny{color:var(--muted);font-size:12px;line-height:1.45}
+.metric-grid{display:grid;gap:10px}.metric{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:14px;padding:12px}.metric b{display:block;margin-bottom:8px}
+.bars{display:grid;gap:8px}.bar-row{display:grid;grid-template-columns:170px 1fr 72px;gap:10px;align-items:center;font-size:12px}.bar-label{color:var(--muted)}
+.track{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,rgba(114,210,255,.95),rgba(158,240,181,.9))}
+.rank{color:var(--muted);text-align:right;font-size:12px}
+.decision{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.decision .box{border:1px solid var(--line);border-radius:16px;padding:14px;background:rgba(255,255,255,.04)}.decision ul{margin:8px 0 0 18px;padding:0;color:var(--muted);font-size:13px;line-height:1.5}
+.formula{margin-top:10px;padding:12px;border-radius:14px;border:1px dashed rgba(114,210,255,.4);background:rgba(114,210,255,.08);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;color:#dff6ff}
+.full{margin-top:16px}
+@media(max-width:1000px){.grid,.decision{grid-template-columns:1fr}.method-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.method-grid{grid-template-columns:1fr}.hero{flex-direction:column}.bar-row{grid-template-columns:1fr}.rank{text-align:left}.page{padding:14px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <div>
+      <h1>Top‑K Methods Comparison</h1>
+      <p class="subtitle">A compact comparison of common top‑k strategies, including whether each method returns the real top‑k set or an approximate top‑k set.</p>
+    </div>
+    <div class="badge">Focus: LLM sampling & sparse attention</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>At a glance</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Real top‑k?</th><th>Exact?</th><th>Core idea</th><th>Best for</th><th>Main weakness</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>Full sort</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Sort everything, then take first <code>k</code></td><td>Need full ranking</td><td>Does more work than top‑k needs</td></tr>
+          <tr><td><b>Heap / partial select</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Keep only the best <code>k</code> seen so far</td><td>CPU-style selection, small/medium <code>k</code></td><td>Comparison-heavy, less GPU friendly</td></tr>
+          <tr><td><b>torch.topk</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>General-purpose library top‑k</td><td>Baseline, compatibility</td><td>Not specialized for LLM / sparse attention</td></tr>
+          <tr><td><b>Radix top‑k</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Find the pivot byte-by-byte, then collect winners</td><td>Large vocab / long score rows</td><td>Tie handling and implementation complexity</td></tr>
+          <tr><td><b>FlashInfer Multi‑CTA Radix</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Split one long row across CTAs</td><td>Very long rows</td><td>Needs inter-CTA synchronization</td></tr>
+          <tr><td><b>FlashInfer FilteredTopK</b></td><td><span class="chip real">Real*</span></td><td><span class="chip exact">Yes*</span></td><td>Coarse histogram → candidate filter → refine</td><td>When candidate bucket stays small</td><td>Can overflow on tie-heavy workloads; fallback preserves exactness</td></tr>
+          <tr><td><b>FlashInfer clusters exact</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Cluster cooperative-groups exact top‑k</td><td>Supported newer GPUs, fast path</td><td>Hardware / mode restricted</td></tr>
+          <tr><td><b>Fused transform top‑k</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Top‑k + page-table/ragged transform</td><td>Sparse attention</td><td>Only useful when next stage needs transform</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><b>Real top‑k?</b> means the algorithm returns the true top‑k set, not an approximate neighbor/candidate set. <b>Exact?</b> means the returned set is mathematically exact for the input values. Output order and equal-value tie choice may still be non-deterministic unless deterministic tie-breaking is enabled.</div>
+    </section>
+
+    <section class="card">
+      <h2>Beginner mental model</h2>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><div><b>Full sort</b><span>Rank every student from 1st to last, then keep the top 5. Easy, but wasteful.</span></div></div>
+        <div class="step"><div class="num">2</div><div><b>Heap</b><span>Carry a small “best 5 so far” box while scanning all students one by one.</span></div></div>
+        <div class="step"><div class="num">3</div><div><b>Radix top‑k</b><span>Do not rank everyone. Just find the cutoff score, then keep everyone above the cutoff plus enough ties.</span></div></div>
+        <div class="step"><div class="num">4</div><div><b>Fused sparse-attention top‑k</b><span>After choosing the winners, immediately convert them into the exact index format the next kernel needs.</span></div></div>
+      </div>
+      <div class="formula">Need top‑k?<br>You do NOT need the full order.<br>You only need the pivot = k-th largest value.</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Method cards</h2>
+    <div class="method-grid">
+      <div class="method"><div class="name">Full sort</div><div class="tiny">Simple and exact. Best when you truly need all items sorted, not just the top‑k.</div></div>
+      <div class="method"><div class="name">Heap / partial select</div><div class="tiny">Classical exact selection strategy. Good on CPU, but not the most natural fit for GPU parallelism.</div></div>
+      <div class="method"><div class="name">torch.topk</div><div class="tiny">The easy exact baseline. Great default choice if your shape is small or you want a standard implementation.</div></div>
+      <div class="method"><div class="name">Radix top‑k</div><div class="tiny">Exact method: transforms floats to ordered integer keys, then finds the pivot one byte at a time.</div></div>
+      <div class="method"><div class="name">FlashInfer Multi‑CTA Radix</div><div class="tiny">Exact long-row radix top‑k using several CTAs for one row.</div></div>
+      <div class="method"><div class="name">FlashInfer FilteredTopK</div><div class="tiny">Exact top‑k set with a fast candidate-filter path and fallback for overflow/tie-heavy cases.</div></div>
+      <div class="method"><div class="name">FlashInfer clusters exact</div><div class="tiny">Exact specialized fast path using CUDA cluster cooperative groups on supported hardware.</div></div>
+      <div class="method"><div class="name">Fused transform top‑k</div><div class="tiny">Exact top‑k plus exact index transform for sparse attention.</div></div>
+    </div>
+  </section>
+
+  <div class="grid full">
+    <section class="card">
+      <h2>Qualitative comparison</h2>
+      <div class="metric-grid">
+        <div class="metric">
+          <b>Real top‑k set, not approximate top‑k</b>
+          <div class="bars">
+            <div class="bar-row"><div class="bar-label">Full sort</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">Heap / partial select</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">torch.topk</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">Radix top‑k</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">Multi‑CTA Radix</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">FilteredTopK</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact*</div></div>
+            <div class="bar-row"><div class="bar-label">Clusters exact</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+            <div class="bar-row"><div class="bar-label">Fused transform top‑k</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">exact</div></div>
+          </div>
+          <div class="note">Exactness is about the selected set. Sorted order and equal-value tie order are separate.</div>
+        </div>
+
+        <div class="metric">
+          <b>GPU friendliness</b>
+          <div class="bars">
+            <div class="bar-row"><div class="bar-label">Full sort</div><div class="track"><div class="fill" style="width:45%"></div></div><div class="rank">medium</div></div>
+            <div class="bar-row"><div class="bar-label">Heap / partial select</div><div class="track"><div class="fill" style="width:35%"></div></div><div class="rank">lower</div></div>
+            <div class="bar-row"><div class="bar-label">torch.topk</div><div class="track"><div class="fill" style="width:60%"></div></div><div class="rank">baseline</div></div>
+            <div class="bar-row"><div class="bar-label">Radix top‑k</div><div class="track"><div class="fill" style="width:82%"></div></div><div class="rank">high</div></div>
+            <div class="bar-row"><div class="bar-label">Multi‑CTA Radix</div><div class="track"><div class="fill" style="width:88%"></div></div><div class="rank">high</div></div>
+            <div class="bar-row"><div class="bar-label">FilteredTopK</div><div class="track"><div class="fill" style="width:90%"></div></div><div class="rank">very high</div></div>
+            <div class="bar-row"><div class="bar-label">Clusters exact</div><div class="track"><div class="fill" style="width:94%"></div></div><div class="rank">very high</div></div>
+            <div class="bar-row"><div class="bar-label">Fused transform top‑k</div><div class="track"><div class="fill" style="width:92%"></div></div><div class="rank">high+</div></div>
+          </div>
+        </div>
+
+        <div class="metric">
+          <b>Implementation simplicity</b>
+          <div class="bars">
+            <div class="bar-row"><div class="bar-label">Full sort</div><div class="track"><div class="fill" style="width:95%"></div></div><div class="rank">easy</div></div>
+            <div class="bar-row"><div class="bar-label">Heap / partial select</div><div class="track"><div class="fill" style="width:80%"></div></div><div class="rank">easy</div></div>
+            <div class="bar-row"><div class="bar-label">torch.topk</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rank">easiest</div></div>
+            <div class="bar-row"><div class="bar-label">Radix top‑k</div><div class="track"><div class="fill" style="width:45%"></div></div><div class="rank">harder</div></div>
+            <div class="bar-row"><div class="bar-label">Multi‑CTA Radix</div><div class="track"><div class="fill" style="width:28%"></div></div><div class="rank">complex</div></div>
+            <div class="bar-row"><div class="bar-label">FilteredTopK</div><div class="track"><div class="fill" style="width:35%"></div></div><div class="rank">complex</div></div>
+            <div class="bar-row"><div class="bar-label">Clusters exact</div><div class="track"><div class="fill" style="width:22%"></div></div><div class="rank">specialized</div></div>
+            <div class="bar-row"><div class="bar-label">Fused transform top‑k</div><div class="track"><div class="fill" style="width:30%"></div></div><div class="rank">complex</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Recommended choices</h2>
+      <div class="decision">
+        <div class="box"><h3>Use torch.topk when</h3><ul><li>You want the simplest exact baseline.</li><li>Your tensors are not huge.</li><li>Performance is not the main bottleneck.</li><li>You want broad framework compatibility.</li></ul></div>
+        <div class="box"><h3>Use radix top‑k when</h3><ul><li>Rows are large: big vocab or long context.</li><li>You care about GPU efficiency.</li><li>You only need top‑k, not full sorting.</li><li>Sampling or index selection is performance-sensitive.</li></ul></div>
+        <div class="box"><h3>Use Multi‑CTA / FilteredTopK when</h3><ul><li>You are inside a performance-tuned inference stack.</li><li>Rows are very long or top‑k is frequent.</li><li>You want a specialized FlashInfer path.</li><li>You can manage complexity and edge cases.</li></ul></div>
+        <div class="box"><h3>Use fused transform top‑k when</h3><ul><li>Top‑k feeds sparse attention directly.</li><li>You need page-table or ragged index conversion.</li><li>You want fewer kernel launches.</li><li>You want to reduce extra memory traffic.</li></ul></div>
+      </div>
+      <div class="note"><b>Rule of thumb:</b><br>Small / simple case → <code>torch.topk</code><br>Large row top‑k → <code>radix top‑k</code><br>Long-row specialized path → <code>Multi‑CTA</code> or <code>FilteredTopK</code><br>Sparse attention pipeline → <code>fused transform top‑k</code></div>
+    </section>
+  </div>
+
+  <section class="card full">
+    <h2>One-sentence summary of each method</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Real top‑k?</th><th>Exact?</th><th>One-sentence summary</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><b>Full sort</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Correct and easy, but does more work than top‑k requires.</td><td><span class="chip bad">usually overkill</span></td></tr>
+        <tr><td><b>Heap / partial select</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>A classical exact top‑k method, better matched to CPU-style selection than GPU bulk parallelism.</td><td><span class="chip mid">situational</span></td></tr>
+        <tr><td><b>torch.topk</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>The most practical exact default baseline.</td><td><span class="chip good">great default</span></td></tr>
+        <tr><td><b>Radix top‑k</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Excellent when you want the exact cutoff fast without sorting everything.</td><td><span class="chip good">LLM-friendly</span></td></tr>
+        <tr><td><b>Multi‑CTA Radix</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>The robust exact choice for very long rows when one CTA is not enough.</td><td><span class="chip good">long-row specialist</span></td></tr>
+        <tr><td><b>FilteredTopK</b></td><td><span class="chip real">Real*</span></td><td><span class="chip exact">Yes*</span></td><td>Exact top‑k with a fast filter/refine path, but more sensitive to ties/overflow.</td><td><span class="chip special">fast path specialist</span></td></tr>
+        <tr><td><b>Clusters exact</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>A hardware-specialized exact path that can be extremely fast on supported GPUs.</td><td><span class="chip special">platform-dependent</span></td></tr>
+        <tr><td><b>Fused transform top‑k</b></td><td><span class="chip real">Real</span></td><td><span class="chip exact">Yes</span></td><td>Exact top‑k plus transform, best when top‑k feeds sparse-attention indices.</td><td><span class="chip good">pipeline winner</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>* FilteredTopK:</b> exact top‑k set when its fallback/overflow logic is used correctly. Tie-heavy or quantized inputs may hurt performance, not intended correctness.</div>
+  </section>
+
+  <section class="card full">
+    <h2>Source-level correctness check</h2>
+    <table>
+      <thead><tr><th>FlashInfer path</th><th>Real top‑k?</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Radix / Multi‑CTA Radix</b></td>
+          <td><span class="chip real">Real exact top‑k</span></td>
+          <td>Finds the exact k-th pivot, writes all values greater than the pivot, then writes enough values equal to the pivot.</td>
+        </tr>
+        <tr>
+          <td><b>FilteredTopK</b></td>
+          <td><span class="chip real">Real exact top‑k*</span></td>
+          <td>Uses a coarse bucket only as a filter, then refines the threshold. Overflow/tie-heavy cases trigger fallback/rebuild logic for correctness.</td>
+        </tr>
+        <tr>
+          <td><b>Clusters exact</b></td>
+          <td><span class="chip real">Real exact top‑k</span></td>
+          <td>The implementation is explicitly the exact cluster path; final selected indices are written from the exact threshold/refinement result.</td>
+        </tr>
+        <tr>
+          <td><b>Fused page-table / ragged transform</b></td>
+          <td><span class="chip real">Real exact top‑k + exact transform</span></td>
+          <td>The top‑k selection is exact; the epilogue only maps selected indices through a page table or adds a ragged offset.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">Important distinction: <b>non-deterministic tie choice is not approximate top‑k</b>. If many values are exactly equal to the pivot, any subset of the tied values can still be a valid exact top‑k set. Deterministic mode only makes the tie choice stable.</div>
+  </section>
+
+</div>
+</body>
+</html>
