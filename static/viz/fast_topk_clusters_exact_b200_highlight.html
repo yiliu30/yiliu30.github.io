@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>B200-specific fast_topk_clusters_exact Optimizations</title>
+<style>
+:root{--bg:#07101f;--ink:#eef5ff;--muted:#aebbd9;--line:rgba(255,255,255,.13);--blue:#75d5ff;--green:#9ef0b5;--yellow:#ffd37a;--purple:#c7a7ff;--red:#ff8f8f}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top left,#19376f 0,#07101f 42%);color:var(--ink)}
+.page{width:min(1220px,100vw);margin:0 auto;padding:24px}
+.hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+h1{margin:0 0 8px;font-size:34px;letter-spacing:-.045em}
+h2{margin:0 0 12px;font-size:20px}
+h3{margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+p{margin:0}.subtitle{color:var(--muted);line-height:1.5;max-width:900px;font-size:15px}
+.badge{border:1px solid rgba(255,211,122,.45);background:rgba(255,211,122,.12);color:var(--yellow);border-radius:999px;padding:8px 12px;font-size:13px;font-weight:800;white-space:nowrap}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 18px 55px rgba(0,0,0,.24)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.full{margin-top:16px}
+.note{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.5;border-left:3px solid var(--blue);padding-left:10px}
+.chip{display:inline-flex;border-radius:999px;padding:4px 8px;border:1px solid var(--line);font-size:12px;white-space:nowrap}
+.chip.b200{color:var(--yellow);background:rgba(255,211,122,.14);border-color:rgba(255,211,122,.42);font-weight:800}
+.chip.sm90{color:var(--purple);background:rgba(199,167,255,.13);border-color:rgba(199,167,255,.4)}
+.chip.generic{color:var(--green);background:rgba(158,240,181,.12);border-color:rgba(158,240,181,.35)}
+.chip.warn{color:var(--red);background:rgba(255,143,143,.12);border-color:rgba(255,143,143,.35)}
+.pipeline{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.stage{position:relative;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:16px;padding:12px;min-height:166px}
+.stage:after{content:"→";position:absolute;right:-13px;top:50%;transform:translateY(-50%);color:var(--blue);font-weight:900}
+.stage:last-child:after{display:none}
+.stage.b200{border-color:rgba(255,211,122,.55);background:linear-gradient(180deg,rgba(255,211,122,.14),rgba(255,255,255,.035));box-shadow:0 0 0 1px rgba(255,211,122,.18) inset}
+.stage .num{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:rgba(117,213,255,.16);color:var(--blue);font-weight:900;margin-bottom:8px}
+.stage.b200 .num{background:rgba(255,211,122,.17);color:var(--yellow)}
+.stage b{display:block;margin-bottom:6px}.stage span{display:block;color:var(--muted);font-size:12px;line-height:1.42}.stage .tag{margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-size:12px}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.box{border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.04);padding:14px}
+.box.b200{border-color:rgba(255,211,122,.55);background:rgba(255,211,122,.10)}
+ul{margin:8px 0 0 18px;padding:0;color:var(--muted);font-size:13px;line-height:1.55}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(117,213,255,.08);border:1px dashed rgba(117,213,255,.4);border-radius:14px;padding:12px;color:#dbf7ff;font-size:13px;line-height:1.55}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}
+@media(max-width:1050px){.pipeline{grid-template-columns:repeat(3,1fr)}.stage:after{display:none}.grid,.compare{grid-template-columns:1fr}}
+@media(max-width:650px){.page{padding:14px}.hero{flex-direction:column}.pipeline{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <div>
+      <h1>B200-specific highlights in <code>fast_topk_clusters_exact</code></h1>
+      <p class="subtitle">This version separates what is truly B200/Blackwell-specific in current FlashInfer dispatch from what is a generic radix/top-k optimization or a general SM90+ cluster capability.</p>
+      <div class="legend">
+        <span class="chip b200">B200 / Blackwell-specific in current dispatch</span>
+        <span class="chip sm90">SM90+ cluster feature</span>
+        <span class="chip generic">Generic exact top-k optimization</span>
+      </div>
+    </div>
+    <div class="badge">Current dispatch gate: compute capability major == 10</div>
+  </div>
+
+  <section class="card">
+    <h2>Pipeline with B200-specific parts highlighted</h2>
+    <div class="pipeline">
+      <div class="stage b200"><div class="num">1</div><b>Blackwell-gated path</b><span>Python chooses clusters exact only when compute capability major is 10, non-deterministic, and graph-safe mode is off.</span><span class="chip b200 tag">B200-specific dispatch</span></div>
+      <div class="stage b200"><div class="num">2</div><b>Cluster count policy</b><span>Batch-size based cluster count: 8, 4, 2, or 1 clusters per row. Disabled to 1 cluster for short rows &lt; 8192.</span><span class="chip b200 tag">B200-tuned policy</span></div>
+      <div class="stage"><div class="num">3</div><b>Thread-block clusters</b><span>Uses CUDA cluster cooperative groups: multiple CTAs cooperate on one row.</span><span class="chip sm90 tag">SM90+ capability</span></div>
+      <div class="stage"><div class="num">4</div><b>Distributed shared memory</b><span>Uses cluster shared-memory mapping to combine CTA histograms without global-memory reduction.</span><span class="chip sm90 tag">SM90+ capability</span></div>
+      <div class="stage"><div class="num">5</div><b>Boundary cache refine</b><span>Full scan once, cache threshold-bin candidates, then refine only cached candidates byte by byte.</span><span class="chip generic tag">generic algorithmic win</span></div>
+      <div class="stage"><div class="num">6</div><b>Exact output</b><span>Write all values above pivot plus enough equal-pivot ties. This is exact top-k, not approximate top-k.</span><span class="chip generic tag">exact top-k</span></div>
+    </div>
+    <div class="note">Most of the math is still exact radix selection. The B200-specific part is mainly the current Python dispatch gate and the tuning/policy around the cluster exact fast path.</div>
+  </section>
+
+  <div class="grid full">
+    <section class="card">
+      <h2>What is B200-specific?</h2>
+      <table>
+        <thead><tr><th>Component</th><th>Classification</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><b><code>cap[0] == 10</code> dispatch</b></td><td><span class="chip b200">B200 / Blackwell-specific</span></td><td>The Python API only auto-selects clusters exact when compute capability major is 10.</td></tr>
+          <tr><td><b><code>get_fast_topk_clusters()</code></b></td><td><span class="chip b200">B200-tuned policy</span></td><td>Allocates more clusters for low batch size to increase per-row parallelism; short rows force 1 cluster.</td></tr>
+          <tr><td><b>Thread-block clusters</b></td><td><span class="chip sm90">SM90+ feature</span></td><td>CUDA cluster cooperative groups require SM90+, so not exclusively B200, but used by the B200 path.</td></tr>
+          <tr><td><b>Distributed shared memory</b></td><td><span class="chip sm90">SM90+ feature</span></td><td><code>cluster.map_shared_rank</code> lets CTAs read peer CTA shared memory inside the cluster.</td></tr>
+          <tr><td><b>Large shared-memory carveout</b></td><td><span class="chip sm90">hardware-sensitive</span></td><td>The kernel trades shared memory for fewer global-memory accesses and larger candidate cache.</td></tr>
+          <tr><td><b>Radix pivot selection</b></td><td><span class="chip generic">Generic</span></td><td>Same exact top-k idea: find the pivot and collect winners.</td></tr>
+          <tr><td><b>Boundary candidate cache</b></td><td><span class="chip generic">Generic algorithmic optimization</span></td><td>Full-row scan once, then refine only threshold-bin candidates.</td></tr>
+          <tr><td><b>Page-table/ragged fused transform</b></td><td><span class="chip generic">Pipeline optimization</span></td><td>Useful for sparse attention regardless of whether the top-k kernel is B200-gated.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Dispatch logic to remember</h2>
+      <div class="code">
+        use clusters exact top-k only if:<br>
+        &nbsp;&nbsp;not dsa_graph_safe<br>
+        &nbsp;&nbsp;not deterministic<br>
+        &nbsp;&nbsp;FLASHINFER_TOPK_ALGO is unset or "clusters"<br>
+        &nbsp;&nbsp;compute capability major == 10
+      </div>
+      <div class="note">So for a slide, the safest wording is: <b>“FlashInfer has a Blackwell/B200-gated clusters exact top-k fast path.”</b> Avoid saying the generic radix top-k kernel itself is B200-specific.</div>
+    </section>
+  </div>
+
+  <section class="card full">
+    <h2>How to explain it in one slide</h2>
+    <div class="compare">
+      <div class="box">
+        <h3>Do not say</h3>
+        <ul>
+          <li>“Radix top-k is a B200-specific algorithm.”</li>
+          <li>“The result is approximate but faster.”</li>
+          <li>“All cluster optimizations are Blackwell-only.”</li>
+        </ul>
+      </div>
+      <div class="box b200">
+        <h3>Better wording</h3>
+        <ul>
+          <li>“The public FlashInfer top-k API can select a Blackwell/B200-gated clusters exact fast path.”</li>
+          <li>“The fast path uses SM90+ cluster cooperative groups and distributed shared memory.”</li>
+          <li>“It remains exact top-k; tie choice may be non-deterministic.”</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
