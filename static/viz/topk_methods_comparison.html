@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Radix Top-K Visualization</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --card: #121a33;
+    --card2: #17213d;
+    --ink: #eef3ff;
+    --muted: #aeb9d6;
+    --line: rgba(255,255,255,.12);
+    --accent: #72d2ff;
+    --accent2: #9ef0b5;
+    --warn: #ffd37a;
+    --danger: #ff8f8f;
+    --purple: #c7a7ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top left, #18264f 0, var(--bg) 42%);
+    color: var(--ink);
+  }
+  .page {
+    width: min(1180px, 100vw);
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 32px;
+    letter-spacing: -0.04em;
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.45;
+    max-width: 800px;
+  }
+  .badge {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.06);
+    color: var(--ink);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.02fr 1.38fr;
+    gap: 16px;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 18px 55px rgba(0,0,0,.24);
+  }
+  h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+  }
+  h3 {
+    margin: 16px 0 8px;
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .flow {
+    display: grid;
+    gap: 10px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255,255,255,.04);
+  }
+  .num {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(114,210,255,.16);
+    color: var(--accent);
+    font-weight: 800;
+  }
+  .step b { display: block; margin-bottom: 3px; }
+  .step span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .formula {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px dashed rgba(114,210,255,.4);
+    background: rgba(114,210,255,.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #dff6ff;
+    line-height: 1.5;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 9px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 650;
+    font-size: 12px;
+  }
+  td.mono, th.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .row-chip {
+    display: inline-flex;
+    min-width: 26px;
+    justify-content: center;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-weight: 800;
+    background: rgba(255,255,255,.08);
+  }
+  .rank-gt { background: rgba(158,240,181,.16); color: var(--accent2); }
+  .rank-eq { background: rgba(255,211,122,.16); color: var(--warn); }
+  .rank-lt { opacity: .58; }
+  .rounds {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 12px 0 14px;
+  }
+  .round {
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+    border-radius: 14px;
+    padding: 12px;
+    min-height: 138px;
+  }
+  .round .title {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .bucket {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 10px;
+    border-radius: 12px;
+    background: rgba(199,167,255,.16);
+    color: var(--purple);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .mini {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .bars {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .bar {
+    display: grid;
+    grid-template-columns: 44px 1fr 20px;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .fill {
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(114,210,255,.95), rgba(158,240,181,.9));
+  }
+  .pillbox {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 9px 0 0;
+  }
+  .pill {
+    border-radius: 999px;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+    font-size: 12px;
+  }
+  .pivot {
+    border-color: rgba(255,211,122,.45);
+    background: rgba(255,211,122,.12);
+  }
+  .selected {
+    border-color: rgba(158,240,181,.5);
+    background: rgba(158,240,181,.12);
+  }
+  .discard {
+    opacity: .55;
+  }
+  .legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 8px 0 12px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.gt { background: var(--accent2); }
+  .dot.eq { background: var(--warn); }
+  .dot.lt { background: rgba(255,255,255,.35); }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 12px;
+    border-left: 3px solid rgba(114,210,255,.6);
+    padding-left: 10px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 12px;
+  }
+  button {
+    appearance: none;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 10px;
+    background: rgba(255,255,255,.04);
+    color: var(--muted);
+    cursor: pointer;
+    font-weight: 700;
+  }
+  button.active {
+    background: rgba(114,210,255,.15);
+    color: var(--accent);
+    border-color: rgba(114,210,255,.4);
+  }
+  .bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .teaching-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .big-idea {
+    display: grid;
+    gap: 10px;
+  }
+  .idea-row {
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+    border-radius: 14px;
+    padding: 12px;
+  }
+  .idea-row b {
+    color: var(--ink);
+  }
+  .idea-row p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .school-example {
+    display: grid;
+    gap: 10px;
+  }
+  .score-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .score-card {
+    min-width: 58px;
+    text-align: center;
+    padding: 9px 8px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+  }
+  .score-card .name {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .score-card .score {
+    font-size: 18px;
+    font-weight: 850;
+  }
+  .score-card.top {
+    border-color: rgba(158,240,181,.5);
+    background: rgba(158,240,181,.12);
+  }
+  .score-card.tie {
+    border-color: rgba(255,211,122,.5);
+    background: rgba(255,211,122,.12);
+  }
+  .digit-demo {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .digit-row {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .digit-label {
+    color: var(--muted);
+  }
+  .digit-buckets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .digit-bucket {
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .digit-bucket.keep {
+    border-color: rgba(114,210,255,.5);
+    background: rgba(114,210,255,.12);
+    color: var(--accent);
+  }
+  .callout {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(158,240,181,.09);
+    border: 1px solid rgba(158,240,181,.32);
+    color: #dfffe8;
+    font-size: 13px;
+    line-height: 1.48;
+  }
+  .vocab {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .vocab-item {
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+  }
+  .vocab-item b {
+    display: block;
+    margin-bottom: 4px;
+  }
+  .vocab-item span {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  @media (max-width: 900px) {
+    .teaching-grid { grid-template-columns: 1fr; }
+    .vocab { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 540px) {
+    .vocab { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 900px) {
+    .grid, .bottom { grid-template-columns: 1fr; }
+    .rounds { grid-template-columns: 1fr 1fr; }
+    .hero { flex-direction: column; }
+  }
+  @media (max-width: 540px) {
+    .rounds { grid-template-columns: 1fr; }
+    .page { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <div>
+      <h1>Radix Top‑K: find the boundary, not the full order</h1>
+      <p class="subtitle">FlashInfer-style radix top-k converts scores into order-preserving integer keys, finds the k-th largest pivot byte by byte, then collects all values above the pivot plus enough ties.</p>
+    </div>
+    <div class="badge">Example: float32 scores · K = 5</div>
+  </div>
+
+
+  <div class="teaching-grid">
+    <section class="card">
+      <h2>Big idea for beginners</h2>
+      <div class="big-idea">
+        <div class="idea-row">
+          <b>Top‑K is like choosing finalists, not ranking everyone.</b>
+          <p>If you only need the best 5 students, you do not need to sort all 1,000 students from best to worst. You only need to know the cutoff score.</p>
+        </div>
+        <div class="idea-row">
+          <b>The pivot is the cutoff line.</b>
+          <p>For top‑5, the pivot is the 5th largest score. Everyone above it is definitely selected. People exactly on the cutoff are ties.</p>
+        </div>
+        <div class="idea-row">
+          <b>Radix means “look at digits from left to right.”</b>
+          <p>Instead of comparing full numbers again and again, radix top‑k asks: which high digit contains the cutoff? Then which next digit? Then the next.</p>
+        </div>
+        <div class="idea-row">
+          <b>Histogram means “count, do not sort.”</b>
+          <p>A 256-bin histogram counts how many values fall into each byte bucket. Counting is usually cheaper than sorting.</p>
+        </div>
+      </div>
+      <div class="callout">
+        The insight: <b>sorting answers too much</b>. Top‑K only needs the boundary between selected and discarded items.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Toy example: school scores</h2>
+      <p class="subtitle">Find top‑3 scores without fully sorting everyone.</p>
+      <div class="school-example">
+        <div class="score-strip">
+          <div class="score-card top"><div class="name">A</div><div class="score">99</div></div>
+          <div class="score-card top"><div class="name">B</div><div class="score">92</div></div>
+          <div class="score-card tie"><div class="name">C</div><div class="score">91</div></div>
+          <div class="score-card"><div class="name">D</div><div class="score">88</div></div>
+          <div class="score-card"><div class="name">E</div><div class="score">76</div></div>
+          <div class="score-card"><div class="name">F</div><div class="score">65</div></div>
+          <div class="score-card"><div class="name">G</div><div class="score">40</div></div>
+        </div>
+
+        <div class="digit-demo">
+          <div class="digit-row">
+            <div class="digit-label">Tens digit</div>
+            <div class="digit-buckets">
+              <span class="digit-bucket keep">90s: 3 scores</span>
+              <span class="digit-bucket">80s: 1</span>
+              <span class="digit-bucket">70s: 1</span>
+              <span class="digit-bucket">60s: 1</span>
+              <span class="digit-bucket">40s: 1</span>
+            </div>
+          </div>
+          <div class="digit-row">
+            <div class="digit-label">Ones digit</div>
+            <div class="digit-buckets">
+              <span class="digit-bucket keep">99</span>
+              <span class="digit-bucket keep">92</span>
+              <span class="digit-bucket keep">91 ← pivot</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="formula">
+          K = 3<br>
+          pivot = 91<br>
+          selected = scores &gt; 91 plus enough scores = 91
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>Vocabulary before reading the CUDA version</h2>
+    <div class="vocab">
+      <div class="vocab-item"><b>Bucket</b><span>A group of values that share the same current byte/digit.</span></div>
+      <div class="vocab-item"><b>Prefix</b><span>The high bytes already chosen. It narrows the candidate set.</span></div>
+      <div class="vocab-item"><b>remaining_k</b><span>How many more winners we still need inside the current bucket.</span></div>
+      <div class="vocab-item"><b>Pivot</b><span>The final cutoff value: the k‑th largest score.</span></div>
+    </div>
+    <div class="callout">
+      In FlashInfer, the “digits” are not decimal digits like 90s or 80s. They are bytes of an ordered integer key. For float32, there are 4 byte rounds. For fp16/bf16, there are only 2 byte rounds.
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Algorithm mental model</h2>
+      <p class="subtitle" style="margin-bottom:12px;">Read this as a “cutoff finder.” The algorithm keeps asking narrower questions until it knows the exact cutoff value.</p>
+      <div class="flow">
+        <div class="step"><div class="num">1</div><div><b>Map float → ordered integer</b><span>After mapping, larger score means larger unsigned key. For float32 this gives a 32-bit key; for fp16/bf16 it is 16-bit.</span></div></div>
+        <div class="step"><div class="num">2</div><div><b>Radix-select the pivot</b><span>Build 256-bin histograms over one byte at a time. Use suffix sums to locate the bucket that contains the k-th largest element.</span></div></div>
+        <div class="step"><div class="num">3</div><div><b>Narrow by prefix</b><span>After each round, keep only values matching the selected high-bit prefix. Update <code>remaining_k</code> by subtracting values already greater than the selected bucket.</span></div></div>
+        <div class="step"><div class="num">4</div><div><b>Collect results</b><span>All keys greater than pivot are definitely selected. Keys equal to pivot fill the remaining slots. Keys below pivot are discarded.</span></div></div>
+      </div>
+
+      <div class="formula">
+        count_ge(bucket) = #values with byte ≥ bucket<br>
+        count_gt(bucket) = #values with byte &gt; bucket<br>
+        choose bucket where: count_ge ≥ remaining_k and count_gt &lt; remaining_k
+      </div>
+
+      <p class="note">This is why radix top-k can avoid sorting. It only needs the threshold value and a final collection pass.</p>
+    </section>
+
+    <section class="card">
+      <h2>Real example: top‑5 from 12 scores</h2>
+      <div class="legend">
+        <span><i class="dot gt"></i>&gt; pivot: selected</span>
+        <span><i class="dot eq"></i>= pivot: tie region</span>
+        <span><i class="dot lt"></i>&lt; pivot: discard</span>
+      </div>
+
+      <table id="scoreTable">
+        <thead>
+          <tr>
+            <th>Id</th>
+            <th>Score</th>
+            <th class="mono">Float bits</th>
+            <th class="mono">Ordered key</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div class="bottom">
+    <section class="card">
+      <h2>Radix rounds: 4 bytes for float32</h2>
+      <p class="subtitle">Each round finds one byte of the final pivot key. The selected bucket is the one containing the current k-th largest candidate.</p>
+      <div class="rounds" id="rounds"></div>
+    </section>
+
+    <section class="card">
+      <h2>Final pivot and collection</h2>
+      <p class="subtitle" style="margin-bottom:10px;">After the pivot is known, the rest is simple: take everything above the cutoff, then fill the remaining slots from the tie group.</p>
+      <div class="pillbox" id="collection"></div>
+      <div class="formula" id="resultText"></div>
+      <h3>Output policy for ties</h3>
+      <div class="tabs">
+        <button id="nonDetBtn" class="active">Fast / non-deterministic</button>
+        <button id="detBtn">Deterministic small-index tie</button>
+      </div>
+      <div class="pillbox" id="finalOutput"></div>
+      <p class="note">When multiple values equal the pivot, the fast path may fill the remaining slot with any equal-pivot element. Deterministic tie-break makes that choice stable.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+const DATA = {"rows": [{"label": "A", "score": 1.5, "bits": "0x3FC00000", "key": 3217031168, "keyHex": "0xBFC00000", "b0": 191, "b1": 192, "b2": 0, "b3": 0}, {"label": "B", "score": 0.75, "bits": "0x3F400000", "key": 3208642560, "keyHex": "0xBF400000", "b0": 191, "b1": 64, "b2": 0, "b3": 0}, {"label": "C", "score": 3.25, "bits": "0x40500000", "key": 3226468352, "keyHex": "0xC0500000", "b0": 192, "b1": 80, "b2": 0, "b3": 0}, {"label": "D", "score": 2.9, "bits": "0x4039999A", "key": 3225000346, "keyHex": "0xC039999A", "b0": 192, "b1": 57, "b2": 153, "b3": 154}, {"label": "E", "score": 2.9, "bits": "0x4039999A", "key": 3225000346, "keyHex": "0xC039999A", "b0": 192, "b1": 57, "b2": 153, "b3": 154}, {"label": "F", "score": -0.4, "bits": "0xBECCCCCD", "key": 1093874482, "keyHex": "0x41333332", "b0": 65, "b1": 51, "b2": 51, "b3": 50}, {"label": "G", "score": 4.1, "bits": "0x40833333", "key": 3229823795, "keyHex": "0xC0833333", "b0": 192, "b1": 131, "b2": 51, "b3": 51}, {"label": "H", "score": 1.2, "bits": "0x3F99999A", "key": 3214514586, "keyHex": "0xBF99999A", "b0": 191, "b1": 153, "b2": 153, "b3": 154}, {"label": "I", "score": 3.0, "bits": "0x40400000", "key": 3225419776, "keyHex": "0xC0400000", "b0": 192, "b1": 64, "b2": 0, "b3": 0}, {"label": "J", "score": 0.1, "bits": "0x3DCCCCCD", "key": 3184315597, "keyHex": "0xBDCCCCCD", "b0": 189, "b1": 204, "b2": 204, "b3": 205}, {"label": "K", "score": 2.5, "bits": "0x40200000", "key": 3223322624, "keyHex": "0xC0200000", "b0": 192, "b1": 32, "b2": 0, "b3": 0}, {"label": "L", "score": 4.1, "bits": "0x40833333", "key": 3229823795, "keyHex": "0xC0833333", "b0": 192, "b1": 131, "b2": 51, "b3": 51}], "rounds": [{"round": 1, "byte": "B0", "shift": 24, "prefixBefore": "0x00000000", "bucket": 192, "bucketHex": "0xC0", "countGt": 0, "countGe": 7, "remainingBefore": 5, "remainingAfter": 5, "candidateLabels": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"], "hist": [{"bucket": "0xC0", "count": 7}, {"bucket": "0xBF", "count": 3}, {"bucket": "0xBD", "count": 1}, {"bucket": "0x41", "count": 1}]}, {"round": 2, "byte": "B1", "shift": 16, "prefixBefore": "0xC0000000", "bucket": 57, "bucketHex": "0x39", "countGt": 4, "countGe": 6, "remainingBefore": 5, "remainingAfter": 1, "candidateLabels": ["C", "D", "E", "G", "I", "K", "L"], "hist": [{"bucket": "0x83", "count": 2}, {"bucket": "0x50", "count": 1}, {"bucket": "0x40", "count": 1}, {"bucket": "0x39", "count": 2}, {"bucket": "0x20", "count": 1}]}, {"round": 3, "byte": "B2", "shift": 8, "prefixBefore": "0xC0390000", "bucket": 153, "bucketHex": "0x99", "countGt": 0, "countGe": 2, "remainingBefore": 1, "remainingAfter": 1, "candidateLabels": ["D", "E"], "hist": [{"bucket": "0x99", "count": 2}]}, {"round": 4, "byte": "B3", "shift": 0, "prefixBefore": "0xC0399900", "bucket": 154, "bucketHex": "0x9A", "countGt": 0, "countGe": 2, "remainingBefore": 1, "remainingAfter": 1, "candidateLabels": ["D", "E"], "hist": [{"bucket": "0x9A", "count": 2}]}], "k": 5, "pivotKeyHex": "0xC039999A", "pivotScore": 2.9, "gt": ["C", "G", "I", "L"], "eq": ["D", "E"], "lt": ["A", "B", "F", "H", "J", "K"]};
+
+function fmtScore(x) {
+  return Number.isInteger(x) ? x.toFixed(1) : x.toFixed(2);
+}
+
+function statusOf(row) {
+  const key = row.key;
+  const pivot = parseInt(DATA.pivotKeyHex, 16);
+  if (key > pivot) return ["selected", "> pivot"];
+  if (key === pivot) return ["pivot", "= pivot"];
+  return ["discard", "< pivot"];
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#scoreTable tbody");
+  tbody.innerHTML = DATA.rows.map(row => {
+    const [cls, label] = statusOf(row);
+    const chipCls = cls === "selected" ? "rank-gt" : cls === "pivot" ? "rank-eq" : "rank-lt";
+    return `<tr>
+      <td><span class="row-chip ${chipCls}">${row.label}</span></td>
+      <td>${fmtScore(row.score)}</td>
+      <td class="mono">${row.bits}</td>
+      <td class="mono">${row.keyHex}</td>
+      <td><span class="pill ${cls}">${label}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderRounds() {
+  const root = document.getElementById("rounds");
+  root.innerHTML = DATA.rounds.map(r => {
+    const max = Math.max(...r.hist.map(h => h.count));
+    const bars = r.hist.slice(0, 5).map(h => {
+      const w = Math.max(8, Math.round(h.count / max * 100));
+      return `<div class="bar"><span>${h.bucket}</span><span><i class="fill" style="display:block;width:${w}%"></i></span><span>${h.count}</span></div>`;
+    }).join("");
+    return `<div class="round">
+      <div class="title"><span>Round ${r.round}</span><span>${r.byte}</span></div>
+      <div class="bucket">${r.bucketHex}</div>
+      <div class="mini">
+        candidates: ${r.candidateLabels.join(", ")}<br>
+        count_gt: ${r.countGt}<br>
+        remaining_k: ${r.remainingBefore} → ${r.remainingAfter}
+      </div>
+      <div class="bars">${bars}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderCollection() {
+  const root = document.getElementById("collection");
+  const pills = [];
+  DATA.gt.forEach(x => pills.push(`<span class="pill selected">${x}: &gt; pivot</span>`));
+  DATA.eq.forEach(x => pills.push(`<span class="pill pivot">${x}: = pivot</span>`));
+  DATA.lt.forEach(x => pills.push(`<span class="pill discard">${x}: discard</span>`));
+  root.innerHTML = pills.join("");
+  document.getElementById("resultText").innerHTML =
+    `pivot score = ${fmtScore(DATA.pivotScore)}<br>` +
+    `pivot ordered key = ${DATA.pivotKeyHex}<br>` +
+    `need K=${DATA.k}: select all &gt; pivot (${DATA.gt.length}) + ${DATA.k - DATA.gt.length} from tie region (${DATA.eq.join(", ")})`;
+}
+
+let deterministic = false;
+function renderFinalOutput() {
+  const root = document.getElementById("finalOutput");
+  let tiePick;
+  if (deterministic) {
+    tiePick = [...DATA.eq].sort()[0];
+  } else {
+    tiePick = DATA.eq[DATA.eq.length - 1]; // deliberately show that fast mode can pick a different equal item
+  }
+  const out = [...DATA.gt, tiePick];
+  root.innerHTML = out.map(x => {
+    const row = DATA.rows.find(r => r.label === x);
+    return `<span class="pill selected">${x}: ${fmtScore(row.score)}</span>`;
+  }).join("");
+}
+
+document.getElementById("nonDetBtn").onclick = () => {
+  deterministic = false;
+  document.getElementById("nonDetBtn").classList.add("active");
+  document.getElementById("detBtn").classList.remove("active");
+  renderFinalOutput();
+};
+document.getElementById("detBtn").onclick = () => {
+  deterministic = true;
+  document.getElementById("detBtn").classList.add("active");
+  document.getElementById("nonDetBtn").classList.remove("active");
+  renderFinalOutput();
+};
+
+renderTable();
+renderRounds();
+renderCollection();
+renderFinalOutput();
+</script>
+</body>
+</html>
