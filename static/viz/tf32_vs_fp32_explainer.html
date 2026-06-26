@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TF32 vs FP32: Why Tensor Cores Use TF32</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a33;
+      --panel2: #18213f;
+      --ink: #f6f8ff;
+      --muted: #aeb8d6;
+      --line: rgba(255,255,255,.14);
+      --green: #8cf2c2;
+      --blue: #85b7ff;
+      --amber: #ffd166;
+      --red: #ff8f8f;
+      --purple: #c7a5ff;
+      --shadow: 0 18px 45px rgba(0,0,0,.28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(132,183,255,.24), transparent 28%),
+        radial-gradient(circle at 82% 5%, rgba(140,242,194,.18), transparent 30%),
+        linear-gradient(135deg, #090d1a 0%, #0b1020 60%, #101835 100%);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    main { max-width: 1220px; margin: 0 auto; padding: 38px 26px 56px; }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.035));
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .title-card { padding: 32px; }
+    .eyebrow { color: var(--green); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; }
+    h1 { font-size: clamp(34px, 5vw, 62px); line-height: 1.02; margin: 12px 0 16px; letter-spacing: -.04em; }
+    h2 { font-size: 25px; margin: 0 0 14px; letter-spacing: -.02em; }
+    h3 { font-size: 17px; margin: 0 0 10px; color: var(--ink); }
+    p { margin: 0 0 14px; color: var(--muted); }
+    .lead { font-size: 20px; color: #dce4ff; max-width: 780px; }
+    .badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .badge { border: 1px solid var(--line); background: rgba(255,255,255,.06); border-radius: 999px; padding: 8px 12px; color: #dce4ff; font-weight: 650; font-size: 13px; }
+    .badge.green { color: #d7fff0; border-color: rgba(140,242,194,.38); }
+    .badge.amber { color: #fff1c0; border-color: rgba(255,209,102,.38); }
+    .metrics { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    .metric {
+      border: 1px solid var(--line); border-radius: 18px; padding: 16px;
+      background: rgba(0,0,0,.14);
+    }
+    .metric .label { color: var(--muted); font-size: 13px; }
+    .metric .value { font-size: 31px; font-weight: 800; letter-spacing: -.03em; margin-top: 4px; }
+    .metric .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; margin-bottom: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; margin-bottom: 18px; }
+    .format-table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px; }
+    .format-table th, .format-table td { border-bottom: 1px solid var(--line); padding: 13px 12px; text-align: left; vertical-align: top; }
+    .format-table th { color: #dce4ff; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; background: rgba(255,255,255,.06); }
+    .format-table td { color: var(--muted); }
+    .format-table tr:last-child td { border-bottom: none; }
+    .tag { display:inline-block; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 800; }
+    .tag.fp32 { background: rgba(133,183,255,.18); color: #cce0ff; }
+    .tag.tf32 { background: rgba(140,242,194,.18); color: #ceffec; }
+    .tag.warn { background: rgba(255,209,102,.18); color: #ffe5a0; }
+    .bits { display:flex; gap: 5px; align-items:center; margin: 12px 0 6px; }
+    .bit { height: 34px; display:flex; align-items:center; justify-content:center; border-radius: 8px; font-weight: 800; color: #07111f; font-size: 12px; }
+    .sign { width: 46px; background: var(--amber); }
+    .exp { width: 130px; background: var(--blue); }
+    .mant-fp32 { flex: 1; background: var(--purple); }
+    .mant-tf32 { width: 140px; background: var(--green); }
+    .zero { flex: 1; background: rgba(255,255,255,.12); color: #b8c2dd; border: 1px dashed rgba(255,255,255,.25); }
+    .caption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .pipeline { display:grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: stretch; margin-top: 12px; }
+    .stage { border: 1px solid var(--line); border-radius: 16px; padding: 15px 12px; text-align: center; background: rgba(0,0,0,.15); position: relative; min-height: 116px; display:flex; flex-direction:column; justify-content:center; }
+    .stage:not(:last-child)::after { content:"→"; position:absolute; right:-17px; top:42%; color: var(--green); font-size: 22px; font-weight:900; z-index:2; }
+    .stage b { display:block; color:#fff; margin-bottom:6px; }
+    .stage span { color: var(--muted); font-size: 13px; }
+    .note { border-left: 4px solid var(--amber); padding: 12px 14px; border-radius: 12px; background: rgba(255,209,102,.08); color: #fff1c0; margin-top: 14px; }
+    .compare-bars { display:grid; gap: 12px; margin-top: 12px; }
+    .bar-row { display:grid; grid-template-columns: 140px 1fr 100px; gap: 12px; align-items:center; color: var(--muted); }
+    .bar-track { height: 22px; border-radius: 999px; background: rgba(255,255,255,.10); overflow:hidden; border: 1px solid var(--line); }
+    .bar { height:100%; border-radius: 999px; background: linear-gradient(90deg, var(--blue), var(--green)); }
+    .bar.fp { width: 6.8%; background: linear-gradient(90deg, #8198c7, var(--blue)); }
+    .bar.tf { width: 100%; }
+    .code { background: #070b16; border: 1px solid var(--line); color: #e8edff; padding: 15px; border-radius: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; overflow-x: auto; white-space: pre; }
+    .mini { font-size: 13px; color: var(--muted); }
+    .callout-good { border-color: rgba(140,242,194,.35); }
+    .callout-bad { border-color: rgba(255,143,143,.35); }
+    .footer { color: #8490b6; font-size: 12px; margin-top: 22px; }
+    .sources a { color: #b7d1ff; text-decoration: none; }
+    .sources li { margin-bottom: 8px; color: var(--muted); }
+    .nowrap { white-space: nowrap; }
+    @media (max-width: 930px) {
+      .hero, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: 1fr; }
+      .stage:not(:last-child)::after { content:"↓"; right: calc(50% - 8px); top: auto; bottom: -23px; }
+      .bar-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="card title-card">
+        <div class="eyebrow">FP32 tensors, TF32 math, Tensor Core speed</div>
+        <h1>Why Tensor Cores use TF32 instead of true FP32</h1>
+        <p class="lead">TF32 is a Tensor Core compute mode for FP32 matrix math. It keeps FP32-like dynamic range, reduces input mantissa precision, and accumulates into FP32. The goal is much higher GEMM/conv throughput with acceptable accuracy for many deep-learning workloads.</p>
+        <div class="badge-row">
+          <span class="badge green">Same FP32 exponent range</span>
+          <span class="badge amber">Lower input precision</span>
+          <span class="badge">FP32 tensors stay FP32 in memory</span>
+          <span class="badge">Mainly matmul / convolution</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>B200 numbers to keep straight</h2>
+        <div class="metrics">
+          <div class="metric">
+            <div class="label">Regular FP32 / CUDA-core spec</div>
+            <div class="value">75 TFLOPS</div>
+            <div class="sub">Full FP32 path; not the TF32 Tensor Core path.</div>
+          </div>
+          <div class="metric">
+            <div class="label">TF32 Tensor Core spec</div>
+            <div class="value">~1.1 / 2.2 PFLOPS</div>
+            <div class="sub">Dense / sparse. 2.2 PFLOPS = 2200 TFLOPS.</div>
+          </div>
+          <div class="metric">
+            <div class="label">Measured in the B200 microbenchmark paper</div>
+            <div class="value">964.5 TFLOPS</div>
+            <div class="sub">TF32 Tensor Core throughput, ~96.5% of theoretical peak.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>1) FP32 vs TF32 bit layout</h2>
+        <p>FP32 and TF32 both use an 8-bit exponent. That is why TF32 has a similar value range to FP32. The precision difference comes from the mantissa/fraction field.</p>
+        <h3><span class="tag fp32">FP32</span> 1 sign + 8 exponent + 23 fraction bits</h3>
+        <div class="bits">
+          <div class="bit sign">S 1</div><div class="bit exp">Exponent 8</div><div class="bit mant-fp32">Fraction / mantissa 23</div>
+        </div>
+        <div class="caption">Higher precision. More expensive multipliers. Usually lower peak throughput for matrix-heavy AI workloads.</div>
+        <br />
+        <h3><span class="tag tf32">TF32</span> 1 sign + 8 exponent + 10 mantissa bits</h3>
+        <div class="bits">
+          <div class="bit sign">S 1</div><div class="bit exp">Exponent 8</div><div class="bit mant-tf32">Mantissa 10</div><div class="bit zero">dropped / rounded lower bits</div>
+        </div>
+        <div class="caption">Same exponent width as FP32, but less mantissa precision. NVIDIA/PyTorch describe TF32 as rounding FP32 inputs to 10 mantissa bits and accumulating in FP32.</div>
+      </div>
+
+      <div class="card">
+        <h2>2) What actually happens during a TF32 matmul?</h2>
+        <p>The tensor can still be <b>torch.float32</b>. TF32 is not normally a storage dtype exposed to your model; it is an internal math mode for selected FP32 matmul/conv kernels.</p>
+        <div class="pipeline">
+          <div class="stage"><b>FP32 tensor</b><span>A and B are stored as float32 in memory.</span></div>
+          <div class="stage"><b>Round inputs</b><span>Before multiply, input values are rounded to TF32 precision.</span></div>
+          <div class="stage"><b>Tensor Core MMA</b><span>Matrix multiply runs on Tensor Cores at much higher throughput.</span></div>
+          <div class="stage"><b>FP32 accumulate</b><span>Products are accumulated with FP32 precision.</span></div>
+          <div class="stage"><b>FP32 output</b><span>Output tensor remains float32 unless your framework casts it.</span></div>
+        </div>
+        <div class="note"><b>Important:</b> TF32 changes the internal multiply precision, not the tensor storage format. Other non-matmul operations generally remain FP32.</div>
+      </div>
+    </section>
+
+    <section class="grid-3">
+      <div class="card callout-good">
+        <h2>Why NVIDIA added TF32</h2>
+        <p>Deep learning spends most of its time in GEMM and convolution. Tensor Cores are specialized matrix engines. To pack many matrix multipliers into the GPU power/area budget, the input multiply precision must be smaller than full FP32.</p>
+        <p>TF32 is a compromise: keep FP32 dynamic range, reduce mantissa precision, and use Tensor Cores.</p>
+      </div>
+      <div class="card">
+        <h2>Why not just use true FP32?</h2>
+        <p>Full FP32 multipliers require much wider significand hardware. That increases area, power, and datapath cost. For massive matrix throughput, NVIDIA gets far more operations per cycle by using reduced-precision inputs such as TF32, BF16, FP16, FP8, and FP4.</p>
+        <p>So true FP32 is still available, but it is not the fastest AI matrix path.</p>
+      </div>
+      <div class="card callout-bad">
+        <h2>When TF32 can be wrong choice</h2>
+        <p>TF32 is not bit-equivalent to FP32. It can change numerical results, especially for workloads that are sensitive to small differences: scientific/HPC solvers, strict regression tests, deterministic debugging, or algorithms with ill-conditioned matrices.</p>
+        <p>For those cases, use true IEEE FP32 and verify kernels with profiler/SASS counters.</p>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>3) Throughput intuition on B200</h2>
+        <p>Using the public HGX B200 spec: individual B200 GPU FP32 is 75 TFLOPS, while TF32 Tensor Core is listed as 2.2 PFLOPS with sparsity. Dense TF32 is half of sparse, about 1.1 PFLOPS.</p>
+        <div class="compare-bars">
+          <div class="bar-row"><b>FP32 CUDA core</b><div class="bar-track"><div class="bar fp"></div></div><span>75 TFLOPS</span></div>
+          <div class="bar-row"><b>TF32 TC dense</b><div class="bar-track"><div class="bar tf" style="width: 50%"></div></div><span>1100 TFLOPS</span></div>
+          <div class="bar-row"><b>TF32 TC sparse</b><div class="bar-track"><div class="bar tf"></div></div><span>2200 TFLOPS</span></div>
+        </div>
+        <div class="note">This is why a plain <b>torch.float32</b> GEMM can look much faster when TF32 is enabled: it may use Tensor Cores rather than the full FP32 CUDA-core path.</div>
+      </div>
+
+      <div class="card">
+        <h2>4) B200 paper caveat: “FP32 Tensor Core” is not the same as FP32 CUDA core</h2>
+        <p>The B200 microbenchmarking paper reports Tensor Core throughput by precision. Its table shows FP32 = 482.0 TFLOPS and TF32 = 964.5 TFLOPS for Tensor Core microbenchmarks.</p>
+        <table class="format-table">
+          <thead><tr><th>Path</th><th>Meaning</th><th>B200 number</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag fp32">FP32 spec</span></td><td>Regular FP32 throughput, usually CUDA-core/SIMT path.</td><td>75 TFLOPS</td></tr>
+            <tr><td><span class="tag fp32">FP32 Tensor Core row</span></td><td>Paper’s Tensor Core precision benchmark, not the same as the normal FP32 spec row.</td><td>482.0 TFLOPS</td></tr>
+            <tr><td><span class="tag tf32">TF32 Tensor Core row</span></td><td>TF32 Tensor Core benchmark.</td><td>964.5 TFLOPS</td></tr>
+          </tbody>
+        </table>
+        <div class="note"><b>Do not mix these labels:</b> product “FP32 75 TFLOPS” and paper “FP32 Tensor Core 482 TFLOPS” refer to different hardware paths/benchmark definitions.</div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>5) PyTorch controls</h2>
+        <p>Use the new precision API when available. It explicitly asks PyTorch to use IEEE FP32 internally instead of TF32 for CUDA matmul/cuDNN paths.</p>
+        <div class="code"># PyTorch 2.9+ style
+import torch
+
+torch.backends.fp32_precision = "ieee"
+torch.backends.cuda.matmul.fp32_precision = "ieee"
+torch.backends.cudnn.fp32_precision = "ieee"</div>
+        <p class="mini">Older API, still commonly used:</p>
+        <div class="code">torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+torch.set_float32_matmul_precision("highest")</div>
+      </div>
+      <div class="card">
+        <h2>6) Benchmarking checklist</h2>
+        <table class="format-table">
+          <thead><tr><th>Goal</th><th>Use</th><th>Verify</th></tr></thead>
+          <tbody>
+            <tr><td>Measure ~75 TFLOPS FP32</td><td>Disable TF32; use true FP32/SIMT kernel or cuBLAS IEEE FP32 path.</td><td>Nsight/SASS shows FFMA-like FP32 path, not Tensor Core MMA.</td></tr>
+            <tr><td>Measure ~1.1 PFLOPS TF32 dense</td><td>Enable TF32; use large FP32 GEMM.</td><td>Tensor Core instructions/counters active.</td></tr>
+            <tr><td>Measure ~2.2 PFLOPS TF32 sparse</td><td>Use supported 2:4 structured sparsity Tensor Core path.</td><td>Sparse Tensor Core path active.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card sources">
+      <h2>Sources used</h2>
+      <ul>
+        <li>NVIDIA Technical Blog, “Accelerating AI Training with NVIDIA TF32 Tensor Cores”: TF32 is a Tensor Core mode, rounds FP32 inputs to TF32, accumulates in FP32, and uses 8 exponent + 10 mantissa bits.</li>
+        <li>PyTorch CUDA semantics documentation: TF32 controls, behavior on float32 matmul/convolution, old and new APIs.</li>
+        <li>NVIDIA Blackwell / HGX B200 datasheet: individual HGX B200 GPU specifications, including FP32 75 TFLOPS and TF32 Tensor Core 2.2 PFLOPS with sparsity.</li>
+        <li>Jarmusch & Chandrasekaran, “Microbenchmarking NVIDIA’s Blackwell Architecture”: B200 dual-die / 148 SM description and Tensor Core throughput table.</li>
+      </ul>
+      <div class="footer">Prepared as a compact visual explainer for FP32 vs TF32 Tensor Core behavior. Always verify exact kernel paths with profiling when benchmarking.</div>
+    </section>
+  </main>
+</body>
+</html>
