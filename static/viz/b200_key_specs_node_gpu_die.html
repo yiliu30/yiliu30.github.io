@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NVIDIA B200 Key Specs — Node / GPU / Die</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a33; --panel2:#182240; --ink:#eef3ff; --muted:#a9b4cf;
+    --line:#334065; --green:#76b900; --blue:#65b9ff; --yellow:#ffd166; --red:#ff7b7b;
+    --chip:#222d52; --shadow:0 16px 40px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#08101f,#10162b 34%,#0b1020);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto;padding:34px 26px 48px}
+  header{display:grid;grid-template-columns:1.2fr .8fr;gap:22px;align-items:end;margin-bottom:24px}
+  h1{font-size:clamp(30px,5vw,56px);line-height:1.02;margin:0 0 12px;letter-spacing:-.04em}
+  h2{font-size:25px;margin:0 0 14px;letter-spacing:-.02em}
+  h3{font-size:18px;margin:0 0 10px;color:#fff}
+  p{margin:0 0 12px;color:var(--muted)}
+  .tag{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:rgba(118,185,0,.12);color:#d8ffb0;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700;margin-bottom:12px}
+  .hero-note{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+  .hero-note b{color:#fff}.hero-note .warn{color:var(--yellow);font-weight:800}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::after{content:"";position:absolute;right:-50px;top:-50px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(118,185,0,.18),transparent 65%)}
+  .level{font-size:13px;color:var(--green);font-weight:900;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px}
+  .big{font-size:42px;line-height:1;font-weight:950;letter-spacing:-.04em;color:#fff;margin:2px 0 4px}
+  .sub{font-size:13px;color:var(--muted)}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+  .kv{background:rgba(0,0,0,.17);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+  .kv .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.kv .v{font-size:16px;font-weight:850;color:#fff;margin-top:2px}
+  .section{margin-top:26px}
+  .flow{display:grid;grid-template-columns:1fr 70px 1fr 70px 1fr;gap:8px;align-items:center;margin-top:14px}
+  .nodebox{border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:18px;padding:16px;min-height:130px}
+  .nodebox .label{color:var(--blue);font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:.1em}.nodebox .title{font-size:22px;font-weight:950;color:#fff;margin:5px 0}
+  .arrow{text-align:center;color:var(--green);font-weight:900;font-size:26px}
+  table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);box-shadow:var(--shadow)}
+  th,td{padding:12px 13px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
+  th{background:#1c2749;color:#dfe9ff;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+  td{color:#edf3ff;font-size:14px} tr:last-child td{border-bottom:0}
+  .muted{color:var(--muted)} .derived{color:#d6eaff}.src{font-size:11px;color:#b7c0d6;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:2px 7px;margin-left:6px;white-space:nowrap;background:rgba(255,255,255,.05)}
+  .ok{color:#b9ff7b;font-weight:800}.caution{color:var(--yellow);font-weight:800}.no{color:var(--red);font-weight:800}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:16px}.callout{border-left:4px solid var(--green);background:rgba(118,185,0,.08);border-radius:14px;padding:14px 16px;color:#dce8ff}.callout p{margin:0;color:#dce8ff}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#081022;border:1px solid var(--line);border-radius:14px;padding:14px;color:#e8f1ff;white-space:pre-wrap}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.pill{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:#dbe6ff;font-size:12px}.pill.green{border-color:rgba(118,185,0,.6);color:#d8ffbd}.pill.yellow{border-color:rgba(255,209,102,.65);color:#ffe6a6}
+  footer{margin-top:28px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}.sources li{margin-bottom:7px}.sources a{color:#a9d3ff;text-decoration:none}.sources a:hover{text-decoration:underline}
+  @media(max-width:860px){header,.grid3,.twocol{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}table{font-size:13px}.big{font-size:35px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="tag">NVIDIA Blackwell B200 · key spec hierarchy</div>
+      <h1>B200 specs by node, GPU, and die</h1>
+      <p>This page summarizes the common <b>8× B200 HGX/DGX node</b>, one <b>B200 GPU</b>, and one physical <b>Blackwell die</b>. Values are separated into <b>directly sourced</b> specs and <b>derived</b> per-die estimates to avoid double-counting the dual-die package.</p>
+    </div>
+    <div class="hero-note">
+      <p><b>Most important correction:</b> a B200 GPU is dual-die, but the CUDA-visible GPU has <b>148 SMs total</b>, not 148 SMs per die.</p>
+      <p class="warn">Per die ≈ 74 active SMs is derived from 148 ÷ 2, not an independent CUDA device.</p>
+    </div>
+  </header>
+
+  <section class="grid3">
+    <div class="card">
+      <div class="level">8-GPU node</div>
+      <div class="big">8× B200</div>
+      <div class="sub">Typical DGX/HGX B200 server/baseboard level</div>
+      <div class="mini">
+        <div class="kv"><div class="k">Blackwell dies</div><div class="v">16</div></div>
+        <div class="kv"><div class="k">Active SMs</div><div class="v">1,184</div></div>
+        <div class="kv"><div class="k">GPU memory</div><div class="v">1,440 GB</div></div>
+        <div class="kv"><div class="k">NVLink aggregate</div><div class="v">14.4 TB/s</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="level">1 GPU package</div>
+      <div class="big">2 dies</div>
+      <div class="sub">Unified by NV-HBI; appears as one coherent GPU to software</div>
+      <div class="mini">
+        <div class="kv"><div class="k">Active SMs</div><div class="v">148</div></div>
+        <div class="kv"><div class="k">Transistors</div><div class="v">208B</div></div>
+        <div class="kv"><div class="k">Memory</div><div class="v">180 GB*</div></div>
+        <div class="kv"><div class="k">HBM BW</div><div class="v">7.7 TB/s</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="level">1 physical die</div>
+      <div class="big">≈74 SMs</div>
+      <div class="sub">Derived split; not separately exposed as a CUDA GPU</div>
+      <div class="mini">
+        <div class="kv"><div class="k">Transistors</div><div class="v">≈104B</div></div>
+        <div class="kv"><div class="k">HBM stacks</div><div class="v">≈4</div></div>
+        <div class="kv"><div class="k">Memory</div><div class="v">≈90 GB*</div></div>
+        <div class="kv"><div class="k">HBM BW</div><div class="v">≈3.85 TB/s</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section card">
+    <h2>Hierarchy: do not double count the two dies</h2>
+    <div class="flow">
+      <div class="nodebox"><div class="label">Node</div><div class="title">DGX/HGX B200</div><p>8 CUDA-visible B200 GPUs. NVIDIA DGX B200 lists 1,440 GB total GPU memory and 14.4 TB/s aggregate NVLink bandwidth.</p></div>
+      <div class="arrow">→</div>
+      <div class="nodebox"><div class="label">GPU</div><div class="title">1 B200</div><p>One B200 package contains two physical Blackwell dies but is presented as one coherent GPU device.</p></div>
+      <div class="arrow">→</div>
+      <div class="nodebox"><div class="label">Die</div><div class="title">½ B200</div><p>Useful for architecture reasoning only. CUDA kernels see the whole B200 device, not an individual die.</p></div>
+    </div>
+    <div class="formula">Node formulas:
+8 GPUs × 2 dies/GPU = 16 Blackwell dies
+8 GPUs × 148 SM/GPU = 1,184 active SMs
+8 GPUs × 180 GB/GPU = 1,440 GB GPU memory
+8 GPUs × 7.7 TB/s/GPU = 61.6 TB/s HBM bandwidth ≈ 62 TB/s</div>
+  </section>
+
+  <section class="section">
+    <h2>Compute peak: dense vs sparse, per node / per GPU / per die</h2>
+    <table>
+      <thead><tr><th>Precision / path</th><th>8× B200 node</th><th>1× B200 GPU</th><th>≈1 die, derived</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>FP4 Tensor Core</td><td><b>72 dense / 144 sparse PFLOPS</b></td><td>9 dense / 18 sparse PFLOPS</td><td class="derived">≈4.5 dense / 9 sparse PFLOPS</td><td>AI inference-oriented low precision</td></tr>
+        <tr><td>FP8 / FP6 Tensor Core</td><td><b>36 dense / 72 sparse PFLOPS</b></td><td>4.5 dense / 9 sparse PFLOPS</td><td class="derived">≈2.25 dense / 4.5 sparse PFLOPS</td><td>Training/inference Tensor Core formats</td></tr>
+        <tr><td>INT8 Tensor Core</td><td><b>36 dense / 72 sparse POPS</b></td><td>4.5 dense / 9 sparse POPS</td><td class="derived">≈2.25 dense / 4.5 sparse POPS</td><td>Integer Tensor Core path</td></tr>
+        <tr><td>FP16 / BF16 Tensor Core</td><td><b>18 dense / 36 sparse PFLOPS</b></td><td>2.25 dense / 4.5 sparse PFLOPS</td><td class="derived">≈1.125 dense / 2.25 sparse PFLOPS</td><td>Common DL training/inference path</td></tr>
+        <tr><td>TF32 Tensor Core</td><td><b>8.8 dense / 17.6 sparse PFLOPS</b></td><td>1.1 dense / 2.2 sparse PFLOPS</td><td class="derived">≈0.55 dense / 1.1 sparse PFLOPS</td><td>Fast Tensor Core path for FP32 tensors</td></tr>
+        <tr><td>FP32 CUDA-core/SIMT</td><td><b>600 TFLOPS</b></td><td>75 TFLOPS</td><td class="derived">≈37.5 TFLOPS</td><td>True FP32 path; not TF32 Tensor Core</td></tr>
+        <tr><td>FP64 / FP64 Tensor Core</td><td><b>296 TFLOPS</b></td><td>37 TFLOPS</td><td class="derived">≈18.5 TFLOPS</td><td>HPC-oriented double precision path</td></tr>
+      </tbody>
+    </table>
+    <div class="legend">
+      <span class="pill green">Dense = normal dense math</span>
+      <span class="pill green">Sparse = NVIDIA 2:4 structured sparsity peak where applicable</span>
+      <span class="pill yellow">Per-die compute is derived by ÷2</span>
+    </div>
+  </section>
+
+  <section class="section twocol">
+    <div class="card">
+      <h2>Memory and interconnect</h2>
+      <table>
+        <thead><tr><th>Metric</th><th>8× node</th><th>1× GPU</th><th>≈1 die</th></tr></thead>
+        <tbody>
+          <tr><td>GPU memory</td><td>1,440 GB total</td><td>180 GB HBM3e*</td><td class="derived">≈90 GB*</td></tr>
+          <tr><td>HBM bandwidth</td><td>61.6 TB/s derived from per-GPU; NVIDIA pages also list ~62–64 TB/s</td><td>7.7 TB/s</td><td class="derived">≈3.85 TB/s</td></tr>
+          <tr><td>HBM stacks</td><td>64 total, derived</td><td>8 total</td><td class="derived">≈4</td></tr>
+          <tr><td>GPU-to-GPU NVLink</td><td>14.4 TB/s aggregate</td><td>1.8 TB/s per GPU</td><td class="muted">Not die-visible</td></tr>
+          <tr><td>Die-to-die link</td><td class="muted">Inside each GPU package</td><td>NV-HBI coherent single-device link</td><td>10 TB/s chip-to-chip link</td></tr>
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top:10px">*NVIDIA product datasheet for HGX B200 lists 180 GB HBM3e per GPU; the architecture paper describes a unified 192 GB HBM3e memory space. Treat 180 GB as the HGX/DGX product capacity exposed in current product specs.</p>
+    </div>
+    <div class="card">
+      <h2>Architecture facts</h2>
+      <table>
+        <thead><tr><th>Metric</th><th>1× B200 GPU</th><th>≈1 die</th></tr></thead>
+        <tbody>
+          <tr><td>Physical dies</td><td>2</td><td>1</td></tr>
+          <tr><td>Transistors</td><td>208 billion</td><td class="derived">≈104 billion</td></tr>
+          <tr><td>Active SMs</td><td>148 total</td><td class="derived">≈74 if evenly split</td></tr>
+          <tr><td>GPCs</td><td>8 total</td><td class="derived">≈4 if evenly split</td></tr>
+          <tr><td>L2 partitions</td><td>4 total</td><td class="derived">≈2 if evenly split</td></tr>
+          <tr><td>MIG</td><td>7 instances supported</td><td class="muted">MIG applies at GPU level</td></tr>
+          <tr><td>TDP</td><td>Configurable up to 1,000 W for HGX B200 GPU</td><td class="derived">Not specified per die</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section twocol">
+    <div class="callout">
+      <h3>Runtime rule for CUDA / PyTorch / vLLM</h3>
+      <p>Use <b>148 SMs per B200 CUDA device</b>. Do not multiply by two again for the two dies. If you have an 8-GPU node, the total active SM count is <b>8 × 148 = 1,184</b>.</p>
+    </div>
+    <div class="callout">
+      <h3>Performance rule for benchmarking</h3>
+      <p><b>FP32 75 TFLOPS</b> is the true FP32/SIMT product spec. <b>TF32 1.1 / 2.2 PFLOPS</b> is Tensor Core dense/sparse. A PyTorch <code>float32</code> GEMM may use TF32 unless disabled.</p>
+    </div>
+  </section>
+
+  <section class="section card">
+    <h2>What is directly sourced vs derived?</h2>
+    <table>
+      <thead><tr><th>Value</th><th>Status</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr><td>8 B200 GPUs, 1,440 GB total memory, 14.4 TB/s NVLink aggregate</td><td class="ok">Direct NVIDIA DGX B200 spec</td><td>NVIDIA DGX B200 page and user guide list these node-level values.</td></tr>
+        <tr><td>180 GB HBM3e, 7.7 TB/s, 75 TFLOPS FP32, 2.2 PFLOPS TF32 sparse, 18 PFLOPS FP4 sparse</td><td class="ok">Direct NVIDIA Blackwell/HGX B200 datasheet</td><td>These are listed under individual HGX B200 GPU specifications.</td></tr>
+        <tr><td>2 dies, 208B transistors, 148 SMs, 8 GPCs, 8 HBM3e stacks, NV-HBI unified device</td><td class="ok">Direct from the B200 microbenchmarking paper</td><td>The paper explicitly describes one B200 GPU this way.</td></tr>
+        <tr><td>≈74 SMs/die, ≈90 GB/die, ≈3.85 TB/s/die, ≈37.5 TFLOPS FP32/die</td><td class="caution">Derived</td><td>Calculated by dividing the GPU-level value by two. Useful for mental model, but not exposed as separate GPU devices.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <h3>Sources used</h3>
+    <ol class="sources">
+      <li><a href="https://www.nvidia.com/en-us/data-center/dgx-b200/">NVIDIA DGX B200 specifications</a>: 8 GPUs, 1,440 GB total memory, 64 TB/s HBM3e bandwidth, FP4/FP8 system performance, 14.4 TB/s NVLink aggregate.</li>
+      <li><a href="https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html">NVIDIA DGX B200 User Guide</a>: 8× B200 GPUs, 1,440 GB total GPU memory, CPUs, NVSwitch, network cards, power supplies.</li>
+      <li><a href="https://www.primeline-solutions.com/media/categories/server/nach-gpu/nvidia-hgx-h200/nvidia-blackwell-b200-datasheet.pdf">NVIDIA Blackwell / HGX B200 datasheet PDF mirror</a>: individual HGX B200 GPU specs including 180 GB HBM3e, 7.7 TB/s, 75 TFLOPS FP32, Tensor Core peaks, 1.8 TB/s NVLink, and two reticle-limited dies connected by a 10 TB/s chip-to-chip interconnect.</li>
+      <li><a href="https://arxiv.org/html/2512.02189v3">Microbenchmarking NVIDIA’s Blackwell Architecture</a>: B200 dual-die architecture, 208B transistors, 148 SMs, 8 GPCs, 8 HBM3e stacks, NV-HBI coherent single-device model.</li>
+    </ol>
+    <p>Note: several NVIDIA Blackwell specs are marked preliminary in the datasheet. For exact runtime confirmation on your node, query CUDA device properties: <code>torch.cuda.get_device_properties(i).multi_processor_count</code>.</p>
+  </footer>
+</div>
+</body>
+</html>
