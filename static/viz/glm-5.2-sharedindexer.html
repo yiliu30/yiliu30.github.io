@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLM-5.2 IndexShare — Accurate Architecture Note</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #151b23;
+    --panel2: #0f1621;
+    --text: #f0f6fc;
+    --muted: #9fb0c3;
+    --line: #303b4a;
+    --blue: #79c0ff;
+    --green: #7ee787;
+    --yellow: #f2cc60;
+    --red: #ff7b72;
+    --purple: #d2a8ff;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: radial-gradient(circle at 12% 0%, #1f2f4d 0, var(--bg) 34%, #070a0f 100%);
+    color: var(--text);
+    line-height: 1.48;
+  }
+  .page { width: min(1180px, 94vw); margin: 32px auto 44px; }
+  .hero {
+    display: grid;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.22);
+  }
+  h1 { margin: 0 0 10px; font-size: clamp(32px, 5vw, 56px); letter-spacing: -.045em; line-height: 1.02; }
+  h2 { margin: 0 0 14px; font-size: 22px; letter-spacing: -.015em; }
+  h3 { margin: 0 0 8px; font-size: 16px; }
+  p { margin: 0; color: var(--muted); }
+  .lead { font-size: 18px; max-width: 780px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { border: 1px solid var(--line); background: rgba(255,255,255,.045); color: var(--text); border-radius: 999px; padding: 7px 10px; font-size: 13px; }
+  .chip.good { border-color: rgba(126,231,135,.4); color: var(--green); }
+  .chip.warn { border-color: rgba(242,204,96,.4); color: var(--yellow); }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 18px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+  .fact { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .fact .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .fact .v { color: var(--text); font-weight: 700; font-size: 18px; }
+  .section { margin-top: 18px; }
+  .flow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .box { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.035); padding: 16px; }
+  .layer-row { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; margin: 8px 0; }
+  .layer-label { color: var(--muted); font-size: 12px; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; }
+  .step { min-width: 38px; text-align: center; padding: 8px 7px; border-radius: 10px; font-weight: 800; font-size: 12px; border: 1px solid var(--line); }
+  .full { background: rgba(126,231,135,.12); color: var(--green); border-color: rgba(126,231,135,.45); }
+  .shared { background: rgba(121,192,255,.12); color: var(--blue); border-color: rgba(121,192,255,.45); }
+  .dense { background: rgba(210,168,255,.12); color: var(--purple); border-color: rgba(210,168,255,.45); }
+  .code { background: #05080d; border: 1px solid var(--line); border-radius: 14px; padding: 14px; overflow-x: auto; color: #d6e2f0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; white-space: pre; }
+  table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 14px; border: 1px solid var(--line); }
+  th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { text-align: left; background: rgba(255,255,255,.055); color: var(--text); font-size: 13px; }
+  td { color: var(--muted); font-size: 14px; }
+  tr:last-child td { border-bottom: 0; }
+  .ok { color: var(--green); font-weight: 700; }
+  .no { color: var(--red); font-weight: 700; }
+  .note { border-left: 4px solid var(--yellow); padding: 12px 14px; background: rgba(242,204,96,.08); border-radius: 12px; color: var(--muted); }
+  .source a { color: var(--blue); text-decoration: none; }
+  .source a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--muted); }
+  @media (max-width: 860px) {
+    .hero, .grid, .grid3, .flow { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="card">
+        <h1>GLM‑5.2 IndexShare</h1>
+        <p class="lead">A source-grounded explanation of the shared indexer mechanism used with DSA sparse attention in GLM‑5.2. The core idea: do not recompute the DSA top‑k token indexer in every layer; reuse selected token indices across a small group of layers.</p>
+        <div class="chips">
+          <span class="chip good">Official name: IndexShare</span>
+          <span class="chip">Related paper: IndexCache</span>
+          <span class="chip">Model type: glm_moe_dsa</span>
+          <span class="chip warn">2.9× is FLOPs, not guaranteed end‑to‑end speedup</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Verified facts</h2>
+        <div class="grid3" style="grid-template-columns: 1fr 1fr; margin-top:0;">
+          <div class="fact"><div class="k">Context</div><div class="v">1,048,576</div></div>
+          <div class="fact"><div class="k">index_topk</div><div class="v">2048</div></div>
+          <div class="fact"><div class="k">index_topk_freq</div><div class="v">4</div></div>
+          <div class="fact"><div class="k">Config pattern</div><div class="v">full / shared</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid section">
+      <div class="card">
+        <h2>1. What DSA does before sharing</h2>
+        <p>DeepSeek Sparse Attention uses a lightweight indexer to score previous tokens for each query and select the top‑k relevant positions. The main attention then runs only on those selected positions instead of attending to the full prefix.</p>
+        <div class="code" style="margin-top:14px;">For each layer:
+  query hidden state
+      ↓
+  DSA indexer scores prefix tokens
+      ↓
+  top-k token indices are selected
+      ↓
+  sparse attention uses only those indices</div>
+      </div>
+
+      <div class="card">
+        <h2>2. What IndexShare changes</h2>
+        <p>GLM‑5.2 applies IndexShare so that every 4 transformer layers share one lightweight indexer. The first layer in the group computes top‑k indices; the following layers reuse those indices, reducing indexer dot‑product and top‑k work in 3/4 layers.</p>
+        <div class="code" style="margin-top:14px;">Layer group of 4:
+  Layer 0: run indexer → cache top-k indices
+  Layer 1: reuse cached top-k indices
+  Layer 2: reuse cached top-k indices
+  Layer 3: reuse cached top-k indices</div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>Layer execution pattern: standard DSA vs IndexShare</h2>
+      <div class="flow">
+        <div class="box">
+          <h3>Standard DSA</h3>
+          <p class="small">Every layer runs its own indexer.</p>
+          <div class="layer-row"><div class="layer-label">Layers</div><div class="steps">
+            <span class="step full">Idx</span><span class="step full">Idx</span><span class="step full">Idx</span><span class="step full">Idx</span>
+            <span class="step full">Idx</span><span class="step full">Idx</span><span class="step full">Idx</span><span class="step full">Idx</span>
+          </div></div>
+        </div>
+        <div class="box">
+          <h3>IndexShare / IndexCache idea</h3>
+          <p class="small">Full layers compute top‑k; shared layers reuse the nearest preceding full layer’s top‑k indices.</p>
+          <div class="layer-row"><div class="layer-label">Ideal group</div><div class="steps">
+            <span class="step full">Full</span><span class="step shared">Share</span><span class="step shared">Share</span><span class="step shared">Share</span>
+            <span class="step full">Full</span><span class="step shared">Share</span><span class="step shared">Share</span><span class="step shared">Share</span>
+          </div></div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:14px;">Important accuracy note: the public GLM‑5.2 config does not start as a perfect F‑S‑S‑S pattern from layer 0. It shows the first three entries as <b>full</b>, then a mostly repeating <b>full + shared + shared + shared</b> pattern. So the implementation should follow <code>indexer_types</code> from config, not hard-code a simplistic pattern.</div>
+    </section>
+
+    <section class="grid section">
+      <div class="card">
+        <h2>Public config evidence</h2>
+        <div class="code">"architectures": ["GlmMoeDsaForCausalLM"]
+"model_type": "glm_moe_dsa"
+"max_position_embeddings": 1048576
+"index_topk": 2048
+"index_topk_freq": 4
+"index_share_for_mtp_iteration": true
+"indexer_types": [
+  "full", "full", "full",
+  "shared", "shared", "shared",
+  "full", "shared", "shared", "shared", ...
+]</div>
+      </div>
+
+      <div class="card">
+        <h2>What is actually shared?</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Shared?</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Top‑k token indices</td><td class="ok">Yes</td><td>Shared layers reuse the selected token positions from a preceding full indexer layer.</td></tr>
+            <tr><td>Main sparse attention computation</td><td class="no">No</td><td>Each layer still computes its own attention output using its own hidden states and parameters.</td></tr>
+            <tr><td>Indexer weights</td><td>Effectively fewer active indexer calls</td><td>Full layers run the indexer; shared layers skip the indexer forward pass.</td></tr>
+            <tr><td>KV cache</td><td>Not reduced by backbone IndexShare</td><td>The blog explicitly notes GLM‑5.2’s architecture reduces FLOPs but does not proportionally reduce per-token KV-cache size.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>Why this helps long context</h2>
+      <div class="grid3">
+        <div class="box">
+          <h3>Problem</h3>
+          <p>The DSA indexer still scans/scales with the prefix to choose relevant tokens. At very long context, this selection overhead becomes important.</p>
+        </div>
+        <div class="box">
+          <h3>Observation</h3>
+          <p>IndexCache reports high cross-layer overlap in selected top‑k tokens: consecutive layers often choose similar important token sets.</p>
+        </div>
+        <div class="box">
+          <h3>Optimization</h3>
+          <p>Run the indexer only at selected full layers, cache the top‑k indices, and reuse them in shared layers.</p>
+        </div>
+      </div>
+      <div class="note" style="margin-top:14px;">Z.AI reports IndexShare reduces <b>per-token FLOPs by 2.9× at 1M context length</b>. This should not be read as “2.9× end-to-end latency speedup” because real serving latency also includes MoE, KV cache traffic, scheduling, communication, kernels, and CPU overhead.</div>
+    </section>
+
+    <section class="grid section">
+      <div class="card">
+        <h2>MTP path: IndexShare + KVShare</h2>
+        <p>GLM‑5.2 also applies IndexShare to the MTP layer used for speculative decoding. For multi-step MTP, the indexer is placed at the first step and top‑k indices are reused by following steps. The blog additionally says KVShare is used in the MTP path to reduce training/inference mismatch, with an ablation showing acceptance length improving from 4.56 to 5.47 after adding IndexShare+KVShare, rejection sampling, and end-to-end TV loss.</p>
+      </div>
+      <div class="card">
+        <h2>Implementation checklist</h2>
+        <table>
+          <thead><tr><th>Check</th><th>Why it matters</th></tr></thead>
+          <tbody>
+            <tr><td>Parse <code>model_type=glm_moe_dsa</code></td><td>GLM‑5.2 is not a standard dense attention model.</td></tr>
+            <tr><td>Respect <code>indexer_types</code></td><td>Do not run indexer on every layer if the config marks the layer as shared.</td></tr>
+            <tr><td>Cache top‑k indices from full layers</td><td>Shared layers need the previous full layer’s selected positions.</td></tr>
+            <tr><td>Use <code>index_topk=2048</code></td><td>This is the released model config value.</td></tr>
+            <tr><td>Do not claim KV-cache reduction</td><td>Backbone IndexShare mainly reduces indexer compute, not KV size.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card section source">
+      <h2>Sources and what each source supports</h2>
+      <table>
+        <thead><tr><th>Source</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td><a href="https://huggingface.co/blog/zai-org/glm-52-blog">Z.AI / Hugging Face GLM‑5.2 blog</a></td><td>IndexShare definition, 4-layer sharing, 2.9× per-token FLOPs claim, MTP IndexShare/KVShare details.</td></tr>
+          <tr><td><a href="https://huggingface.co/zai-org/GLM-5.2/blob/main/config.json">GLM‑5.2 config.json</a></td><td>Actual released config: <code>glm_moe_dsa</code>, <code>index_topk=2048</code>, <code>index_topk_freq=4</code>, <code>indexer_types</code>, 1M context.</td></tr>
+          <tr><td><a href="https://arxiv.org/abs/2603.12201">IndexCache paper</a></td><td>General mechanism: Full layers compute fresh indices; Shared layers reuse nearest preceding Full layer’s top‑k indices; motivation from cross-layer redundancy.</td></tr>
+          <tr><td><a href="https://huggingface.co/papers/2602.15763">GLM‑5 technical report page</a></td><td>GLM‑5 context for DSA architecture and long-context engineering.</td></tr>
+        </tbody>
+      </table>
+      <p class="small" style="margin-top:12px;">Last checked: 2026‑06‑26. Claims not directly supported above are intentionally avoided.</p>
+    </section>
+  </main>
+</body>
+</html>
