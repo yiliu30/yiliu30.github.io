@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attention Matrix View — Make Only Frame-0 Query Rows Dense</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #11182d;
+    --panel2: #151f38;
+    --ink: #edf3ff;
+    --muted: #9fb0d1;
+    --line: rgba(255,255,255,.12);
+    --dense: #4cc9f0;
+    --dense2: #7dd3fc;
+    --keep: #fbbf24;
+    --drop: #2a3554;
+    --text: #a78bfa;
+    --f0: #22c55e;
+    --warn: #fb7185;
+    --good: #34d399;
+    --shadow: 0 24px 80px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 8% 6%, rgba(76,201,240,.18), transparent 32%),
+      radial-gradient(circle at 84% 12%, rgba(167,139,250,.18), transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(34,197,94,.10), transparent 42%),
+      var(--bg);
+    color: var(--ink);
+  }
+  .page { max-width: 1280px; margin: 0 auto; padding: 34px 24px 60px; }
+  .hero {
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, rgba(17,24,45,.92), rgba(21,31,56,.86));
+    border-radius: 28px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    right: -120px;
+    top: -120px;
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(circle, rgba(76,201,240,.22), transparent 68%);
+    pointer-events: none;
+  }
+  h1 { margin: 0 0 10px; font-size: clamp(30px, 4vw, 52px); line-height: 1.02; letter-spacing: -0.045em; }
+  .subtitle { margin: 0; max-width: 900px; color: var(--muted); font-size: 18px; line-height: 1.55; }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 12px; color: #d9e7ff; background: rgba(255,255,255,.055);
+    font-size: 13px; white-space: nowrap;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display:inline-block; }
+  .dot.dense { background: var(--dense); box-shadow: 0 0 16px rgba(76,201,240,.85); }
+  .dot.keep { background: var(--keep); }
+  .dot.drop { background: var(--drop); border: 1px solid rgba(255,255,255,.18); }
+  .dot.f0 { background: var(--f0); box-shadow: 0 0 16px rgba(34,197,94,.75); }
+
+  .grid2 { display: grid; grid-template-columns: 1.02fr .98fr; gap: 20px; margin-top: 22px; align-items: stretch; }
+  .card {
+    border: 1px solid var(--line); background: rgba(17,24,45,.86); border-radius: 22px;
+    padding: 22px; box-shadow: 0 14px 46px rgba(0,0,0,.22);
+  }
+  h2 { margin: 0 0 14px; font-size: 24px; letter-spacing: -0.025em; }
+  h3 { margin: 0 0 10px; font-size: 18px; letter-spacing: -0.02em; }
+  p { color: var(--muted); line-height: 1.56; }
+  .muted { color: var(--muted); }
+  .callout {
+    border: 1px solid rgba(76,201,240,.28);
+    background: rgba(76,201,240,.09);
+    border-radius: 18px;
+    padding: 15px 16px;
+    color: #dff7ff;
+    line-height: 1.52;
+  }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  code { color: #e0f2fe; background: rgba(255,255,255,.075); padding: 2px 6px; border-radius: 7px; }
+  pre {
+    margin: 12px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: 18px;
+    background: #080d19; color: #dbeafe; overflow-x: auto; line-height: 1.55; font-size: 13px;
+  }
+
+  .token-line { margin-top: 16px; display: grid; grid-template-columns: repeat(9, 1fr); gap: 7px; }
+  .token {
+    min-height: 48px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    font-size: 12px; color: #eaf2ff; background: rgba(255,255,255,.055);
+  }
+  .token small { color: var(--muted); margin-top: 3px; }
+  .token.text { background: rgba(167,139,250,.18); border-color: rgba(167,139,250,.45); }
+  .token.f0 { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.50); box-shadow: inset 0 0 0 1px rgba(34,197,94,.15); }
+
+  .matrix-wrap { overflow: auto; padding-bottom: 4px; }
+  .concept-matrix {
+    display: grid;
+    grid-template-columns: 86px repeat(9, minmax(62px, 1fr));
+    gap: 5px;
+    min-width: 740px;
+    margin-top: 14px;
+  }
+  .axis-corner, .axis-top, .axis-left, .mcell {
+    min-height: 46px; border-radius: 10px; display:flex; align-items:center; justify-content:center;
+    text-align:center; font-size: 12px; border: 1px solid rgba(255,255,255,.10);
+  }
+  .axis-corner { color: var(--muted); background: rgba(255,255,255,.035); }
+  .axis-top { color: #dbeafe; background: rgba(255,255,255,.055); font-weight: 650; }
+  .axis-left { color: #dbeafe; background: rgba(255,255,255,.055); font-weight: 650; }
+  .axis-left.f0, .axis-top.f0 { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.40); }
+  .axis-top.text, .axis-left.text { background: rgba(167,139,250,.18); border-color: rgba(167,139,250,.40); }
+  .mcell { color: #cbd5e1; background: rgba(42,53,84,.70); position: relative; overflow: hidden; }
+  .mcell.keep { background: rgba(251,191,36,.22); border-color: rgba(251,191,36,.40); color: #fff7d6; }
+  .mcell.drop { opacity: .68; }
+  .mcell.dense { background: rgba(76,201,240,.28); border-color: rgba(76,201,240,.58); color: #e0fbff; font-weight: 750; }
+  .mcell.dense::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+    transform: translateX(-100%); animation: shine 3.4s linear infinite;
+  }
+  @keyframes shine { to { transform: translateX(100%); } }
+
+  .steps { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+  .step { border: 1px solid var(--line); background: rgba(255,255,255,.045); border-radius: 18px; padding: 16px; }
+  .num { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius: 10px; background: rgba(76,201,240,.18); color: #e0fbff; margin-bottom: 10px; font-weight: 750; }
+  .step b { display:block; margin-bottom: 6px; }
+  .step span { display:block; color: var(--muted); font-size: 13px; line-height:1.5; }
+
+  .controls { display:grid; grid-template-columns: repeat(7, minmax(95px,1fr)); gap: 10px; margin: 14px 0 16px; }
+  label { display:block; color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+  input, select {
+    width: 100%; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--line);
+    background: rgba(8,13,25,.9); color: var(--ink); outline: none;
+  }
+  input:focus { border-color: rgba(76,201,240,.65); box-shadow: 0 0 0 3px rgba(76,201,240,.10); }
+  .stats { display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0 16px; }
+  .stat { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.045); padding: 13px; }
+  .stat .v { font-size: 22px; font-weight: 780; letter-spacing:-.02em; color:#fff; }
+  .stat .k { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.3; }
+  .block-panel { border:1px solid var(--line); background:#080d19; border-radius:18px; padding:14px; overflow:auto; }
+  .block-matrix { display:grid; gap:2px; width:max-content; }
+  .bcell { width:7px; height:7px; border-radius:2px; background: var(--drop); opacity:.80; }
+  .bcell.keep { background: var(--keep); opacity:.85; }
+  .bcell.dense { background: var(--dense); box-shadow: 0 0 5px rgba(76,201,240,.55); opacity: 1; }
+  .bcell.textkey { outline: 1px solid rgba(167,139,250,.58); }
+  .bcell.f0row { outline: 1px solid rgba(34,197,94,.58); }
+  .legend { display:flex; gap: 12px; flex-wrap: wrap; align-items:center; margin-top: 11px; color: var(--muted); font-size: 12px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .sw.dense { background: var(--dense); } .sw.keep { background: var(--keep); } .sw.drop { background: var(--drop); } .sw.f0 { background: transparent; border: 2px solid var(--f0); }
+
+  .compare { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  .mini { border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 18px; padding: 16px; }
+  .mini h3 { display:flex; align-items:center; gap:8px; }
+  .pill { display:inline-block; border-radius: 999px; padding: 4px 9px; font-size: 11px; border:1px solid var(--line); color: #dbeafe; background: rgba(255,255,255,.06); }
+  .risk { border-color: rgba(251,113,133,.35); background: rgba(251,113,133,.08); }
+  .safe { border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.08); }
+
+  .footer-note { margin-top: 20px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  @media (max-width: 980px) {
+    .grid2, .compare { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: repeat(2, 1fr); }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Attention matrix view:<br/>make only frame-0 query rows dense</h1>
+      <p class="subtitle">
+        This visual explains the debugging intervention: keep sparse attention for most video tokens, but override the sparse mask for the query rows belonging to the first video frame. Those rows attend to every key/value token densely.
+      </p>
+      <div class="badge-row">
+        <span class="badge"><span class="dot dense"></span> Dense: keep all K/V columns</span>
+        <span class="badge"><span class="dot keep"></span> Sparse kept block</span>
+        <span class="badge"><span class="dot drop"></span> Dropped block</span>
+        <span class="badge"><span class="dot f0"></span> Frame-0 query rows</span>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2>1. Token packing: rows are Q, columns are K/V</h2>
+        <p>
+          In video diffusion self-attention, tokens are usually flattened into one sequence. A common mental model is:
+        </p>
+        <div class="token-line" aria-label="Token packing">
+          <div class="token text">Text<br/><small>prompt/global</small></div>
+          <div class="token f0">F0<br/><small>first frame</small></div>
+          <div class="token">F1<br/><small>frame 1</small></div>
+          <div class="token">F2<br/><small>frame 2</small></div>
+          <div class="token">F3<br/><small>frame 3</small></div>
+          <div class="token">F4<br/><small>frame 4</small></div>
+          <div class="token">F5<br/><small>frame 5</small></div>
+          <div class="token">F6<br/><small>frame 6</small></div>
+          <div class="token">F7<br/><small>frame 7</small></div>
+        </div>
+        <pre><span class="muted">sequence =</span> [text tokens] + [frame0 tokens] + [frame1 tokens] + ... + [frame7 tokens]
+
+<span class="muted">attention scores =</span> Q @ Kᵀ
+<span class="muted">one row =</span> one query token attending over all K/V tokens</pre>
+      </div>
+
+      <div class="card">
+        <h2>2. What “frame-0 query rows dense” means</h2>
+        <div class="callout">
+          Only the <b>rows</b> whose output belongs to frame 0 are forced dense. The columns remain all K/V tokens: text, frame 0, frame 1, … frame 7.
+        </div>
+        <p>
+          This checks whether the first-frame artifact comes from corrupted attention outputs for frame-0 tokens. If the bright spots disappear, the sparse mask for frame-0 query rows is the likely failure point.
+        </p>
+        <pre>for q_token in frame0_tokens:
+    output[q_token] = dense_attention(Q[q_token], all_K, all_V)
+
+for q_token in frame1_to_frame7_tokens:
+    output[q_token] = sparse_attention(Q[q_token], selected_K, selected_V)</pre>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:22px;">
+      <h2>3. Conceptual attention matrix</h2>
+      <p>
+        Rows are query groups. Columns are key/value groups. The green-labeled <b>Q frame0</b> row is the only visual row group forced to be dense across all columns.
+      </p>
+      <div class="matrix-wrap">
+        <div class="concept-matrix" id="conceptMatrix"></div>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2>4. Block-level mask override</h2>
+        <p>
+          Real sparse kernels usually operate on blocks, not individual tokens. If a query block overlaps frame 0, mark the whole query block dense across all key blocks.
+        </p>
+        <pre>visual_start = text_len
+tokens_per_frame = latent_H * latent_W
+
+frame0_q_start = visual_start
+frame0_q_end   = visual_start + tokens_per_frame
+
+first_q_block = frame0_q_start // q_block_size
+last_q_block  = (frame0_q_end - 1) // q_block_size
+
+# Force all K/V blocks to be selected for frame-0 query blocks.
+mask[:, :, first_q_block:last_q_block + 1, :] = True</pre>
+      </div>
+      <div class="card">
+        <h2>5. Why this is a good diagnostic</h2>
+        <div class="steps">
+          <div class="step"><span class="num">1</span><b>Minimal change</b><span>Only frame-0 query rows change from sparse to dense. Other frames still use the sparse policy.</span></div>
+          <div class="step"><span class="num">2</span><b>Artifact localization</b><span>If frame-0 bright spots vanish, the error is located in frame-0 attention output.</span></div>
+          <div class="step"><span class="num">3</span><b>Production guard</b><span>You can keep most speedup and add a small first-frame dense fallback for short videos.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:22px;">
+      <h2>6. Interactive block-mask example</h2>
+      <p>
+        Adjust the example shape. The blue horizontal stripe shows the query blocks that overlap frame 0 and are forced dense across all key blocks.
+      </p>
+      <div class="controls">
+        <div><label>Text tokens</label><input id="textLen" type="number" min="0" value="256" /></div>
+        <div><label>Latent H</label><input id="hLat" type="number" min="1" value="24" /></div>
+        <div><label>Latent W</label><input id="wLat" type="number" min="1" value="40" /></div>
+        <div><label>Frames</label><input id="frames" type="number" min="1" value="8" /></div>
+        <div><label>Q block</label><input id="qBlock" type="number" min="1" value="128" /></div>
+        <div><label>K block</label><input id="kBlock" type="number" min="1" value="64" /></div>
+        <div><label>Sparse topk</label><input id="topk" type="number" min="0.05" max="1" step="0.05" value="0.50" /></div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="block-panel">
+        <div id="blockMatrix" class="block-matrix"></div>
+      </div>
+      <div class="legend">
+        <span><i class="sw dense"></i> forced dense for frame-0 query block</span>
+        <span><i class="sw keep"></i> sparse selected block</span>
+        <span><i class="sw drop"></i> dropped block</span>
+        <span><i class="sw f0"></i> block overlaps frame 0</span>
+      </div>
+    </section>
+
+    <section class="compare">
+      <div class="mini risk">
+        <h3><span class="pill">Before</span> global topk sparse</h3>
+        <p>
+          Frame 0 gets the same sparse ratio as every other frame. For short videos, one dropped key block can represent a large fraction of available temporal/context information.
+        </p>
+        <pre>mask[:, :, :, :] = sparse_topk_mask</pre>
+      </div>
+      <div class="mini safe">
+        <h3><span class="pill">After</span> frame-0 rows protected</h3>
+        <p>
+          Only the first-frame query blocks are overwritten to dense. This protects the temporal boundary frame while preserving sparse attention elsewhere.
+        </p>
+        <pre>mask[:, :, frame0_q_blocks, :] = True</pre>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:22px;">
+      <h2>7. How to read the result</h2>
+      <div class="callout">
+        <b>If the first-frame bright spots disappear:</b> the sparse mask is harming frame-0 query outputs. Add an adaptive guard: dense first-frame rows for short sequences, higher topk for short videos, or always keep text/global blocks.
+      </div>
+      <p class="footer-note">
+        Note: actual token order may differ by model, especially with temporal patches, joint text-image attention, Hilbert permutation, or custom packing. The core idea remains the same: identify the token range whose output maps to temporal position 0, then override the sparse mask for those query rows or query blocks.
+      </p>
+    </section>
+  </main>
+<script>
+  const groups = ["Text", "F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7"];
+
+  function buildConceptMatrix() {
+    const root = document.getElementById('conceptMatrix');
+    root.innerHTML = '';
+    const corner = document.createElement('div');
+    corner.className = 'axis-corner';
+    corner.textContent = 'Q rows ↓ / K,V cols →';
+    root.appendChild(corner);
+    groups.forEach(g => {
+      const d = document.createElement('div');
+      d.className = 'axis-top ' + (g === 'Text' ? 'text' : g === 'F0' ? 'f0' : '');
+      d.textContent = 'K/V ' + g;
+      root.appendChild(d);
+    });
+
+    groups.forEach((row, r) => {
+      const left = document.createElement('div');
+      left.className = 'axis-left ' + (row === 'Text' ? 'text' : row === 'F0' ? 'f0' : '');
+      left.textContent = 'Q ' + row;
+      root.appendChild(left);
+      groups.forEach((col, c) => {
+        const cell = document.createElement('div');
+        const forceDense = row === 'F0';
+        const textProtected = col === 'Text' && row !== 'Text';
+        const kept = ((r * 7 + c * 11 + 3) % 5) < 2 || row === col || textProtected;
+        cell.className = 'mcell ' + (forceDense ? 'dense' : kept ? 'keep' : 'drop');
+        cell.innerHTML = forceDense ? 'dense' : kept ? 'keep' : 'drop';
+        root.appendChild(cell);
+      });
+    });
+  }
+
+  function ceilDiv(a,b){ return Math.ceil(a/b); }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function hashKeep(r,c,topk){
+    const x = ((r + 17) * 1103515245 + (c + 29) * 12345) >>> 0;
+    const u = (x % 1000) / 1000;
+    return u < topk;
+  }
+  function fmt(n){ return n.toLocaleString(undefined, {maximumFractionDigits: 1}); }
+
+  function updateBlocks(){
+    const textLen = Math.max(0, parseInt(document.getElementById('textLen').value || 0));
+    const h = Math.max(1, parseInt(document.getElementById('hLat').value || 1));
+    const w = Math.max(1, parseInt(document.getElementById('wLat').value || 1));
+    const T = Math.max(1, parseInt(document.getElementById('frames').value || 1));
+    const qb = Math.max(1, parseInt(document.getElementById('qBlock').value || 1));
+    const kb = Math.max(1, parseInt(document.getElementById('kBlock').value || 1));
+    const topk = clamp(parseFloat(document.getElementById('topk').value || 0.5), 0.01, 1.0);
+
+    const tokensPerFrame = h * w;
+    const seq = textLen + T * tokensPerFrame;
+    const qBlocks = ceilDiv(seq, qb);
+    const kBlocks = ceilDiv(seq, kb);
+    const f0Start = textLen;
+    const f0End = textLen + tokensPerFrame;
+    const firstQB = Math.floor(f0Start / qb);
+    const lastQB = Math.floor((f0End - 1) / qb);
+    const f0QBlocks = Math.max(0, lastQB - firstQB + 1);
+    const sparsePerQ = Math.ceil(topk * kBlocks);
+    const allSparse = qBlocks * sparsePerQ;
+    const protectedMask = f0QBlocks * kBlocks + Math.max(0, qBlocks - f0QBlocks) * sparsePerQ;
+    const fullDense = qBlocks * kBlocks;
+    const extraVsSparse = protectedMask - allSparse;
+    const protectedPercent = fullDense ? (protectedMask / fullDense * 100) : 0;
+
+    const stats = document.getElementById('stats');
+    stats.innerHTML = `
+      <div class="stat"><div class="v">${fmt(seq)}</div><div class="k">total tokens</div></div>
+      <div class="stat"><div class="v">${fmt(tokensPerFrame)}</div><div class="k">tokens in frame 0</div></div>
+      <div class="stat"><div class="v">${firstQB}–${lastQB}</div><div class="k">frame-0 Q block range</div></div>
+      <div class="stat"><div class="v">${protectedPercent.toFixed(1)}%</div><div class="k">kept blocks vs full dense</div></div>
+    `;
+
+    const bm = document.getElementById('blockMatrix');
+    bm.innerHTML = '';
+    bm.style.gridTemplateColumns = `repeat(${kBlocks}, 7px)`;
+    const maxCells = 14000;
+    const scaleDown = qBlocks * kBlocks > maxCells;
+    const rowStep = scaleDown ? Math.ceil((qBlocks * kBlocks) / maxCells) : 1;
+    for (let r=0; r<qBlocks; r+=rowStep) {
+      for (let c=0; c<kBlocks; c++) {
+        const denseRow = r >= firstQB && r <= lastQB;
+        const kept = denseRow || hashKeep(r, c, topk) || c < Math.ceil(textLen / kb);
+        const cell = document.createElement('div');
+        cell.className = 'bcell ' + (denseRow ? 'dense f0row' : kept ? 'keep' : '');
+        if (c < Math.ceil(textLen / kb)) cell.classList.add('textkey');
+        cell.title = `Q block ${r}, K block ${c}: ${denseRow ? 'forced dense for frame-0 query block' : kept ? 'kept by sparse mask' : 'dropped'}`;
+        bm.appendChild(cell);
+      }
+    }
+  }
+
+  buildConceptMatrix();
+  updateBlocks();
+  document.querySelectorAll('input').forEach(el => el.addEventListener('input', updateBlocks));
+</script>
+</body>
+</html>
