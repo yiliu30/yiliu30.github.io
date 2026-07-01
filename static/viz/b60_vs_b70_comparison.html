@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel Arc Pro B70 vs B60 Comparison</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a2f;
+      --panel-2: #18233d;
+      --text: #edf2ff;
+      --muted: #aeb9d4;
+      --line: #2c3858;
+      --accent: #7dd3fc;
+      --accent-2: #a7f3d0;
+      --warn: #fde68a;
+      --b70: #93c5fd;
+      --b60: #c4b5fd;
+      --good: #86efac;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(125, 211, 252, 0.16), transparent 32%),
+        radial-gradient(circle at 92% 8%, rgba(167, 243, 208, 0.12), transparent 30%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 42px 28px 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 28px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .card,
+    .section {
+      background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.09);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+      border-radius: 24px;
+    }
+
+    .hero-main {
+      padding: 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: rgba(125, 211, 252, 0.11);
+      filter: blur(4px);
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.02;
+      margin: 0 0 14px;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      font-size: 19px;
+      color: var(--muted);
+      max-width: 800px;
+      margin: 0;
+    }
+
+    .hero-side {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .verdict {
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(134, 239, 172, 0.1);
+      border: 1px solid rgba(134, 239, 172, 0.22);
+    }
+
+    .verdict strong {
+      color: var(--good);
+      display: block;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .mini-note {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .card {
+      padding: 22px;
+      min-height: 140px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+    }
+
+    .metric-sub {
+      color: var(--accent-2);
+      font-weight: 700;
+      margin-top: 4px;
+      font-size: 14px;
+    }
+
+    .section {
+      padding: 26px;
+      margin-top: 22px;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 25px;
+      letter-spacing: -0.025em;
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 18px;
+      font-size: 15px;
+    }
+
+    .compare-table th,
+    .compare-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    .compare-table th {
+      color: var(--text);
+      text-align: left;
+      background: rgba(255,255,255,0.06);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .compare-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .compare-table td:nth-child(2) {
+      color: var(--b70);
+      font-weight: 700;
+    }
+
+    .compare-table td:nth-child(3) {
+      color: var(--b60);
+      font-weight: 700;
+    }
+
+    .diff {
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    .bars {
+      display: grid;
+      gap: 15px;
+      margin-top: 8px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 86px;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .bar-label {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .bar-track {
+      height: 18px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--b70), var(--accent-2));
+    }
+
+    .bar-value {
+      font-weight: 800;
+      color: var(--text);
+      text-align: right;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .callout {
+      padding: 20px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+    }
+
+    .callout h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    li { margin: 7px 0; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, 0.12);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    .footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    .compact {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    @media (max-width: 940px) {
+      .hero,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .bar-row {
+        grid-template-columns: 120px minmax(0, 1fr) 78px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 24px 14px 38px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .section,
+      .card {
+        border-radius: 18px;
+        padding: 20px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .compare-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">Intel Arc Pro B-Series</div>
+        <h1>B70 vs B60</h1>
+        <p class="subtitle">
+          B70 is the larger compute-oriented SKU: more Xe/XMX/vector resources, more VRAM,
+          higher bandwidth, PCIe x16, and better theoretical perf/W. B60 remains useful for
+          software enablement, CI, and compatibility testing.
+        </p>
+      </div>
+
+      <aside class="hero-side">
+        <div class="verdict">
+          <strong>Practical verdict</strong>
+          Choose <b>B70</b> for LLM / PyTorch / oneAPI / OpenVINO performance work.
+          Use <b>B60</b> for bring-up, CI, and basic software compatibility coverage.
+        </div>
+        <div class="mini-note">
+          Source: Intel official specification pages for Arc Pro B70 and Arc Pro B60.
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="metric-label">FP32 peak</div>
+        <div class="metric-value">1.87×</div>
+        <div class="metric-sub">B70 over B60</div>
+      </div>
+      <div class="card">
+        <div class="metric-label">INT8 peak</div>
+        <div class="metric-value">1.86×</div>
+        <div class="metric-sub">367 vs 197 TOPS</div>
+      </div>
+      <div class="card">
+        <div class="metric-label">VRAM</div>
+        <div class="metric-value">32 GB</div>
+        <div class="metric-sub">B70, +8 GB</div>
+      </div>
+      <div class="card">
+        <div class="metric-label">Memory bandwidth</div>
+        <div class="metric-value">608</div>
+        <div class="metric-sub">GB/s on B70</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Core spec comparison</h2>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Arc Pro B70</th>
+            <th>Arc Pro B60</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Launch</td><td>Q1 2026</td><td>Q2 2025</td><td>B60 appeared earlier</td></tr>
+          <tr><td>Xe-cores</td><td>32</td><td>20</td><td><span class="diff">B70 1.6×</span> core count</td></tr>
+          <tr><td>Render slices</td><td>8</td><td>5</td><td><span class="diff">B70 1.6×</span></td></tr>
+          <tr><td>RT units</td><td>32</td><td>20</td><td><span class="diff">B70 1.6×</span></td></tr>
+          <tr><td>XMX engines</td><td>256</td><td>160</td><td><span class="diff">B70 1.6×</span>; important for matrix/AI kernels</td></tr>
+          <tr><td>Vector engines</td><td>256</td><td>160</td><td><span class="diff">B70 1.6×</span></td></tr>
+          <tr><td>Graphics clock</td><td>2280 MHz</td><td>2400 MHz</td><td>B60 has higher base graphics clock, but fewer cores</td></tr>
+          <tr><td>Max dynamic clock</td><td>2800 MHz</td><td>Not listed</td><td>B70 page lists boost/dynamic clock</td></tr>
+          <tr><td>FP32 peak</td><td>22.94 TFLOPS</td><td>12.28 TFLOPS</td><td><span class="diff">B70 1.87×</span></td></tr>
+          <tr><td>INT8 peak</td><td>367 TOPS</td><td>197 TOPS</td><td><span class="diff">B70 1.86×</span></td></tr>
+          <tr><td>Memory</td><td>32 GB GDDR6</td><td>24 GB GDDR6</td><td><span class="diff">B70 +8 GB</span></td></tr>
+          <tr><td>Memory bus</td><td>256-bit</td><td>192-bit</td><td><span class="diff">B70 1.33×</span></td></tr>
+          <tr><td>Bandwidth</td><td>608 GB/s</td><td>456 GB/s</td><td><span class="diff">B70 1.33×</span></td></tr>
+          <tr><td>ECC memory</td><td>Listed as supported</td><td>Not listed on spec page</td><td>B70 is clearer for workstation reliability</td></tr>
+          <tr><td>PCIe</td><td>PCIe 5.0 x16</td><td>PCIe 5.0 x8</td><td>B70 has wider host link</td></tr>
+          <tr><td>TBP</td><td>230 W</td><td>200 W</td><td>B70 uses 15% more power</td></tr>
+          <tr><td>Device ID</td><td>0xE223</td><td>0xE211</td><td>Useful for detection scripts</td></tr>
+          <tr><td>oneAPI / OpenVINO / IPEX</td><td>Yes</td><td>Yes</td><td>Same main software stack</td></tr>
+          <tr><td>Media engines</td><td>2</td><td>2</td><td>Same listed count</td></tr>
+          <tr><td>AV1 encode/decode</td><td>Yes</td><td>Yes</td><td>Same listed support</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>B70 normalized advantage</h2>
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-label">Xe / XMX / Vector</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 80%;"></div></div>
+          <div class="bar-value">1.60×</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">FP32 peak</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 93.5%;"></div></div>
+          <div class="bar-value">1.87×</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">INT8 peak</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 93%;"></div></div>
+          <div class="bar-value">1.86×</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">VRAM capacity</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 66.5%;"></div></div>
+          <div class="bar-value">1.33×</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Bandwidth</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 66.5%;"></div></div>
+          <div class="bar-value">1.33×</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">TBP</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 57.5%;"></div></div>
+          <div class="bar-value">1.15×</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="two-col">
+      <div class="callout">
+        <h3>Why B70 matters for LLM / XPU work</h3>
+        <span class="tag">More VRAM</span>
+        <span class="tag">More XMX</span>
+        <span class="tag">More bandwidth</span>
+        <span class="tag">PCIe x16</span>
+        <ul>
+          <li>32 GB VRAM gives more room for larger models, KV cache, calibration, and multi-process tests.</li>
+          <li>256 XMX engines make B70 more attractive for INT8 / matrix-heavy workloads.</li>
+          <li>608 GB/s bandwidth helps attention, dequant, activation movement, and memory-bound inference.</li>
+          <li>PCIe 5.0 x16 is better for host-device transfers and multi-card host traffic.</li>
+        </ul>
+      </div>
+
+      <div class="callout">
+        <h3>Where B60 still fits</h3>
+        <span class="tag">CI</span>
+        <span class="tag">Bring-up</span>
+        <span class="tag">Compatibility</span>
+        <ul>
+          <li>Good for software enablement, CI validation, and basic kernel compatibility coverage.</li>
+          <li>Still supports the same main Intel software stack: oneAPI, OpenVINO, and IPEX.</li>
+          <li>Less ideal for serious performance characterization or larger model-size coverage.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Perf / watt from listed peak specs</h2>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Arc Pro B70</th>
+            <th>Arc Pro B60</th>
+            <th>Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>FP32 / W</td><td>~99.7 GFLOPS/W</td><td>~61.4 GFLOPS/W</td><td>B70 is much stronger on theoretical peak efficiency</td></tr>
+          <tr><td>INT8 / W</td><td>~1.60 TOPS/W</td><td>~0.99 TOPS/W</td><td>B70 also wins on INT8 peak efficiency</td></tr>
+          <tr><td>Bandwidth / W</td><td>~2.64 GB/s/W</td><td>~2.28 GB/s/W</td><td>B70 still wins despite higher TBP</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="footer">
+      <p class="compact">
+        Official specs:
+        <a href="https://www.intel.com/content/www/us/en/products/sku/245797/intel-arc-pro-b70-graphics/specifications.html">Intel Arc Pro B70</a>
+        ·
+        <a href="https://www.intel.com/content/www/us/en/products/sku/243916/intel-arc-pro-b60-graphics/specifications.html">Intel Arc Pro B60</a>
+      </p>
+    </footer>
+  </main>
+</body>
+</html>
