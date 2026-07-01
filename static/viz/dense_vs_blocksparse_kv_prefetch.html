@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dense FlashAttention vs Block-Sparse Attention: KV Tile Prefetch</title>
+<style>
+  :root{
+    --bg:#0f1220;
+    --panel:#171b2f;
+    --panel2:#1d2340;
+    --text:#eef2ff;
+    --muted:#a8b0d6;
+    --line:#333a63;
+    --dense:#79a7ff;
+    --sparse:#8be28b;
+    --warn:#ffd166;
+    --skip:#ff7b7b;
+    --code:#0b1020;
+    --accent:#bca7ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top left, #202749 0, #0f1220 45%);
+    color:var(--text);
+    line-height:1.55;
+  }
+  .wrap{max-width:1200px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:38px;line-height:1.1;margin:0 0 12px}
+  h2{font-size:26px;margin:34px 0 14px}
+  h3{font-size:18px;margin:20px 0 10px}
+  p{color:var(--muted);margin:8px 0}
+  .hero{
+    border:1px solid var(--line);
+    background:linear-gradient(135deg, rgba(121,167,255,.13), rgba(139,226,139,.10));
+    border-radius:22px;
+    padding:28px;
+    box-shadow:0 20px 80px rgba(0,0,0,.25);
+  }
+  .pill{
+    display:inline-block;
+    padding:5px 10px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    color:var(--muted);
+    font-size:13px;
+    margin-right:8px;
+    background:rgba(255,255,255,.04);
+  }
+  .grid{display:grid;gap:18px}
+  .two{grid-template-columns:1fr 1fr}
+  @media(max-width:900px){.two{grid-template-columns:1fr}}
+  .card{
+    background:rgba(23,27,47,.86);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:20px;
+    box-shadow:0 12px 40px rgba(0,0,0,.18);
+  }
+  .card.dense{border-top:4px solid var(--dense)}
+  .card.sparse{border-top:4px solid var(--sparse)}
+  .card.warn{border-top:4px solid var(--warn)}
+  .tag{
+    font-weight:700;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dense .dot{background:var(--dense)}
+  .sparse .dot{background:var(--sparse)}
+  .warn .dot{background:var(--warn)}
+  .kv-row{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0;
+  }
+  .block{
+    min-width:44px;height:38px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    background:#252b4a;border:1px solid #3c456f;
+    font-weight:700;color:#e7ebff;
+  }
+  .block.on{background:rgba(139,226,139,.16);border-color:var(--sparse);color:#cbffcb}
+  .block.d{background:rgba(121,167,255,.16);border-color:var(--dense);color:#d9e6ff}
+  .block.skip{background:rgba(255,123,123,.12);border-color:var(--skip);color:#ffd1d1;text-decoration:line-through}
+  .arrow{color:var(--muted);font-weight:700}
+  .timeline{
+    display:grid;
+    grid-template-columns:130px repeat(6, 1fr);
+    gap:8px;
+    align-items:stretch;
+    margin-top:12px;
+  }
+  .lane{color:var(--muted);font-weight:700;display:flex;align-items:center}
+  .step{
+    background:#202642;border:1px solid var(--line);border-radius:12px;
+    padding:10px;min-height:76px;font-size:13px;
+  }
+  .step strong{display:block;color:var(--text);margin-bottom:3px}
+  .step.blue{border-color:rgba(121,167,255,.7);background:rgba(121,167,255,.10)}
+  .step.green{border-color:rgba(139,226,139,.7);background:rgba(139,226,139,.10)}
+  .step.yellow{border-color:rgba(255,209,102,.75);background:rgba(255,209,102,.10)}
+  .step.red{border-color:rgba(255,123,123,.75);background:rgba(255,123,123,.10)}
+  code, pre{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  pre{
+    background:var(--code);
+    border:1px solid var(--line);
+    color:#d7e1ff;
+    padding:14px;
+    border-radius:14px;
+    overflow:auto;
+    font-size:13px;
+  }
+  .compare{
+    width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:16px;
+    border:1px solid var(--line);background:var(--panel);
+  }
+  .compare th,.compare td{padding:14px;border-bottom:1px solid var(--line);vertical-align:top}
+  .compare th{background:#202642;text-align:left;color:#fff}
+  .compare tr:last-child td{border-bottom:0}
+  .yes{color:#9ff59f;font-weight:700}
+  .no{color:#ffaaaa;font-weight:700}
+  .maybe{color:#ffe39a;font-weight:700}
+  .callout{
+    border-left:4px solid var(--warn);
+    background:rgba(255,209,102,.10);
+    padding:14px 16px;
+    border-radius:12px;
+    margin:14px 0;
+  }
+  .small{font-size:13px;color:var(--muted)}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+  .mini-dot{width:12px;height:12px;border-radius:4px;display:inline-block}
+  .src{font-size:13px;color:#b8c1ea}
+  .src a{color:#cbd7ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <span class="pill">CUDA kernel learning note</span>
+    <span class="pill">Block size: 128 in repo API</span>
+    <span class="pill">Focus: K/V tile prefetch</span>
+    <h1>Dense FlashAttention vs Block-Sparse Attention</h1>
+    <p>
+      This page compares the <b>prefetch pattern</b> in the dense FlashAttention-style path and the
+      block-sparse path in <code>mit-han-lab/Block-Sparse-Attention</code>. The important code-level point:
+      sparse K tile selection is resolved at runtime from a compressed block mask, then the K pointer jumps by
+      <code>leap</code>. The shown V staging, however, still advances one block at a time in the loop.
+    </p>
+  </section>
+
+  <h2>1. High-level difference</h2>
+  <div class="grid two">
+    <div class="card dense">
+      <div class="tag"><span class="dot"></span>Dense FlashAttention-style path</div>
+      <p>For one Q block, the kernel walks K/V blocks in reverse contiguous order.</p>
+      <div class="kv-row">
+        <span class="block d">K7</span><span class="arrow">→</span>
+        <span class="block d">K6</span><span class="arrow">→</span>
+        <span class="block d">K5</span><span class="arrow">→</span>
+        <span class="block d">K4</span><span class="arrow">→</span>
+        <span class="block d">K3</span><span class="arrow">...</span>
+      </div>
+      <pre>next_K = current_K - 1
+K_ptr += -kBlockN * k_row_stride
+V_ptr += -kBlockN * v_row_stride</pre>
+      <p>The next K/V tile address is predictable from the loop index <code>n_block</code>.</p>
+    </div>
+
+    <div class="card sparse">
+      <div class="tag"><span class="dot"></span>Block-sparse path</div>
+      <p>For one Q block, valid K blocks come from a runtime blockmask list.</p>
+      <div class="kv-row">
+        <span class="block on">K7</span><span class="arrow">→</span>
+        <span class="block skip">K6</span>
+        <span class="block skip">K5</span><span class="arrow">→</span>
+        <span class="block on">K4</span>
+        <span class="block skip">K3</span>
+        <span class="block skip">K2</span><span class="arrow">→</span>
+        <span class="block on">K1</span>
+      </div>
+      <pre>next_K = blockmask.mask_val(mask_idx)
+leap   = current_K - next_K
+K_ptr += -kBlockN * leap * k_row_stride</pre>
+      <p>The next selected K tile is known only after reading sparse metadata at runtime.</p>
+    </div>
+  </div>
+
+  <h2>2. Where the sparse pattern is resolved</h2>
+  <div class="card">
+    <p>The repo first converts the boolean block mask into a reversed integer list per Q-block row:</p>
+    <pre>boolean mask row:   [1, 0, 0, 1, 0, 1]
+converted row list: [5, 3, 0, -1, -1, -1]</pre>
+    <p>
+      In the CUDA kernel, <code>fwdBlockmask</code> computes a pointer to the row list using
+      <code>batch_idx</code>, sparse head id, and the current Q-block row. Then <code>mask_val(i)</code>
+      returns the selected K-block id, and <code>max_no_larger(target)</code> binary-searches the first
+      selected K-block that is legal under the current causal/local range.
+    </p>
+  </div>
+
+  <h2>3. Prefetch timeline: dense path</h2>
+  <div class="card dense">
+    <p>
+      Dense path is a regular software pipeline. K is initially staged for the last legal block.
+      Each loop iteration stages V for the current block and stages the next K block by subtracting exactly one block.
+    </p>
+
+    <div class="timeline">
+      <div class="lane">Loop step</div>
+      <div class="step blue"><strong>Prologue</strong>copy Q, copy K[n]</div>
+      <div class="step blue"><strong>Iter n</strong>wait K[n]</div>
+      <div class="step blue"><strong>Iter n</strong>copy V[n]</div>
+      <div class="step blue"><strong>Iter n</strong>QK GEMM</div>
+      <div class="step blue"><strong>Iter n</strong>copy K[n-1]</div>
+      <div class="step blue"><strong>Iter n</strong>softmax + PV</div>
+
+      <div class="lane">Address rule</div>
+      <div class="step"><strong>K start</strong><code>n_block_max - 1</code></div>
+      <div class="step"><strong>Current</strong><code>n_block</code></div>
+      <div class="step"><strong>V</strong><code>-1 block</code></div>
+      <div class="step"><strong>Compute</strong>always</div>
+      <div class="step"><strong>K next</strong><code>-1 block</code></div>
+      <div class="step"><strong>Output</strong>accumulate</div>
+    </div>
+
+    <pre>for n_block = n_max-1 ... n_min:
+    stage V[n_block]
+    compute Q @ K[n_block]^T
+    stage K[n_block - 1]
+    compute softmax(scores) @ V[n_block]</pre>
+  </div>
+
+  <h2>4. Prefetch timeline: block-sparse path</h2>
+  <div class="card sparse">
+    <p>
+      Sparse path keeps the FlashAttention-style pipeline but inserts runtime sparse control.
+      The current dense loop position <code>n_block</code> is compared with <code>next_block_col_idx</code>
+      from the mask. If they differ, the code treats this as <code>is_skip</code>.
+    </p>
+
+    <div class="timeline">
+      <div class="lane">Loop step</div>
+      <div class="step green"><strong>Metadata</strong><code>mask_val(i)</code></div>
+      <div class="step yellow"><strong>Compare</strong><code>n_block != next</code></div>
+      <div class="step red"><strong>If skip</strong>zero / masked scores</div>
+      <div class="step green"><strong>If hit</strong>QK GEMM</div>
+      <div class="step green"><strong>K prefetch</strong>jump by <code>leap</code></div>
+      <div class="step yellow"><strong>V staging</strong>shown as one-block step</div>
+
+      <div class="lane">Address rule</div>
+      <div class="step"><strong>Next K</strong>from blockmask</div>
+      <div class="step"><strong>Skip?</strong>runtime branch</div>
+      <div class="step"><strong>Compute</strong>skip QK/PV</div>
+      <div class="step"><strong>Compute</strong>normal QK/PV</div>
+      <div class="step"><strong>K ptr</strong><code>-leap</code></div>
+      <div class="step"><strong>V ptr</strong><code>-1</code> in shown code</div>
+    </div>
+
+    <pre>next = blockmask.mask_val(mask_idx)
+
+if n_block != next:
+    # skip compute for this logical block
+    leap = n_block - next
+    K_ptr += -kBlockN * leap * k_row_stride
+else:
+    # real selected block
+    mask_idx += 1
+    next = blockmask.mask_val(mask_idx)
+    compute QK and PV</pre>
+
+    <div class="callout">
+      <b>Code-level nuance:</b> the K prefetch path is sparse-aware through <code>leap</code>.
+      In the shown forward code, the V staging statements still advance <code>tVgV</code> by
+      <code>-kBlockN * v_row_stride</code>, not by <code>leap</code>. So the safest interpretation is:
+      <b>sparse K tile selection is runtime-indirect; V staging is not visibly the same sparse jump in these snippets.</b>
+    </div>
+  </div>
+
+  <h2>5. Side-by-side comparison</h2>
+  <table class="compare">
+    <thead>
+      <tr>
+        <th>Aspect</th>
+        <th>Dense FlashAttention-style path</th>
+        <th>Block-sparse path in this repo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Pattern knowledge</td>
+        <td>Compile-time / loop-structure predictable. Every legal K block is visited.</td>
+        <td>Runtime. The block mask is passed from Python and read by CUDA.</td>
+      </tr>
+      <tr>
+        <td>Next K tile</td>
+        <td><code>n_block - 1</code></td>
+        <td><code>blockmask.mask_val(mask_idx)</code>, then pointer jumps by <code>leap</code>.</td>
+      </tr>
+      <tr>
+        <td>K prefetch address</td>
+        <td><span class="yes">Contiguous</span>: subtract one K block.</td>
+        <td><span class="yes">Sparse-aware</span>: subtract <code>leap</code> K blocks.</td>
+      </tr>
+      <tr>
+        <td>V prefetch / staging address</td>
+        <td><span class="yes">Contiguous</span>: subtract one V block.</td>
+        <td><span class="maybe">Nuanced</span>: shown statements subtract one V block, not <code>leap</code>.</td>
+      </tr>
+      <tr>
+        <td>Skipped block compute</td>
+        <td><span class="no">No skip</span>; all legal blocks compute QK/PV.</td>
+        <td><span class="yes">Skip branch exists</span>; when <code>n_block != next_block_col_idx</code>, it avoids the normal QK/PV path for that logical block.</td>
+      </tr>
+      <tr>
+        <td>Metadata overhead</td>
+        <td>Almost none for block selection.</td>
+        <td>Extra blockmask loads, binary search / iterator logic, branch, and pointer leap calculation.</td>
+      </tr>
+      <tr>
+        <td>Best mental model</td>
+        <td>Dense tiled attention with predictable one-tile lookahead.</td>
+        <td>FlashAttention-like pipeline plus runtime sparse iterator; K prefetch follows selected sparse blocks.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>6. Tiny example</h2>
+  <div class="grid two">
+    <div class="card dense">
+      <h3>Dense sequence</h3>
+      <p>Legal blocks: 7, 6, 5, 4, 3, 2, 1, 0</p>
+      <div class="kv-row">
+        <span class="block d">7</span><span class="block d">6</span><span class="block d">5</span><span class="block d">4</span>
+        <span class="block d">3</span><span class="block d">2</span><span class="block d">1</span><span class="block d">0</span>
+      </div>
+      <pre>K prefetch: 7 → 6 → 5 → 4 → 3 → 2 → 1 → 0
+V staging:  7 → 6 → 5 → 4 → 3 → 2 → 1 → 0</pre>
+    </div>
+
+    <div class="card sparse">
+      <h3>Sparse sequence</h3>
+      <p>Selected blocks from mask: 7, 4, 1</p>
+      <div class="kv-row">
+        <span class="block on">7</span><span class="block skip">6</span><span class="block skip">5</span><span class="block on">4</span>
+        <span class="block skip">3</span><span class="block skip">2</span><span class="block on">1</span><span class="block skip">0</span>
+      </div>
+      <pre>K prefetch: 7 → leap 3 → 4 → leap 3 → 1
+V staging:  code snippets show step-by-step V pointer movement
+Compute:     only selected logical blocks take normal QK/PV</pre>
+    </div>
+  </div>
+
+  <h2>7. Takeaways</h2>
+  <div class="card warn">
+    <div class="tag"><span class="dot"></span>What to remember</div>
+    <ul>
+      <li><b>Dense FA:</b> next K/V addresses are statically predictable from the loop counter.</li>
+      <li><b>Block-sparse:</b> next selected K address depends on runtime blockmask metadata.</li>
+      <li><b>The code resolves this by:</b> compressed Python blockmask → CUDA <code>fwdBlockmask</code> → <code>mask_val</code> / <code>max_no_larger</code> → <code>leap</code> → sparse K pointer update.</li>
+      <li><b>Do not overstate the V side:</b> the visible code path uses <code>leap</code> for K pointer advancement, while V staging appears as a one-block decrement in the shown snippets.</li>
+    </ul>
+  </div>
+
+  <h2>Source mapping</h2>
+  <p class="src">
+    Main source files: <a href="https://github.com/mit-han-lab/Block-Sparse-Attention/blob/main/csrc/block_sparse_attn/src/flash_fwd_kernel.h">flash_fwd_kernel.h</a>,
+    <a href="https://github.com/mit-han-lab/Block-Sparse-Attention/blob/main/csrc/block_sparse_attn/src/flash_blockmask.h">flash_blockmask.h</a>,
+    <a href="https://github.com/mit-han-lab/Block-Sparse-Attention/blob/main/block_sparse_attn/block_sparse_attn_interface.py">block_sparse_attn_interface.py</a>,
+    and <a href="https://github.com/mit-han-lab/Block-Sparse-Attention/blob/main/README.md">README.md</a>.
+  </p>
+  <p class="small">
+    Generated as a learning visualization. It uses pseudocode and code variable names, not a full copy of the source.
+  </p>
+</div>
+</body>
+</html>
