@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SSA Gist Tokens — Unified Visual Deck</title>
+<style>
+  :root {
+    --bg:#070a13;
+    --panel:#0d1428;
+    --panel2:#101b34;
+    --ink:#eef4ff;
+    --muted:#aebbd8;
+    --line:rgba(255,255,255,.14);
+    --accent:#52e0ff;
+    --accent2:#69e28d;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin:0;
+    background:radial-gradient(circle at 18% 0%,#1c2b55 0,#0b1020 38%,#060914 100%);
+    color:var(--ink);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height:1.45;
+  }
+  .shell { max-width:1240px; margin:0 auto; padding:34px 24px 60px; }
+  .hero {
+    border:1px solid var(--line);
+    border-radius:28px;
+    background:linear-gradient(135deg,rgba(17,26,51,.92),rgba(11,16,32,.76));
+    box-shadow:0 24px 80px rgba(0,0,0,.32);
+    padding:30px;
+    margin-bottom:24px;
+  }
+  h1 { margin:0 0 10px; font-size:clamp(34px,5vw,58px); line-height:1.02; letter-spacing:-.045em; }
+  .hero p { max-width:920px; color:var(--muted); margin:0 0 18px; font-size:17px; }
+  .nav { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+  .nav a {
+    color:#dff9ff;
+    text-decoration:none;
+    border:1px solid rgba(82,224,255,.28);
+    background:rgba(82,224,255,.08);
+    border-radius:999px;
+    padding:9px 13px;
+    font-size:14px;
+    font-weight:700;
+  }
+  .meta-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+  .meta { border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.045); padding:14px; }
+  .meta b { color:white; display:block; margin-bottom:4px; }
+  .meta span { color:var(--muted); font-size:13px; }
+  .chapter {
+    margin-top:28px;
+    border:1px solid var(--line);
+    border-radius:28px;
+    background:rgba(13,20,40,.74);
+    box-shadow:0 18px 60px rgba(0,0,0,.24);
+    overflow:hidden;
+  }
+  .chapter-head {
+    display:flex;
+    justify-content:space-between;
+    gap:18px;
+    align-items:flex-start;
+    padding:22px 24px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+  }
+  .chapter-head h2 { margin:2px 0 4px; font-size:25px; letter-spacing:-.02em; }
+  .chapter-head p { margin:0; color:var(--muted); }
+  .eyebrow { color:var(--accent2); font-weight:900; text-transform:uppercase; letter-spacing:.08em; font-size:12px; }
+  .toplink { color:#dff9ff; text-decoration:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:7px 10px; white-space:nowrap; font-size:13px; }
+  .visual-frame {
+    width:100%;
+    min-height:900px;
+    border:0;
+    display:block;
+    background:#0b1020;
+  }
+  .foot { color:#91a2c4; font-size:13px; margin-top:24px; text-align:center; }
+  @media(max-width:820px) {
+    .shell { padding:22px 14px 42px; }
+    .hero { padding:22px; }
+    .meta-grid { grid-template-columns:1fr; }
+    .chapter-head { flex-direction:column; }
+  }
+</style>
+<script>
+  function resizeFrame(frame) {
+    try {
+      const doc = frame.contentDocument || frame.contentWindow.document;
+      const resize = () => {
+        const h = Math.max(
+          doc.documentElement.scrollHeight || 0,
+          doc.body ? doc.body.scrollHeight : 0
+        );
+        frame.style.height = (h + 4) + 'px';
+      };
+      resize();
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver(resize);
+        ro.observe(doc.documentElement);
+        if (doc.body) ro.observe(doc.body);
+      }
+      setTimeout(resize, 250);
+      setTimeout(resize, 1000);
+    } catch (e) {
+      frame.style.height = '1200px';
+    }
+  }
+</script>
+</head>
+<body>
+  <main class="shell" id="top">
+    <section class="hero">
+      <h1>SSA Gist Tokens — Unified Visual Deck</h1>
+      <p>This single HTML fuses the three SSA visuals while preserving their original layouts and content as much as possible. It is organized as a presentation-style page: overview, training mechanism, then the full raw-token/gist-token mask example.</p>
+      <div class="meta-grid">
+        <div class="meta"><b>1. Concept</b><span>Gist token = learned chunk summary + deterministic pointer to raw KV range.</span></div>
+        <div class="meta"><b>2. Training</b><span>Gist-aware mask forces future prediction through gist bottlenecks.</span></div>
+        <div class="meta"><b>3. Mask</b><span>Rows are query tokens; columns are key tokens, including raw-token query rows.</span></div>
+      </div>
+      <nav class="nav" aria-label="Page navigation">
+        <a href="#chapter-1">Chapter 1 — Code-verified overview</a><a href="#chapter-2">Chapter 2 — Training mechanism</a><a href="#chapter-3">Chapter 3 — Full mask example</a>
+      </nav>
+    </section>
+    
+    <section class="chapter" id="chapter-1">
+      <div class="chapter-head">
+        <div>
+          <div class="eyebrow">Source visual 1</div>
+          <h2>Chapter 1 — Code-verified overview</h2>
+          <p>Original SSA gist-token visual summary.</p>
+        </div>
+        <a class="toplink" href="#top">Back to top</a>
+      </div>
+      <iframe class="visual-frame" title="Chapter 1 — Code-verified overview" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot; /&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+&lt;title&gt;SSA via Gist Tokens — Code-Verified Visual Summary&lt;/title&gt;
+&lt;style&gt;
+  :root{
+    --bg:#0b1020;
+    --panel:#111a33;
+    --panel2:#162447;
+    --ink:#ecf2ff;
+    --muted:#a9b7d8;
+    --blue:#6ea8ff;
+    --cyan:#52e0ff;
+    --green:#69e28d;
+    --yellow:#ffd166;
+    --red:#ff6b6b;
+    --purple:#b78cff;
+    --line:#2d3b63;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:radial-gradient(circle at top left,#18284e 0,#0b1020 42%,#070a13 100%);
+    color:var(--ink);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    line-height:1.45;
+  }
+  .page{max-width:1180px;margin:0 auto;padding:34px 28px 54px}
+  .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:22px;align-items:stretch;margin-bottom:20px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  h1{font-size:38px;line-height:1.08;margin:0 0 10px;letter-spacing:-.03em}
+  h2{font-size:22px;margin:0 0 14px;letter-spacing:-.02em}
+  h3{font-size:16px;margin:0 0 10px;color:#dbe7ff}
+  p{margin:0 0 12px;color:var(--muted)}
+  .tag{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);border-radius:999px;padding:6px 10px;color:#dbe7ff;font-size:13px;margin:4px 6px 0 0}
+  .tag b{color:white}
+  .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+  .mini{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);border-radius:16px;padding:13px}
+  .mini .num{font-size:24px;font-weight:800;color:white}.mini .lbl{font-size:12px;color:var(--muted)}
+  .section{margin-top:22px}
+  .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch}
+  .step{position:relative;min-height:170px;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:18px;background:rgba(17,26,51,.72)}
+  .step:after{content:&quot;→&quot;;position:absolute;right:-16px;top:50%;transform:translateY(-50%);color:var(--cyan);font-size:26px;font-weight:800}
+  .step:last-child:after{display:none}
+  .step .idx{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(82,224,255,.14);border:1px solid rgba(82,224,255,.45);color:#bdf6ff;font-weight:700;margin-bottom:10px}
+  .seq{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:14px 0}
+  .tok{min-width:34px;height:34px;padding:0 10px;border-radius:10px;background:#24345e;border:1px solid #3c5186;display:grid;place-items:center;font-weight:700;font-size:13px;color:#dbe7ff}
+  .gist{background:rgba(105,226,141,.14);border-color:rgba(105,226,141,.72);color:#baffca;box-shadow:0 0 0 2px rgba(105,226,141,.05)}
+  .meta{background:rgba(183,140,255,.15);border-color:rgba(183,140,255,.70);color:#eadcff}
+  .raw2{background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.64);color:#ffefb0}
+  .drop{opacity:.35;filter:saturate(.4)}
+  .arrow{color:var(--cyan);font-weight:900;font-size:22px;margin:0 4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .codebox{background:#060a14;border:1px solid #233158;border-radius:16px;padding:14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#d8e6ff;white-space:pre}
+  .matrix{display:grid;grid-template-columns:90px repeat(9,1fr);gap:4px;margin-top:10px;align-items:center}.mcell{height:28px;border-radius:7px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:11px;color:#93a5ce}.mhead{height:28px;display:grid;place-items:center;font-size:11px;color:#c9d6f6}.yes{background:rgba(105,226,141,.24);color:#caffd6;border:1px solid rgba(105,226,141,.35)}.maybe{background:rgba(255,209,102,.22);color:#fff2c2;border:1px solid rgba(255,209,102,.35)}.no{background:rgba(255,107,107,.10);color:#ffb1b1;border:1px solid rgba(255,107,107,.18)}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}.green{background:var(--green)}.yellow{background:var(--yellow)}.red{background:var(--red)}.purple{background:var(--purple)}.cyan{background:var(--cyan)}
+  .pipeline{display:flex;flex-direction:column;gap:10px}.bar{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center}.barlabel{font-size:13px;color:#cbd8f7}.track{height:38px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;padding:5px;gap:5px}.seg{height:26px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:800}.seg.raw{background:rgba(255,255,255,.12);color:#d8e3ff}.seg.g{background:rgba(105,226,141,.2);color:#bbffcd;border:1px solid rgba(105,226,141,.45)}.seg.sel{background:rgba(255,209,102,.25);color:#fff0bd;border:1px solid rgba(255,209,102,.45)}.seg.meta{background:rgba(183,140,255,.20);color:#eadcff;border:1px solid rgba(183,140,255,.45)}
+  table{width:100%;border-collapse:separate;border-spacing:0;margin-top:8px;overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.12)}th,td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#d9e6ff;background:rgba(255,255,255,.08);text-align:left}td{font-size:14px;color:var(--muted)}tr:last-child td{border-bottom:none}td b{color:#f6f9ff}.note{border-left:4px solid var(--cyan);padding:12px 14px;background:rgba(82,224,255,.08);border-radius:12px;color:#dcecff}.warn{border-left-color:var(--yellow);background:rgba(255,209,102,.08)}
+  .foot{margin-top:26px;color:#8090bb;font-size:12px}.small{font-size:13px;color:var(--muted)}
+  @media(max-width:900px){.hero,.grid2,.grid3{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.step:after{display:none}.matrix{grid-template-columns:70px repeat(9,1fr)}.bar{grid-template-columns:1fr}}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;page&quot;&gt;
+  &lt;section class=&quot;hero&quot;&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h1&gt;SSA via Gist Tokens&lt;/h1&gt;
+      &lt;p&gt;&lt;b&gt;Simplified Sparse Attention&lt;/b&gt; uses normal special tokens as learned chunk summaries. At decode, the query scores only these gist tokens, selects top chunks, then attends to the original raw KV of selected chunks.&lt;/p&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Not&lt;/b&gt; raw-token reconstruction&lt;/span&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Yes&lt;/b&gt; learned routing proxy&lt;/span&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Yes&lt;/b&gt; deterministic chunk pointer&lt;/span&gt;
+      &lt;div class=&quot;kv&quot;&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;gist token per chunk&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;top-k&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;select relevant gists&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;KV&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;unfold original raw cache&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h2&gt;Most accurate mental model&lt;/h2&gt;
+      &lt;div class=&quot;codebox&quot;&gt;G_i = token inserted after chunk_i
+
+It carries:
+  1. learned hidden/KV summary
+  2. known chunk id by position
+  3. routing score q · K_G_i
+
+It does NOT generate raw tokens.
+It selects their existing KV range.&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;1. Tiny concrete example&lt;/h2&gt;
+    &lt;p&gt;Assume 3 chunks, 4 raw tokens each. Gist tokens are inserted into the real sequence, so their position gives a deterministic mapping to the chunk before them.&lt;/p&gt;
+    &lt;div class=&quot;seq&quot;&gt;
+      &lt;span class=&quot;tok&quot;&gt;A&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;B&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;C&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;E&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;G&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;I&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;J&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;K&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;L&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;grid3&quot;&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Semantic proxy&lt;/h3&gt;&lt;p&gt;G2&#x27;s hidden state/KV learns “what chunk 2 contains”.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Position pointer&lt;/h3&gt;&lt;p&gt;G2 is after chunk 2, so code can map it to raw KV range E–H.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Routing key&lt;/h3&gt;&lt;p&gt;Decode computes score = q · K&lt;sub&gt;G2&lt;/sub&gt; to decide if chunk 2 should be unfolded.&lt;/p&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;2. Training: force old chunks through gist bottleneck&lt;/h2&gt;
+    &lt;p&gt;The model is continued-pretrained with a gist-aware causal mask. Later tokens cannot freely attend to old raw tokens; they mainly see old chunk information through gist tokens.&lt;/p&gt;
+    &lt;div class=&quot;matrix&quot;&gt;
+      &lt;div&gt;&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;A&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;B&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;C&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;D&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;E&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;F&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;Q&lt;/div&gt;
+      &lt;div class=&quot;mhead&quot;&gt;inside chunk 1&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell maybe&quot;&gt;make G1&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;
+      &lt;div class=&quot;mhead&quot;&gt;later query Q&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;self&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;legend&quot;&gt;&lt;span&gt;&lt;i class=&quot;dot green&quot;&gt;&lt;/i&gt;visible&lt;/span&gt;&lt;span&gt;&lt;i class=&quot;dot yellow&quot;&gt;&lt;/i&gt;gist creation&lt;/span&gt;&lt;span&gt;&lt;i class=&quot;dot red&quot;&gt;&lt;/i&gt;blocked by gist mask&lt;/span&gt;&lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;3. Decode core steps&lt;/h2&gt;
+    &lt;div class=&quot;flow&quot;&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;1&lt;/div&gt;&lt;h3&gt;Build gist metadata&lt;/h3&gt;&lt;p&gt;Find gist positions, cumsum them into chunk IDs, and gather gist keys.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;2&lt;/div&gt;&lt;h3&gt;Score only gists&lt;/h3&gt;&lt;p&gt;Compute q × K&lt;sub&gt;gist&lt;/sub&gt;, not q × all raw K.&lt;/p&gt;&lt;div class=&quot;codebox&quot;&gt;score_i = q · K_Gi&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;3&lt;/div&gt;&lt;h3&gt;Select chunks&lt;/h3&gt;&lt;p&gt;Top-k chooses relevant gist IDs, then maps them to chunk IDs.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok gist drop&quot;&gt;G1&lt;/span&gt;&lt;span class=&quot;tok gist raw2&quot;&gt;G2&lt;/span&gt;&lt;span class=&quot;tok gist drop&quot;&gt;G3&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;4&lt;/div&gt;&lt;h3&gt;Unfold raw KV&lt;/h3&gt;&lt;p&gt;Keep selected gist + selected chunk raw KV; skip unselected raw KV.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok raw2&quot;&gt;E&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;G&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;H&lt;/span&gt;&lt;span class=&quot;tok gist raw2&quot;&gt;G2&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;4. What “recover raw KV” really means&lt;/h2&gt;
+    &lt;div class=&quot;pipeline&quot;&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Full KV cache exists&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;A-D&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;E-H&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;I-L&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G3&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:18%&quot;&gt;suffix&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Routing reads&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G3&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Selected context&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg sel&quot; style=&quot;width:18%&quot;&gt;E-H raw KV&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:8%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:18%&quot;&gt;suffix&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;note warn&quot; style=&quot;margin-top:16px&quot;&gt;&lt;b&gt;Key correction:&lt;/b&gt; G2 does not reconstruct E/F/G/H. G2&#x27;s selected chunk ID causes the attention/kernel path to keep the existing KV positions for E/F/G/H.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;5. Code-verified implementation map&lt;/h2&gt;
+    &lt;table&gt;
+      &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Part&lt;/th&gt;&lt;th&gt;Real implementation behavior&lt;/th&gt;&lt;th&gt;Why it matters&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Data prep&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;src/data/gist.py&lt;/code&gt; inserts gist tokens, including a semantic-boundary variant that can place gist tokens near sentence/clause/word boundaries.&lt;/td&gt;&lt;td&gt;Gist tokens are real input tokens, not a side index.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Reference decode&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;gist_qwen2.py&lt;/code&gt; identifies gist tokens, computes &lt;code&gt;gist_scores = q · K_gist&lt;/code&gt;, top-k selects gist indices, then builds &lt;code&gt;keep_mask&lt;/code&gt; over raw/gist KV positions.&lt;/td&gt;&lt;td&gt;This shows “unfolding” is implemented as mask selection over existing KV.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Generation loop&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;generation_utils.py&lt;/code&gt; carries &lt;code&gt;attention_mask_gist&lt;/code&gt; through generation and converts prompt-time gist masks into single-row decode masks.&lt;/td&gt;&lt;td&gt;Keeps gist constraints consistent after prefill.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Optimized dispatcher&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;attn_candidate.py&lt;/code&gt; caches gist metadata, supports head/group selection modes, builds per-group selection bitmaps, and dispatches the compact CUDA decode kernel.&lt;/td&gt;&lt;td&gt;Avoids rebuilding dense masks every layer/step.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;CUDA decode&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;sparse_decode_attn.cu&lt;/code&gt; computes the keep predicate inside the kernel, compacts kept indices, runs split-K flash decode, and combines partial results.&lt;/td&gt;&lt;td&gt;Physical sparsity: only selected KV is read for attention, not all raw KV.&lt;/td&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;6. Hierarchical H-SSA: gist of gists&lt;/h2&gt;
+    &lt;p&gt;For long context, the same idea becomes coarse-to-fine. First select meta-gists, then child gists inside selected parent regions, then unfold raw chunks.&lt;/p&gt;
+    &lt;div class=&quot;seq&quot;&gt;
+      &lt;span class=&quot;tok&quot;&gt;A-D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;E-H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;
+      &lt;span class=&quot;tok meta&quot;&gt;M1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;I-L&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;M-P&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G4&lt;/span&gt;
+      &lt;span class=&quot;tok meta&quot;&gt;M2&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok meta raw2&quot;&gt;select M1&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok gist raw2&quot;&gt;select G2&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok raw2&quot;&gt;unfold E-H&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;7. Practical reading&lt;/h2&gt;
+    &lt;div class=&quot;grid2&quot;&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Core insight&lt;/h3&gt;&lt;p&gt;Train the summary token so its key is a useful chunk-level retrieval key. Then sparse routing is just normal attention scoring against fewer keys.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Production caveat&lt;/h3&gt;&lt;p&gt;This is not a drop-in sparse kernel for arbitrary checkpoints. It needs gist-token continued pretraining and gist-aware masks/cache handling.&lt;/p&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;div class=&quot;foot&quot;&gt;Created as a compact visualization of the paper and public implementation. Source references: arXiv 2604.20920 and github.com/yuzhenmao/simplified-sparse-attention.&lt;/div&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+" onload="resizeFrame(this)"></iframe>
+    </section>
+    <section class="chapter" id="chapter-2">
+      <div class="chapter-head">
+        <div>
+          <div class="eyebrow">Source visual 2</div>
+          <h2>Chapter 2 — Training mechanism</h2>
+          <p>Extended explanation of how gist tokens are trained.</p>
+        </div>
+        <a class="toplink" href="#top">Back to top</a>
+      </div>
+      <iframe class="visual-frame" title="Chapter 2 — Training mechanism" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot; /&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+&lt;title&gt;SSA via Gist Tokens — Code-Verified Visual Summary&lt;/title&gt;
+&lt;style&gt;
+  :root{
+    --bg:#0b1020;
+    --panel:#111a33;
+    --panel2:#162447;
+    --ink:#ecf2ff;
+    --muted:#a9b7d8;
+    --blue:#6ea8ff;
+    --cyan:#52e0ff;
+    --green:#69e28d;
+    --yellow:#ffd166;
+    --red:#ff6b6b;
+    --purple:#b78cff;
+    --line:#2d3b63;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:radial-gradient(circle at top left,#18284e 0,#0b1020 42%,#070a13 100%);
+    color:var(--ink);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    line-height:1.45;
+  }
+  .page{max-width:1180px;margin:0 auto;padding:34px 28px 54px}
+  .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:22px;align-items:stretch;margin-bottom:20px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  h1{font-size:38px;line-height:1.08;margin:0 0 10px;letter-spacing:-.03em}
+  h2{font-size:22px;margin:0 0 14px;letter-spacing:-.02em}
+  h3{font-size:16px;margin:0 0 10px;color:#dbe7ff}
+  p{margin:0 0 12px;color:var(--muted)}
+  .tag{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);border-radius:999px;padding:6px 10px;color:#dbe7ff;font-size:13px;margin:4px 6px 0 0}
+  .tag b{color:white}
+  .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+  .mini{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);border-radius:16px;padding:13px}
+  .mini .num{font-size:24px;font-weight:800;color:white}.mini .lbl{font-size:12px;color:var(--muted)}
+  .section{margin-top:22px}
+  .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch}
+  .step{position:relative;min-height:170px;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:18px;background:rgba(17,26,51,.72)}
+  .step:after{content:&quot;→&quot;;position:absolute;right:-16px;top:50%;transform:translateY(-50%);color:var(--cyan);font-size:26px;font-weight:800}
+  .step:last-child:after{display:none}
+  .step .idx{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(82,224,255,.14);border:1px solid rgba(82,224,255,.45);color:#bdf6ff;font-weight:700;margin-bottom:10px}
+  .seq{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:14px 0}
+  .tok{min-width:34px;height:34px;padding:0 10px;border-radius:10px;background:#24345e;border:1px solid #3c5186;display:grid;place-items:center;font-weight:700;font-size:13px;color:#dbe7ff}
+  .gist{background:rgba(105,226,141,.14);border-color:rgba(105,226,141,.72);color:#baffca;box-shadow:0 0 0 2px rgba(105,226,141,.05)}
+  .meta{background:rgba(183,140,255,.15);border-color:rgba(183,140,255,.70);color:#eadcff}
+  .raw2{background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.64);color:#ffefb0}
+  .drop{opacity:.35;filter:saturate(.4)}
+  .arrow{color:var(--cyan);font-weight:900;font-size:22px;margin:0 4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .codebox{background:#060a14;border:1px solid #233158;border-radius:16px;padding:14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#d8e6ff;white-space:pre}
+  .matrix{display:grid;grid-template-columns:90px repeat(9,1fr);gap:4px;margin-top:10px;align-items:center}.mcell{height:28px;border-radius:7px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:11px;color:#93a5ce}.mhead{height:28px;display:grid;place-items:center;font-size:11px;color:#c9d6f6}.yes{background:rgba(105,226,141,.24);color:#caffd6;border:1px solid rgba(105,226,141,.35)}.maybe{background:rgba(255,209,102,.22);color:#fff2c2;border:1px solid rgba(255,209,102,.35)}.no{background:rgba(255,107,107,.10);color:#ffb1b1;border:1px solid rgba(255,107,107,.18)}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}.green{background:var(--green)}.yellow{background:var(--yellow)}.red{background:var(--red)}.purple{background:var(--purple)}.cyan{background:var(--cyan)}
+  .pipeline{display:flex;flex-direction:column;gap:10px}.bar{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center}.barlabel{font-size:13px;color:#cbd8f7}.track{height:38px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;padding:5px;gap:5px}.seg{height:26px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:800}.seg.raw{background:rgba(255,255,255,.12);color:#d8e3ff}.seg.g{background:rgba(105,226,141,.2);color:#bbffcd;border:1px solid rgba(105,226,141,.45)}.seg.sel{background:rgba(255,209,102,.25);color:#fff0bd;border:1px solid rgba(255,209,102,.45)}.seg.meta{background:rgba(183,140,255,.20);color:#eadcff;border:1px solid rgba(183,140,255,.45)}
+  table{width:100%;border-collapse:separate;border-spacing:0;margin-top:8px;overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.12)}th,td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#d9e6ff;background:rgba(255,255,255,.08);text-align:left}td{font-size:14px;color:var(--muted)}tr:last-child td{border-bottom:none}td b{color:#f6f9ff}.note{border-left:4px solid var(--cyan);padding:12px 14px;background:rgba(82,224,255,.08);border-radius:12px;color:#dcecff}.warn{border-left-color:var(--yellow);background:rgba(255,209,102,.08)}
+  .foot{margin-top:26px;color:#8090bb;font-size:12px}.small{font-size:13px;color:var(--muted)}
+
+  .trainflow{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:14px}.trainstep{border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:15px;background:rgba(255,255,255,.045);position:relative;min-height:150px}.trainstep:after{content:&quot;→&quot;;position:absolute;right:-14px;top:48%;transform:translateY(-50%);color:var(--cyan);font-weight:900;font-size:24px}.trainstep:last-child:after{display:none}.pill{display:inline-flex;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);font-size:12px;color:#dbe7ff;margin:3px 4px 5px 0}.lossbox{background:linear-gradient(135deg,rgba(105,226,141,.12),rgba(82,224,255,.10));border:1px solid rgba(105,226,141,.25);border-radius:18px;padding:16px}.grad{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.grad .node{padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-weight:700;color:#eaf1ff;font-size:13px}.grad .node.hot{background:rgba(255,209,102,.16);border-color:rgba(255,209,102,.45);color:#fff1bd}.grad .node.greenish{background:rgba(105,226,141,.14);border-color:rgba(105,226,141,.45);color:#caffd6}.maskmini{display:grid;grid-template-columns:120px repeat(8,1fr);gap:4px;margin-top:10px}.maskmini .mh,.maskmini .mc{height:28px;border-radius:7px;display:grid;place-items:center;font-size:10px}.maskmini .mh{color:#cbd8f7}.maskmini .mc{background:rgba(255,255,255,.05);color:#91a3c9}.mc.v{background:rgba(105,226,141,.22);border:1px solid rgba(105,226,141,.35);color:#d7ffdf}.mc.b{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.22);color:#ffc1c1}.mc.gm{background:rgba(82,224,255,.14);border:1px solid rgba(82,224,255,.32);color:#c8f8ff}@media(max-width:900px){.trainflow{grid-template-columns:1fr}.trainstep:after{display:none}.maskmini{grid-template-columns:86px repeat(8,1fr)}}
+
+  @media(max-width:900px){.hero,.grid2,.grid3{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.step:after{display:none}.matrix{grid-template-columns:70px repeat(9,1fr)}.bar{grid-template-columns:1fr}}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;page&quot;&gt;
+  &lt;section class=&quot;hero&quot;&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h1&gt;SSA via Gist Tokens&lt;/h1&gt;
+      &lt;p&gt;&lt;b&gt;Simplified Sparse Attention&lt;/b&gt; uses normal special tokens as learned chunk summaries. At decode, the query scores only these gist tokens, selects top chunks, then attends to the original raw KV of selected chunks.&lt;/p&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Not&lt;/b&gt; raw-token reconstruction&lt;/span&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Yes&lt;/b&gt; learned routing proxy&lt;/span&gt;
+      &lt;span class=&quot;tag&quot;&gt;&lt;b&gt;Yes&lt;/b&gt; deterministic chunk pointer&lt;/span&gt;
+      &lt;div class=&quot;kv&quot;&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;gist token per chunk&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;top-k&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;select relevant gists&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;mini&quot;&gt;&lt;div class=&quot;num&quot;&gt;KV&lt;/div&gt;&lt;div class=&quot;lbl&quot;&gt;unfold original raw cache&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h2&gt;Most accurate mental model&lt;/h2&gt;
+      &lt;div class=&quot;codebox&quot;&gt;G_i = token inserted after chunk_i
+
+It carries:
+  1. learned hidden/KV summary
+  2. known chunk id by position
+  3. routing score q · K_G_i
+
+It does NOT generate raw tokens.
+It selects their existing KV range.&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;1. Tiny concrete example&lt;/h2&gt;
+    &lt;p&gt;Assume 3 chunks, 4 raw tokens each. Gist tokens are inserted into the real sequence, so their position gives a deterministic mapping to the chunk before them.&lt;/p&gt;
+    &lt;div class=&quot;seq&quot;&gt;
+      &lt;span class=&quot;tok&quot;&gt;A&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;B&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;C&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;E&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;G&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;I&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;J&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;K&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;L&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;grid3&quot;&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Semantic proxy&lt;/h3&gt;&lt;p&gt;G2&#x27;s hidden state/KV learns “what chunk 2 contains”.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Position pointer&lt;/h3&gt;&lt;p&gt;G2 is after chunk 2, so code can map it to raw KV range E–H.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Routing key&lt;/h3&gt;&lt;p&gt;Decode computes score = q · K&lt;sub&gt;G2&lt;/sub&gt; to decide if chunk 2 should be unfolded.&lt;/p&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;2. Training: force old chunks through gist bottleneck&lt;/h2&gt;
+    &lt;p&gt;The model is continued-pretrained with a gist-aware causal mask. Later tokens cannot freely attend to old raw tokens; they mainly see old chunk information through gist tokens.&lt;/p&gt;
+    &lt;div class=&quot;matrix&quot;&gt;
+      &lt;div&gt;&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;A&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;B&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;C&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;D&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;E&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;F&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;mhead&quot;&gt;Q&lt;/div&gt;
+      &lt;div class=&quot;mhead&quot;&gt;inside chunk 1&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mcell maybe&quot;&gt;make G1&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;–&lt;/div&gt;
+      &lt;div class=&quot;mhead&quot;&gt;later query Q&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell no&quot;&gt;masked&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;mcell yes&quot;&gt;self&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;legend&quot;&gt;&lt;span&gt;&lt;i class=&quot;dot green&quot;&gt;&lt;/i&gt;visible&lt;/span&gt;&lt;span&gt;&lt;i class=&quot;dot yellow&quot;&gt;&lt;/i&gt;gist creation&lt;/span&gt;&lt;span&gt;&lt;i class=&quot;dot red&quot;&gt;&lt;/i&gt;blocked by gist mask&lt;/span&gt;&lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;3. Training deep dive: how a gist token actually becomes useful&lt;/h2&gt;
+    &lt;p&gt;The gist token is not pretrained with a separate “summary target”. It becomes useful because the model is trained under a restricted attention mask. To predict future tokens well, the only path to old chunk information is through the chunk&#x27;s gist token.&lt;/p&gt;
+
+    &lt;div class=&quot;trainflow&quot;&gt;
+      &lt;div class=&quot;trainstep&quot;&gt;
+        &lt;span class=&quot;pill&quot;&gt;Step A&lt;/span&gt;
+        &lt;h3&gt;Add special tokens&lt;/h3&gt;
+        &lt;p&gt;The trainer adds &lt;code&gt;&amp;lt;gist&amp;gt;&lt;/code&gt;, &lt;code&gt;&amp;lt;Gist&amp;gt;&lt;/code&gt;, and &lt;code&gt;&amp;lt;MGist&amp;gt;&lt;/code&gt; to the tokenizer/model vocab.&lt;/p&gt;
+        &lt;div class=&quot;codebox&quot;&gt;tokenizer.add_special_tokens(...)
+resize_token_embeddings(...)&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;trainstep&quot;&gt;
+        &lt;span class=&quot;pill&quot;&gt;Step B&lt;/span&gt;
+        &lt;h3&gt;Initialize embeddings&lt;/h3&gt;
+        &lt;p&gt;The new gist embeddings and LM-head rows are initialized from the average of existing token embeddings, then updated by training.&lt;/p&gt;
+        &lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok&quot;&gt;avg emb&lt;/span&gt;&lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;&amp;lt;gist&amp;gt;&lt;/span&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;trainstep&quot;&gt;
+        &lt;span class=&quot;pill&quot;&gt;Step C&lt;/span&gt;
+        &lt;h3&gt;Insert into text&lt;/h3&gt;
+        &lt;p&gt;Preprocessing inserts gist tokens after fixed-size or word/semantic chunks.&lt;/p&gt;
+        &lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok&quot;&gt;A-D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;g&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;E-H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;g&lt;/span&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;trainstep&quot;&gt;
+        &lt;span class=&quot;pill&quot;&gt;Step D&lt;/span&gt;
+        &lt;h3&gt;Apply gist mask&lt;/h3&gt;
+        &lt;p&gt;Local raw tokens are visible inside the current chunk, but older chunks are visible mainly through previous gist tokens.&lt;/p&gt;
+        &lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok drop&quot;&gt;A-D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;E-H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;trainstep&quot;&gt;
+        &lt;span class=&quot;pill&quot;&gt;Step E&lt;/span&gt;
+        &lt;h3&gt;Normal LM loss&lt;/h3&gt;
+        &lt;p&gt;There is no extra summary loss. The standard next-token cross-entropy pushes useful information into gist hidden states.&lt;/p&gt;
+        &lt;div class=&quot;codebox&quot;&gt;loss = CE(logits[t], token[t+1])&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;4. The key training pressure&lt;/h2&gt;
+    &lt;p&gt;Suppose chunk 1 contains a fact needed later:&lt;/p&gt;
+    &lt;div class=&quot;seq&quot;&gt;
+      &lt;span class=&quot;tok&quot;&gt;The&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;password&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;is&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;739&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;...&lt;/span&gt;&lt;span class=&quot;tok&quot;&gt;Later&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;Q?&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;grid2&quot;&gt;
+      &lt;div class=&quot;lossbox&quot;&gt;
+        &lt;h3&gt;Without gist pressure&lt;/h3&gt;
+        &lt;p&gt;Later token could directly attend to &lt;span class=&quot;tok raw2&quot; style=&quot;display:inline-grid;height:24px;min-width:28px&quot;&gt;739&lt;/span&gt;, so there is little need for a compact chunk proxy.&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;lossbox&quot;&gt;
+        &lt;h3&gt;With SSA gist mask&lt;/h3&gt;
+        &lt;p&gt;Later token cannot directly see old raw tokens from chunk 1. It can see &lt;span class=&quot;tok gist&quot; style=&quot;display:inline-grid;height:24px;min-width:28px&quot;&gt;G1&lt;/span&gt;, so predicting the answer correctly requires G1&#x27;s KV to carry that useful information.&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;maskmini&quot;&gt;
+      &lt;div&gt;&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;The&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;password&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;is&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;739&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;Later&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;Q&lt;/div&gt;&lt;div class=&quot;mh&quot;&gt;Ans&lt;/div&gt;
+      &lt;div class=&quot;mh&quot;&gt;G1 query&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;self&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;–&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;–&lt;/div&gt;
+      &lt;div class=&quot;mh&quot;&gt;Later query&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;×&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;×&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;×&lt;/div&gt;&lt;div class=&quot;mc b&quot;&gt;×&lt;/div&gt;&lt;div class=&quot;mc gm&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;✓&lt;/div&gt;&lt;div class=&quot;mc v&quot;&gt;self&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;note&quot; style=&quot;margin-top:14px&quot;&gt;&lt;b&gt;Why the gist learns:&lt;/b&gt; if the model misses a future prediction because G1 is not informative, cross-entropy gradients flow through the future token&#x27;s attention into G1&#x27;s K/V hidden state, then back through the Transformer layers and the gist embedding. Over many examples, G1 becomes a useful learned routing/summary representation.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;5. What exactly gets trained?&lt;/h2&gt;
+    &lt;table&gt;
+      &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Object&lt;/th&gt;&lt;th&gt;What changes during training&lt;/th&gt;&lt;th&gt;Role after training&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Gist token embedding&lt;/b&gt;&lt;/td&gt;&lt;td&gt;New special-token embedding starts from average embedding, then receives gradients like normal tokens.&lt;/td&gt;&lt;td&gt;Provides the initial hidden state for each gist position.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Transformer weights&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Attention/MLP weights adapt so chunk information can be written into gist positions under the mask.&lt;/td&gt;&lt;td&gt;Transforms local raw chunk evidence into useful gist KV states.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Gist K/V states&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Not persistent parameters; they are activations produced per input by the trained model.&lt;/td&gt;&lt;td&gt;Stored in KV cache and used as compact routing keys/values.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Routing behavior&lt;/b&gt;&lt;/td&gt;&lt;td&gt;No separate router module. Query-to-gist affinity is learned implicitly through normal attention training.&lt;/td&gt;&lt;td&gt;Decode scores &lt;code&gt;q · K_gist&lt;/code&gt; and unfolds selected raw chunks.&lt;/td&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;6. Required CPT vs optional selective finetuning&lt;/h2&gt;
+    &lt;div class=&quot;grid2&quot;&gt;
+      &lt;div class=&quot;mini&quot;&gt;
+        &lt;h3&gt;Stage 1 — Continued pretraining&lt;/h3&gt;
+        &lt;p&gt;&lt;b&gt;Required.&lt;/b&gt; Train on text with interleaved gist tokens and gist mask. The objective is still standard next-token prediction. This teaches chunk compression and already makes query-to-gist top-k useful.&lt;/p&gt;
+        &lt;div class=&quot;codebox&quot;&gt;python gist_cpt_trainer.py&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;
+        &lt;h3&gt;Stage 2 — Selective finetuning&lt;/h3&gt;
+        &lt;p&gt;&lt;b&gt;Optional.&lt;/b&gt; Enable selective training so the model sees the same sparse/unfolded context pattern it will use at decode. The repo exposes flags such as &lt;code&gt;--selective&lt;/code&gt;, &lt;code&gt;--top_k&lt;/code&gt;, &lt;code&gt;--top_p&lt;/code&gt;, and chunk controls.&lt;/p&gt;
+        &lt;div class=&quot;codebox&quot;&gt;python gist_sft_trainer.py
+# or CPT with --selective&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;note warn&quot; style=&quot;margin-top:16px&quot;&gt;&lt;b&gt;Important:&lt;/b&gt; this is why SSA is not training-free. A normal checkpoint has never learned that &lt;code&gt;&amp;lt;gist&amp;gt;&lt;/code&gt; must summarize a chunk or that its key should act as a reliable chunk router.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;7. Decode core steps&lt;/h2&gt;
+    &lt;div class=&quot;flow&quot;&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;1&lt;/div&gt;&lt;h3&gt;Build gist metadata&lt;/h3&gt;&lt;p&gt;Find gist positions, cumsum them into chunk IDs, and gather gist keys.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;2&lt;/div&gt;&lt;h3&gt;Score only gists&lt;/h3&gt;&lt;p&gt;Compute q × K&lt;sub&gt;gist&lt;/sub&gt;, not q × all raw K.&lt;/p&gt;&lt;div class=&quot;codebox&quot;&gt;score_i = q · K_Gi&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;3&lt;/div&gt;&lt;h3&gt;Select chunks&lt;/h3&gt;&lt;p&gt;Top-k chooses relevant gist IDs, then maps them to chunk IDs.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok gist drop&quot;&gt;G1&lt;/span&gt;&lt;span class=&quot;tok gist raw2&quot;&gt;G2&lt;/span&gt;&lt;span class=&quot;tok gist drop&quot;&gt;G3&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;idx&quot;&gt;4&lt;/div&gt;&lt;h3&gt;Unfold raw KV&lt;/h3&gt;&lt;p&gt;Keep selected gist + selected chunk raw KV; skip unselected raw KV.&lt;/p&gt;&lt;div class=&quot;seq&quot;&gt;&lt;span class=&quot;tok raw2&quot;&gt;E&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;G&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;H&lt;/span&gt;&lt;span class=&quot;tok gist raw2&quot;&gt;G2&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;8. What “recover raw KV” really means&lt;/h2&gt;
+    &lt;div class=&quot;pipeline&quot;&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Full KV cache exists&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;A-D&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;E-H&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:12%&quot;&gt;I-L&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:6%&quot;&gt;G3&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:18%&quot;&gt;suffix&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Routing reads&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G1&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:10%&quot;&gt;G3&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;bar&quot;&gt;&lt;div class=&quot;barlabel&quot;&gt;Selected context&lt;/div&gt;&lt;div class=&quot;track&quot;&gt;&lt;div class=&quot;seg sel&quot; style=&quot;width:18%&quot;&gt;E-H raw KV&lt;/div&gt;&lt;div class=&quot;seg g&quot; style=&quot;width:8%&quot;&gt;G2&lt;/div&gt;&lt;div class=&quot;seg raw&quot; style=&quot;width:18%&quot;&gt;suffix&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;note warn&quot; style=&quot;margin-top:16px&quot;&gt;&lt;b&gt;Key correction:&lt;/b&gt; G2 does not reconstruct E/F/G/H. G2&#x27;s selected chunk ID causes the attention/kernel path to keep the existing KV positions for E/F/G/H.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;9. Code-verified implementation map&lt;/h2&gt;
+    &lt;table&gt;
+      &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Part&lt;/th&gt;&lt;th&gt;Real implementation behavior&lt;/th&gt;&lt;th&gt;Why it matters&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Data prep&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;src/data/gist.py&lt;/code&gt; inserts gist tokens, including a semantic-boundary variant that can place gist tokens near sentence/clause/word boundaries.&lt;/td&gt;&lt;td&gt;Gist tokens are real input tokens, not a side index.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Reference decode&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;gist_qwen2.py&lt;/code&gt; identifies gist tokens, computes &lt;code&gt;gist_scores = q · K_gist&lt;/code&gt;, top-k selects gist indices, then builds &lt;code&gt;keep_mask&lt;/code&gt; over raw/gist KV positions.&lt;/td&gt;&lt;td&gt;This shows “unfolding” is implemented as mask selection over existing KV.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Generation loop&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;generation_utils.py&lt;/code&gt; carries &lt;code&gt;attention_mask_gist&lt;/code&gt; through generation and converts prompt-time gist masks into single-row decode masks.&lt;/td&gt;&lt;td&gt;Keeps gist constraints consistent after prefill.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;Optimized dispatcher&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;attn_candidate.py&lt;/code&gt; caches gist metadata, supports head/group selection modes, builds per-group selection bitmaps, and dispatches the compact CUDA decode kernel.&lt;/td&gt;&lt;td&gt;Avoids rebuilding dense masks every layer/step.&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td&gt;&lt;b&gt;CUDA decode&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;sparse_decode_attn.cu&lt;/code&gt; computes the keep predicate inside the kernel, compacts kept indices, runs split-K flash decode, and combines partial results.&lt;/td&gt;&lt;td&gt;Physical sparsity: only selected KV is read for attention, not all raw KV.&lt;/td&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;10. Hierarchical H-SSA: gist of gists&lt;/h2&gt;
+    &lt;p&gt;For long context, the same idea becomes coarse-to-fine. First select meta-gists, then child gists inside selected parent regions, then unfold raw chunks.&lt;/p&gt;
+    &lt;div class=&quot;seq&quot;&gt;
+      &lt;span class=&quot;tok&quot;&gt;A-D&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;E-H&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;
+      &lt;span class=&quot;tok meta&quot;&gt;M1&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;I-L&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;
+      &lt;span class=&quot;tok&quot;&gt;M-P&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G4&lt;/span&gt;
+      &lt;span class=&quot;tok meta&quot;&gt;M2&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok meta raw2&quot;&gt;select M1&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok gist raw2&quot;&gt;select G2&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok raw2&quot;&gt;unfold E-H&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card section&quot;&gt;
+    &lt;h2&gt;11. Practical reading&lt;/h2&gt;
+    &lt;div class=&quot;grid2&quot;&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Core insight&lt;/h3&gt;&lt;p&gt;Train the summary token so its key is a useful chunk-level retrieval key. Then sparse routing is just normal attention scoring against fewer keys.&lt;/p&gt;&lt;/div&gt;
+      &lt;div class=&quot;mini&quot;&gt;&lt;h3&gt;Production caveat&lt;/h3&gt;&lt;p&gt;This is not a drop-in sparse kernel for arbitrary checkpoints. It needs gist-token continued pretraining and gist-aware masks/cache handling.&lt;/p&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;div class=&quot;foot&quot;&gt;Created as a compact visualization of the paper and public implementation, now including the gist-token training mechanism. Source references: arXiv 2604.20920 and github.com/yuzhenmao/simplified-sparse-attention.&lt;/div&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+" onload="resizeFrame(this)"></iframe>
+    </section>
+    <section class="chapter" id="chapter-3">
+      <div class="chapter-head">
+        <div>
+          <div class="eyebrow">Source visual 3</div>
+          <h2>Chapter 3 — Full mask example</h2>
+          <p>Three-gist toy example with raw-token and gist-token query rows.</p>
+        </div>
+        <a class="toplink" href="#top">Back to top</a>
+      </div>
+      <iframe class="visual-frame" title="Chapter 3 — Full mask example" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot; /&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+&lt;title&gt;SSA: 3 Gist Tokens Attention Example&lt;/title&gt;
+&lt;style&gt;
+  :root {
+    --bg: #0b1020;
+    --panel: #11182c;
+    --panel2: #151f38;
+    --text: #edf2ff;
+    --muted: #aab6d3;
+    --raw1: #38bdf8;
+    --raw2: #a78bfa;
+    --raw3: #34d399;
+    --gist: #fbbf24;
+    --suffix: #fb7185;
+    --yes: #22c55e;
+    --maybe: #60a5fa;
+    --no: #334155;
+    --outline: rgba(255,255,255,.13);
+    --shadow: rgba(0,0,0,.25);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 20% 0%, #1e293b 0, var(--bg) 42%, #060914 100%);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;
+    line-height: 1.45;
+  }
+  .page { max-width: 1180px; margin: 0 auto; padding: 34px 20px 54px; }
+  .hero {
+    padding: 28px;
+    border: 1px solid var(--outline);
+    border-radius: 26px;
+    background: linear-gradient(135deg, rgba(17,24,44,.96), rgba(21,31,56,.86));
+    box-shadow: 0 22px 60px var(--shadow);
+  }
+  h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 52px); line-height: 1.02; letter-spacing: -0.04em; }
+  h2 { margin: 34px 0 14px; font-size: 25px; letter-spacing: -0.02em; }
+  h3 { margin: 18px 0 8px; font-size: 18px; }
+  p { color: var(--muted); margin: 8px 0; }
+  .em { color: var(--text); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  @media (min-width: 980px) { .grid.two { grid-template-columns: 1.1fr .9fr; } }
+  .card {
+    border: 1px solid var(--outline);
+    border-radius: 22px;
+    background: rgba(17,24,44,.78);
+    padding: 20px;
+    box-shadow: 0 16px 42px rgba(0,0,0,.18);
+  }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
+  .swatch { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+  .sequence { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0 8px; }
+  .tok {
+    min-width: 42px;
+    text-align: center;
+    border-radius: 12px;
+    padding: 9px 10px;
+    font-weight: 750;
+    color: #06101f;
+    box-shadow: 0 8px 20px rgba(0,0,0,.24);
+    border: 1px solid rgba(255,255,255,.22);
+    position: relative;
+  }
+  .raw1 { background: var(--raw1); }
+  .raw2 { background: var(--raw2); color: #160b2f; }
+  .raw3 { background: var(--raw3); }
+  .gist { background: var(--gist); color: #2f2100; }
+  .suffix { background: var(--suffix); color: #310812; }
+  .arrow { color: #94a3b8; font-weight: 900; padding: 0 2px; }
+  .note { color: var(--muted); font-size: 13px; }
+  .rulebox {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  @media (max-width: 760px) { .rulebox { grid-template-columns: 1fr; } }
+  .rule {
+    background: rgba(255,255,255,.045);
+    border: 1px solid var(--outline);
+    border-radius: 18px;
+    padding: 14px;
+  }
+  .rule strong { color: white; }
+  .matrix-wrap { overflow-x: auto; padding-bottom: 4px; }
+  table.matrix {
+    width: max-content;
+    border-collapse: separate;
+    border-spacing: 5px;
+    font-size: 13px;
+  }
+  .matrix th, .matrix td {
+    width: 46px;
+    height: 38px;
+    border-radius: 10px;
+    text-align: center;
+    vertical-align: middle;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .matrix th { color: var(--muted); font-weight: 750; background: rgba(255,255,255,.04); }
+  .rowhead { min-width: 74px !important; color: var(--text) !important; background: rgba(251,191,36,.15) !important; }
+  .attend-local { background: rgba(34,197,94,.88); color: #04210d; font-weight: 900; }
+  .attend-gist { background: rgba(96,165,250,.9); color: #06182e; font-weight: 900; }
+  .attend-self { background: rgba(251,191,36,.9); color: #2f2100; font-weight: 900; }
+  .attend-suffix { background: rgba(251,113,133,.88); color: #310812; font-weight: 900; }
+  .fullmask tr.gist-row .rowhead { background: rgba(251,191,36,.18) !important; color: var(--text) !important; }
+  .fullmask tr.raw-row .rowhead { background: rgba(96,165,250,.09) !important; color: var(--text) !important; }
+  .blocked { background: rgba(51,65,85,.72); color: #94a3b8; }
+  .future { background: rgba(15,23,42,.96); color: #475569; }
+  .mini { font-size: 11px; display: block; opacity: .85; font-weight: 600; }
+  .flow {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 14px;
+    border: 1px solid var(--outline);
+    background: rgba(255,255,255,.045);
+    border-radius: 18px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 6px 9px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 12px;
+    color: #05111f;
+    background: var(--gist);
+    text-align: center;
+  }
+  .code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, &quot;Liberation Mono&quot;, monospace;
+    background: rgba(0,0,0,.28);
+    border: 1px solid var(--outline);
+    border-radius: 16px;
+    padding: 14px;
+    color: #dbeafe;
+    overflow-x: auto;
+    white-space: pre;
+    margin-top: 12px;
+  }
+  .decode-vis {
+    display: grid;
+    gap: 14px;
+  }
+  @media (min-width: 900px) { .decode-vis { grid-template-columns: 1fr 1fr; } }
+  .score-row { display: grid; grid-template-columns: 64px 1fr 46px; gap: 10px; align-items: center; margin: 12px 0; }
+  .bar { height: 18px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; border: 1px solid rgba(255,255,255,.1); }
+  .bar &gt; i { display: block; height: 100%; background: linear-gradient(90deg, #fbbf24, #22c55e); border-radius: 999px; }
+  .selected { outline: 3px solid rgba(34,197,94,.7); outline-offset: 2px; }
+  .callout {
+    border-left: 4px solid var(--gist);
+    padding: 12px 14px;
+    background: rgba(251,191,36,.08);
+    border-radius: 14px;
+    color: #fef3c7;
+  }
+  .footer { margin-top: 30px; font-size: 13px; color: #8ea0c7; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;page&quot;&gt;
+  &lt;section class=&quot;hero&quot;&gt;
+    &lt;h1&gt;SSA: Which tokens do 3 gist tokens attend to?&lt;/h1&gt;
+    &lt;p&gt;Concrete toy sequence: 3 raw chunks, 3 interleaved gist tokens, then a generation suffix.&lt;/p&gt;
+    &lt;div class=&quot;sequence&quot; aria-label=&quot;token sequence&quot;&gt;
+      &lt;span class=&quot;tok raw1&quot;&gt;A1&lt;/span&gt;&lt;span class=&quot;tok raw1&quot;&gt;A2&lt;/span&gt;&lt;span class=&quot;tok raw1&quot;&gt;A3&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok raw2&quot;&gt;B1&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;B2&lt;/span&gt;&lt;span class=&quot;tok raw2&quot;&gt;B3&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G2&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok raw3&quot;&gt;C1&lt;/span&gt;&lt;span class=&quot;tok raw3&quot;&gt;C2&lt;/span&gt;&lt;span class=&quot;tok raw3&quot;&gt;C3&lt;/span&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;
+      &lt;span class=&quot;arrow&quot;&gt;→&lt;/span&gt;
+      &lt;span class=&quot;tok suffix&quot;&gt;S1&lt;/span&gt;&lt;span class=&quot;tok suffix&quot;&gt;S2&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;legend&quot;&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:var(--raw1)&quot;&gt;&lt;/i&gt;Chunk 1 raw&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:var(--raw2)&quot;&gt;&lt;/i&gt;Chunk 2 raw&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:var(--raw3)&quot;&gt;&lt;/i&gt;Chunk 3 raw&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:var(--gist)&quot;&gt;&lt;/i&gt;Gist tokens&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:var(--suffix)&quot;&gt;&lt;/i&gt;Generation suffix&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h2&gt;1. Training-time gist mask: row = query token, column = key token&lt;/h2&gt;
+    &lt;p&gt;This full mask includes &lt;span class=&quot;em&quot;&gt;raw-token query rows&lt;/span&gt; and &lt;span class=&quot;em&quot;&gt;gist-token query rows&lt;/span&gt;. Raw tokens are normal Transformer queries too. The special part is the mask: later chunks can read previous chunks mainly through gist tokens, not through old raw tokens.&lt;/p&gt;
+    &lt;div class=&quot;matrix-wrap&quot;&gt;
+      &lt;table class=&quot;matrix fullmask&quot; aria-label=&quot;full training gist mask attention matrix&quot;&gt;
+        &lt;thead&gt;
+          &lt;tr&gt;
+            &lt;th class=&quot;rowhead&quot;&gt;query \ key&lt;/th&gt;
+            &lt;th&gt;A1&lt;/th&gt;&lt;th&gt;A2&lt;/th&gt;&lt;th&gt;A3&lt;/th&gt;&lt;th&gt;G1&lt;/th&gt;&lt;th&gt;B1&lt;/th&gt;&lt;th&gt;B2&lt;/th&gt;&lt;th&gt;B3&lt;/th&gt;&lt;th&gt;G2&lt;/th&gt;&lt;th&gt;C1&lt;/th&gt;&lt;th&gt;C2&lt;/th&gt;&lt;th&gt;C3&lt;/th&gt;&lt;th&gt;G3&lt;/th&gt;&lt;th&gt;S1&lt;/th&gt;&lt;th&gt;S2&lt;/th&gt;
+          &lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;A1&lt;span class=&quot;mini&quot;&gt;raw query A&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;A2&lt;span class=&quot;mini&quot;&gt;raw query A&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;A3&lt;span class=&quot;mini&quot;&gt;raw query A&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;gist-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;G1&lt;span class=&quot;mini&quot;&gt;summary A&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;B1&lt;span class=&quot;mini&quot;&gt;raw query B&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;B2&lt;span class=&quot;mini&quot;&gt;raw query B&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;B3&lt;span class=&quot;mini&quot;&gt;raw query B&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;gist-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;G2&lt;span class=&quot;mini&quot;&gt;summary B&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;C1&lt;span class=&quot;mini&quot;&gt;raw query C&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;C2&lt;span class=&quot;mini&quot;&gt;raw query C&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;C3&lt;span class=&quot;mini&quot;&gt;raw query C&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;gist-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;G3&lt;span class=&quot;mini&quot;&gt;summary C&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-local&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;S1&lt;span class=&quot;mini&quot;&gt;suffix query&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;td class=&quot;future&quot;&gt;×&lt;/td&gt;
+&lt;/tr&gt;
+          &lt;tr class=&quot;raw-row&quot;&gt;
+&lt;th class=&quot;rowhead&quot;&gt;S2&lt;span class=&quot;mini&quot;&gt;suffix query&lt;/span&gt;&lt;/th&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;blocked&quot;&gt;×&lt;/td&gt;
+&lt;td class=&quot;attend-gist&quot;&gt;G&lt;/td&gt;
+&lt;td class=&quot;attend-suffix&quot;&gt;✓&lt;/td&gt;
+&lt;td class=&quot;attend-self&quot;&gt;self&lt;/td&gt;
+&lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;note&quot;&gt;Read one row at a time: a colored cell means the row query can attend to that column key. Dark cells are future tokens blocked by causal masking; gray cells are old raw tokens hidden behind previous gists.&lt;/p&gt;
+    &lt;div class=&quot;legend&quot;&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(34,197,94,.88)&quot;&gt;&lt;/i&gt;Local raw chunk attended&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(96,165,250,.9)&quot;&gt;&lt;/i&gt;Previous gist attended&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(251,191,36,.9)&quot;&gt;&lt;/i&gt;Self&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(251,113,133,.88)&quot;&gt;&lt;/i&gt;Suffix causal token attended&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(51,65,85,.72)&quot;&gt;&lt;/i&gt;Previous raw chunk blocked&lt;/span&gt;
+      &lt;span&gt;&lt;i class=&quot;swatch&quot; style=&quot;background:rgba(15,23,42,.96)&quot;&gt;&lt;/i&gt;Future tokens blocked by causality&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;grid two&quot;&gt;
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h2&gt;2. Read the matrix as 4 rules&lt;/h2&gt;
+      &lt;div class=&quot;rulebox&quot;&gt;
+        &lt;div class=&quot;rule&quot;&gt;
+          &lt;strong&gt;Raw tokens&lt;/strong&gt;
+          &lt;p&gt;Are also query rows. A raw token reads &lt;span class=&quot;em&quot;&gt;previous gists&lt;/span&gt; plus its &lt;span class=&quot;em&quot;&gt;local causal raw tokens&lt;/span&gt;.&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;rule&quot;&gt;
+          &lt;strong&gt;G1&lt;/strong&gt;
+          &lt;p&gt;Attends to &lt;span class=&quot;em&quot;&gt;A1 A2 A3&lt;/span&gt; plus itself. It becomes the summary/proxy of chunk 1.&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;rule&quot;&gt;
+          &lt;strong&gt;G2 / G3&lt;/strong&gt;
+          &lt;p&gt;Attend to their &lt;span class=&quot;em&quot;&gt;own raw chunk&lt;/span&gt;, previous gist tokens, plus self. They do &lt;span class=&quot;em&quot;&gt;not&lt;/span&gt; directly read previous chunks’ raw tokens.&lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;code&quot;&gt;Raw B2 query keys = {G1, B1, B2}
+Raw C2 query keys = {G1, G2, C1, C2}
+G1 query keys    = {A1, A2, A3, G1}
+G2 query keys    = {G1, B1, B2, B3, G2}
+G3 query keys    = {G1, G2, C1, C2, C3, G3}&lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;card&quot;&gt;
+      &lt;h2&gt;3. Why this trains useful gist tokens&lt;/h2&gt;
+      &lt;div class=&quot;flow&quot;&gt;
+        &lt;div class=&quot;step&quot;&gt;
+          &lt;span class=&quot;badge&quot;&gt;Mask&lt;/span&gt;
+          &lt;p&gt;Later suffix tokens cannot freely read old raw chunks. They mainly see old content through gist tokens.&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;step&quot;&gt;
+          &lt;span class=&quot;badge&quot;&gt;Loss&lt;/span&gt;
+          &lt;p&gt;Normal next-token cross-entropy is applied on the generation suffix.&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;step&quot;&gt;
+          &lt;span class=&quot;badge&quot;&gt;Gradient&lt;/span&gt;
+          &lt;p&gt;If suffix prediction needs information from chunk B, gradients push G2’s hidden/KV state to carry that information.&lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;p class=&quot;callout&quot;&gt;Important: &lt;b&gt;G2 does not reconstruct B1/B2/B3&lt;/b&gt;. It learns to be a good proxy/router for chunk B, whose original raw KV range is still known by position.&lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h2&gt;4. Decode-time: query first attends to gist tokens, then selected raw chunk is unfolded&lt;/h2&gt;
+    &lt;p&gt;Now suppose a decode query &lt;span class=&quot;em&quot;&gt;q&lt;/span&gt; needs information from chunk 2. SSA first scores only the cheap gist keys.&lt;/p&gt;
+    &lt;div class=&quot;decode-vis&quot;&gt;
+      &lt;div&gt;
+        &lt;h3&gt;Routing over gist tokens&lt;/h3&gt;
+        &lt;div class=&quot;score-row&quot;&gt;&lt;span class=&quot;tok gist&quot;&gt;G1&lt;/span&gt;&lt;div class=&quot;bar&quot;&gt;&lt;i style=&quot;width:18%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;0.18&lt;/b&gt;&lt;/div&gt;
+        &lt;div class=&quot;score-row&quot;&gt;&lt;span class=&quot;tok gist selected&quot;&gt;G2&lt;/span&gt;&lt;div class=&quot;bar&quot;&gt;&lt;i style=&quot;width:91%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;0.91&lt;/b&gt;&lt;/div&gt;
+        &lt;div class=&quot;score-row&quot;&gt;&lt;span class=&quot;tok gist&quot;&gt;G3&lt;/span&gt;&lt;div class=&quot;bar&quot;&gt;&lt;i style=&quot;width:27%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;0.27&lt;/b&gt;&lt;/div&gt;
+        &lt;p class=&quot;note&quot;&gt;Top-1 gist is G2 → select chunk 2.&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div&gt;
+        &lt;h3&gt;Unfold selected chunk&lt;/h3&gt;
+        &lt;div class=&quot;sequence&quot;&gt;
+          &lt;span class=&quot;tok gist selected&quot;&gt;G2&lt;/span&gt;
+          &lt;span class=&quot;tok raw2 selected&quot;&gt;B1&lt;/span&gt;&lt;span class=&quot;tok raw2 selected&quot;&gt;B2&lt;/span&gt;&lt;span class=&quot;tok raw2 selected&quot;&gt;B3&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;p&gt;Final sparse attention uses the selected gist + selected raw KV. Other chunks’ raw KV are skipped for this query.&lt;/p&gt;
+        &lt;div class=&quot;code&quot;&gt;q · K_gist → top-k gist ids
+selected: G2
+G2 position → chunk 2 raw KV range
+final keys ≈ {G2, B1, B2, B3, suffix causal tokens}&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h2&gt;One-line mental model&lt;/h2&gt;
+    &lt;p class=&quot;callout&quot;&gt;&lt;b&gt;Training mask:&lt;/b&gt; Gist token learns by attending to its local raw chunk and previous gists. &lt;br/&gt;&lt;b&gt;Inference routing:&lt;/b&gt; query attends to gist tokens, selects chunk ids, then unfolds original raw KV for selected chunks.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;p class=&quot;footer&quot;&gt;Toy example based on the SSA paper’s interleaved gist-token mask and selective unfolding mechanism. Exact production behavior can include sink tokens, suffix tokens, hierarchical meta-gists, GQA group union, and implementation-specific fallback paths.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+" onload="resizeFrame(this)"></iframe>
+    </section>
+    <p class="foot">Unified from: ssa_gist_token_visual.html, ssa_gist_token_visual_training.html, and ssa_3_gist_attention_visual_full_mask.html.</p>
+  </main>
+</body>
+</html>
