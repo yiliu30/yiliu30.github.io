@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cache-DiT Working Flow — No Cache vs Cache-DiT</title>
+<style>
+  :root{
+    --bg:#08111f;
+    --panel:#101b2f;
+    --panel2:#0d1728;
+    --ink:#eef6ff;
+    --muted:#9fb3ca;
+    --line:#263954;
+    --blue:#64b5ff;
+    --cyan:#62e6d8;
+    --green:#84e29c;
+    --yellow:#ffd36e;
+    --orange:#ffad66;
+    --red:#ff7575;
+    --purple:#c7a2ff;
+    --grey:#50647f;
+    --shadow:0 20px 50px rgba(0,0,0,.35);
+    --radius:22px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    background:
+      radial-gradient(circle at 15% -10%, rgba(100,181,255,.22), transparent 36%),
+      radial-gradient(circle at 90% 0%, rgba(199,162,255,.18), transparent 30%),
+      radial-gradient(circle at 50% 110%, rgba(98,230,216,.12), transparent 38%),
+      var(--bg);
+    color:var(--ink);
+    line-height:1.45;
+  }
+  a{color:var(--cyan)}
+  .wrap{width:min(1280px, calc(100vw - 32px)); margin:0 auto; padding:30px 0 60px}
+  .hero{display:grid; grid-template-columns:1.15fr .85fr; gap:22px; align-items:stretch; margin-bottom:22px}
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.035));
+    border:1px solid rgba(255,255,255,.11);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .heroMain{padding:30px 32px 28px}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border:1px solid rgba(100,181,255,.35); background:rgba(100,181,255,.10); color:#cbe8ff; border-radius:999px; font-size:13px; font-weight:700; letter-spacing:.02em}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 18px var(--cyan)}
+  h1{font-size:clamp(34px, 5vw, 68px); line-height:.96; margin:18px 0 18px; letter-spacing:-.06em}
+  .subtitle{font-size:18px; color:var(--muted); max-width:800px; margin:0}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px}
+  .pill{display:inline-flex; gap:8px; align-items:center; padding:8px 10px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); font-size:13px; color:#cbd8e8}
+  .sw{width:12px; height:12px; border-radius:4px}
+  .metrics{padding:20px; display:grid; gap:12px}
+  .metric{padding:18px; border-radius:18px; background:rgba(0,0,0,.16); border:1px solid rgba(255,255,255,.08)}
+  .metric b{font-size:30px; display:block; letter-spacing:-.04em}
+  .metric span{display:block;color:var(--muted);font-size:13px;margin-top:4px}
+  .section{margin-top:22px; padding:24px}
+  .section h2{font-size:28px; line-height:1.05; margin:0 0 8px; letter-spacing:-.03em}
+  .section p{color:var(--muted); margin:0 0 16px}
+  .compare{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:stretch}
+  .lane{padding:18px; background:rgba(0,0,0,.14); border:1px solid rgba(255,255,255,.08); border-radius:20px; min-height:420px}
+  .laneTitle{display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:16px}
+  .laneTitle h3{margin:0; font-size:22px; letter-spacing:-.02em}
+  .tag{font-size:12px; color:#cbd8e8; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.08); padding:6px 9px; border-radius:999px; white-space:nowrap}
+  .pipeline{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0 18px}
+  .pipeItem{padding:12px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center; min-height:74px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative}
+  .pipeItem:after{content:"→"; position:absolute; right:-14px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:900}
+  .pipeItem:last-child:after{display:none}
+  .pipeItem .icon{font-size:23px}
+  .pipeItem strong{font-size:13px; display:block; margin-top:5px}
+  .stepHeader{display:flex; justify-content:space-between; align-items:center; margin:14px 0 8px; color:#dfe9f7; font-size:13px}
+  .blockRow{display:grid; grid-template-columns:repeat(12,1fr); gap:5px; padding:10px; background:rgba(0,0,0,.18); border-radius:16px; border:1px solid rgba(255,255,255,.07)}
+  .blk{height:32px; border-radius:9px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#07111f; border:1px solid rgba(255,255,255,.18)}
+  .compute{background:linear-gradient(180deg, #91d5ff, #4aa3ff)}
+  .front{background:linear-gradient(180deg, #9fffc6, #43d87b)}
+  .back{background:linear-gradient(180deg, #ffd98b, #ffad37)}
+  .reuse{background:linear-gradient(180deg, #c8b3ff, #8b6cff)}
+  .miss{background:linear-gradient(180deg, #ffb08f, #ff6e6e)}
+  .idle{background:linear-gradient(180deg, #70839d, #465a73); color:#dce8f7}
+  .timeline{display:grid; grid-template-columns:repeat(14,1fr); gap:7px; margin-top:10px}
+  .tstep{height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; border:1px solid rgba(255,255,255,.12)}
+  .fullStep{background:rgba(100,181,255,.22); color:#cfeaff}
+  .cacheStep{background:rgba(199,162,255,.20); color:#eadfff}
+  .warmStep{background:rgba(132,226,156,.22); color:#d6ffe0}
+  .decision{display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; margin-top:16px}
+  .decisionBox{padding:14px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); min-height:92px}
+  .decisionBox strong{display:block; margin-bottom:6px}
+  .decisionBox small{color:var(--muted)}
+  .arrow{font-size:30px; color:var(--muted)}
+  .controls{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:16px 0 20px}
+  .control{padding:14px; border-radius:16px; background:rgba(0,0,0,.16); border:1px solid rgba(255,255,255,.08)}
+  label{display:flex; justify-content:space-between; color:#dce8f7; font-weight:700; font-size:13px; margin-bottom:10px}
+  input[type="range"]{width:100%; accent-color:#62e6d8}
+  select{width:100%; background:#0c1728; color:var(--ink); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:10px}
+  .vizGrid{display:grid; grid-template-columns:1.1fr .9fr; gap:18px}
+  .bars{display:grid; gap:10px; margin-top:10px}
+  .barRow{display:grid; grid-template-columns:110px 1fr 72px; gap:12px; align-items:center; font-size:13px; color:#cbd8e8}
+  .barTrack{height:18px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; border:1px solid rgba(255,255,255,.07)}
+  .barFill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--cyan), var(--blue)); width:0%}
+  .formula{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); padding:14px; border-radius:16px; color:#d7eaff; overflow:auto}
+  .callout{padding:15px 16px; border-left:4px solid var(--cyan); background:rgba(98,230,216,.08); border-radius:14px; color:#d1f8f5}
+  .miniGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:14px}
+  .mini{padding:14px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08)}
+  .mini strong{display:block; margin-bottom:5px}
+  .mini span{color:var(--muted); font-size:13px}
+  .foot{margin-top:22px; color:#8092a8; font-size:12px; text-align:center}
+  .caption{font-size:12px; color:var(--muted); margin-top:8px}
+  .stageBand{display:grid; grid-template-columns:1fr 2fr 1fr; gap:8px; margin:12px 0}
+  .band{padding:11px; text-align:center; border-radius:14px; border:1px solid rgba(255,255,255,.09); font-weight:800; font-size:13px}
+  .band.frontB{background:rgba(132,226,156,.16); color:#caffd6}
+  .band.middleB{background:rgba(199,162,255,.14); color:#eadfff}
+  .band.backB{background:rgba(255,211,110,.14); color:#ffe9b5}
+  @media (max-width:980px){.hero,.compare,.vizGrid{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr 1fr}.pipeItem:nth-child(2):after{display:none}.miniGrid{grid-template-columns:1fr}.barRow{grid-template-columns:86px 1fr 62px}.timeline{grid-template-columns:repeat(7,1fr)}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="card heroMain">
+        <div class="eyebrow"><span class="dot"></span> Cache-DiT mental model</div>
+        <h1>No cache is the reference. Cache-DiT skips safe DiT block work.</h1>
+        <p class="subtitle">A DiT pipeline repeatedly denoises latent features. Without Cache-DiT, every denoising step runs every transformer block. Cache-DiT wraps the blocks, measures cross-step feature similarity, and reuses cached outputs when the current step is close enough.</p>
+        <div class="legend">
+          <span class="pill"><span class="sw" style="background:#4aa3ff"></span> normal compute</span>
+          <span class="pill"><span class="sw" style="background:#43d87b"></span> Fn front blocks</span>
+          <span class="pill"><span class="sw" style="background:#8b6cff"></span> cache reuse / skip</span>
+          <span class="pill"><span class="sw" style="background:#ffad37"></span> Bn back blocks</span>
+          <span class="pill"><span class="sw" style="background:#ff6e6e"></span> cache miss → recompute</span>
+        </div>
+      </div>
+      <div class="card metrics">
+        <div class="metric"><b>20–50</b><span>typical denoising steps: the same DiT backbone is called again and again</span></div>
+        <div class="metric"><b>&gt;95%</b><span>transformer backbone can dominate DiT latency / memory in the report’s model</span></div>
+        <div class="metric"><b>1.6×–2.9×</b><span>DBCache-only speedup examples on FLUX.1-dev L20, depending on cache aggressiveness</span></div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>1. Reference path: normal DiT, no Cache-DiT</h2>
+      <p>Every denoising step recomputes the full transformer stack. This is the baseline behavior and the easiest correctness reference.</p>
+      <div class="compare">
+        <div class="lane">
+          <div class="laneTitle"><h3>Pipeline level</h3><span class="tag">baseline</span></div>
+          <div class="pipeline">
+            <div class="pipeItem"><div class="icon">📝</div><strong>Prompt</strong></div>
+            <div class="pipeItem"><div class="icon">🧠</div><strong>Text encoder</strong></div>
+            <div class="pipeItem"><div class="icon">🌫️</div><strong>Noisy latent</strong></div>
+            <div class="pipeItem"><div class="icon">🧱</div><strong>DiT blocks × T</strong></div>
+          </div>
+          <div class="stepHeader"><span>Denoising step t</span><span>all blocks run</span></div>
+          <div class="blockRow" id="noCacheBlocks"></div>
+          <div class="stepHeader"><span>Denoising step t+1</span><span>all blocks run again</span></div>
+          <div class="blockRow" id="noCacheBlocks2"></div>
+          <div class="callout" style="margin-top:16px">Cost model: <b>T steps × L blocks</b>. No step-level or block-level reuse is used.</div>
+        </div>
+        <div class="lane">
+          <div class="laneTitle"><h3>Transformer block detail</h3><span class="tag">full recompute</span></div>
+          <div class="formula">for step in denoising_steps:\n    h = latent\n    for block in transformer_blocks:\n        h = block(h, t, cond)   # attention + FFN\n    latent = scheduler_update(h)</div>
+          <div class="miniGrid">
+            <div class="mini"><strong>Simple</strong><span>No extra state or cache decision.</span></div>
+            <div class="mini"><strong>Accurate</strong><span>Every block sees the exact current-step hidden state.</span></div>
+            <div class="mini"><strong>Expensive</strong><span>Temporal redundancy across neighboring steps is not used.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>2. Cache-DiT setup: instrument first, then decide at runtime</h2>
+      <p>Cache-DiT is inserted as a PyTorch-native middleware layer. It first discovers model-specific block layout, maps each block to a known forward pattern, then wraps block forward calls so runtime caching can happen without rewriting the whole model.</p>
+      <div class="pipeline" style="grid-template-columns:repeat(5,1fr)">
+        <div class="pipeItem"><div class="icon">🧩</div><strong>Diffusers pipe</strong></div>
+        <div class="pipeItem"><div class="icon">🔎</div><strong>BlockAdapter</strong></div>
+        <div class="pipeItem"><div class="icon">🧾</div><strong>Forward pattern</strong></div>
+        <div class="pipeItem"><div class="icon">🎣</div><strong>Wrap forward()</strong></div>
+        <div class="pipeItem"><div class="icon">⚡</div><strong>DBCache runtime</strong></div>
+      </div>
+      <div class="formula">cache_dit.enable_cache(pipe)\n# instrumentation → cache hooks → optional parallelism / quantization / offload\n# during inference: compute, skip, or reuse per block / per step</div>
+    </section>
+
+    <section class="card section">
+      <h2>3. Runtime comparison: no cache vs DBCache</h2>
+      <p>DBCache keeps first <b>Fn</b> blocks and last <b>Bn</b> blocks computed. Middle blocks are cacheable: if the L1 residual difference is below threshold τ, reuse previous-step cache; otherwise recompute and refresh the cache.</p>
+      <div class="compare">
+        <div class="lane">
+          <div class="laneTitle"><h3>No Cache-DiT</h3><span class="tag">reference</span></div>
+          <div class="stepHeader"><span>Step t−1</span><span>full compute</span></div><div class="blockRow" id="refA"></div>
+          <div class="stepHeader"><span>Step t</span><span>full compute</span></div><div class="blockRow" id="refB"></div>
+          <div class="stepHeader"><span>Step t+1</span><span>full compute</span></div><div class="blockRow" id="refC"></div>
+          <div class="caption">Every row is identical in compute pattern: all 12 example blocks run.</div>
+        </div>
+        <div class="lane">
+          <div class="laneTitle"><h3>Cache-DiT DBCache</h3><span class="tag">skip safe middle work</span></div>
+          <div class="stageBand"><div class="band frontB">Fn always compute</div><div class="band middleB">middle cache decision</div><div class="band backB">Bn always compute</div></div>
+          <div class="stepHeader"><span>Warmup / full step</span><span>build reference cache</span></div><div class="blockRow" id="cacheWarm"></div>
+          <div class="stepHeader"><span>Cache-allowed step</span><span>L1 diff &lt; τ → reuse</span></div><div class="blockRow" id="cacheHit"></div>
+          <div class="stepHeader"><span>Cache-allowed step</span><span>L1 diff ≥ τ → some misses</span></div><div class="blockRow" id="cacheMiss"></div>
+          <div class="caption">Middle blocks are approximation candidates; front/back blocks protect quality and reduce drift.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>4. Interactive toy view: change Fn, Bn, threshold, and SCM mode</h2>
+      <p>This is a simplified visual model, not a kernel benchmark. It helps build intuition for why larger cache regions increase speed but also increase quality risk.</p>
+      <div class="controls">
+        <div class="control"><label>Fn front blocks <span id="fnVal">2</span></label><input id="fn" type="range" min="0" max="5" value="2" /></div>
+        <div class="control"><label>Bn back blocks <span id="bnVal">2</span></label><input id="bn" type="range" min="0" max="5" value="2" /></div>
+        <div class="control"><label>Residual threshold τ <span id="tauVal">0.15</span></label><input id="tau" type="range" min="0.05" max="0.30" value="0.15" step="0.01" /></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1fr 2fr">
+        <div class="control"><label>SCM schedule <span id="scmVal">fast</span></label><select id="scm"><option value="slow">slow: more full steps</option><option value="medium">medium</option><option value="fast" selected>fast</option><option value="ultra">ultra: more cache steps</option></select></div>
+        <div class="control"><label>Estimated computed block ratio <span id="ratioVal">—</span></label><div class="barTrack"><div class="barFill" id="ratioFill"></div></div><div class="caption">Lower ratio roughly means more skipped middle blocks.</div></div>
+      </div>
+      <div class="vizGrid">
+        <div class="lane">
+          <div class="laneTitle"><h3>28-step SCM timeline</h3><span class="tag" id="timelineTag">fast</span></div>
+          <div class="timeline" id="timeline"></div>
+          <div class="caption">Green = warmup/full reference, blue = full compute, purple = cache-allowed step.</div>
+        </div>
+        <div class="lane">
+          <div class="laneTitle"><h3>One cache-allowed step</h3><span class="tag">12-block toy transformer</span></div>
+          <div class="blockRow" id="interactiveBlocks"></div>
+          <div class="decision">
+            <div class="decisionBox"><strong>L1 diff &lt; τ</strong><small>middle block output is similar to previous step → reuse cached hidden/residual</small></div>
+            <div class="arrow">⇄</div>
+            <div class="decisionBox"><strong>L1 diff ≥ τ</strong><small>middle block changed too much → run the real block and update cache</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>5. Report numbers: no-cache baseline as reference</h2>
+      <p>Latency examples below are from the Cache-DiT technical report’s FLUX.1-dev, L20, 28-step DBCache configuration table. Lower latency means fewer expensive block forwards were executed.</p>
+      <div class="bars" id="latencyBars"></div>
+      <div class="caption">Baseline no cache: 24.85s. F1B0 with aggressive threshold τ=0.20 is fastest in this table, but more aggressive cache settings can have more quality risk.</div>
+    </section>
+
+    <section class="card section">
+      <h2>6. Key takeaway</h2>
+      <div class="compare">
+        <div class="lane"><h3>No Cache-DiT</h3><div class="formula">exact but expensive\nT denoising steps × L transformer blocks\nall attention + FFN recomputed</div></div>
+        <div class="lane"><h3>Cache-DiT</h3><div class="formula">approximate but controlled\nwarmup/full steps build cache\nFn blocks anchor current step\nmiddle blocks skip/reuse when safe\nBn blocks repair accumulated error</div></div>
+      </div>
+      <div class="callout" style="margin-top:16px">Important: this is a diffusion feature cache, not an LLM KV cache. It reuses hidden states or residual paths across denoising steps, not attention KV tensors across generated tokens.</div>
+    </section>
+
+    <div class="foot">Created for learning purpose. Data and mechanism summarized from the Cache-DiT technical report; visualization uses a simplified 12-block toy model.</div>
+  </div>
+<script>
+  const N=12;
+  function makeBlocks(el, pattern){
+    const root = typeof el === 'string' ? document.getElementById(el) : el;
+    root.innerHTML='';
+    pattern.forEach((cls,i)=>{
+      const d=document.createElement('div');
+      d.className='blk '+cls;
+      d.textContent='B'+(i+1);
+      root.appendChild(d);
+    });
+  }
+  const all=Array(N).fill('compute');
+  ['noCacheBlocks','noCacheBlocks2','refA','refB','refC','cacheWarm'].forEach(id=>makeBlocks(id,all));
+  makeBlocks('cacheHit',['front','front','reuse','reuse','reuse','reuse','reuse','reuse','reuse','reuse','back','back']);
+  makeBlocks('cacheMiss',['front','front','reuse','miss','reuse','reuse','miss','reuse','reuse','miss','back','back']);
+
+  const latency = [
+    ['No cache baseline',24.85,'1.00×'],
+    ['F1B0 τ=0.08',15.59,'1.59×'],
+    ['F1B0 τ=0.20',8.58,'2.90×'],
+    ['F8B8 τ=0.15',15.41,'1.61×'],
+    ['F12B12 τ=0.20',15.11,'1.64×']
+  ];
+  const bars=document.getElementById('latencyBars');
+  latency.forEach(([name,val,sp])=>{
+    const row=document.createElement('div'); row.className='barRow';
+    row.innerHTML=`<span>${name}</span><div class="barTrack"><div class="barFill" style="width:${val/24.85*100}%"></div></div><span>${val}s · ${sp}</span>`;
+    bars.appendChild(row);
+  });
+
+  const fn=document.getElementById('fn'), bn=document.getElementById('bn'), tau=document.getElementById('tau'), scm=document.getElementById('scm');
+  const schedules={slow:{full:18,cache:10},medium:{full:15,cache:13},fast:{full:11,cache:17},ultra:{full:8,cache:20}};
+  function renderInteractive(){
+    const F=+fn.value, B=+bn.value, T=+tau.value, mode=scm.value;
+    document.getElementById('fnVal').textContent=F;
+    document.getElementById('bnVal').textContent=B;
+    document.getElementById('tauVal').textContent=T.toFixed(2);
+    document.getElementById('scmVal').textContent=mode;
+    document.getElementById('timelineTag').textContent=mode;
+    const pattern=[];
+    for(let i=0;i<N;i++){
+      if(i<F) pattern.push('front');
+      else if(i>=N-B) pattern.push('back');
+      else {
+        const pseudoDiff = ((i*37 + Math.round(T*100)*7) % 100) / 100;
+        pattern.push(pseudoDiff < Math.min(.85, T*3.7) ? 'reuse' : 'miss');
+      }
+    }
+    makeBlocks('interactiveBlocks', pattern);
+    const midCount=Math.max(0,N-F-B);
+    const cacheHitProb=Math.min(.85,T*3.7);
+    const s=schedules[mode];
+    const cacheStepCompute=(F+B+(1-cacheHitProb)*midCount)/N;
+    const fullRatio=s.full/28;
+    const totalRatio=fullRatio*1 + (s.cache/28)*cacheStepCompute;
+    document.getElementById('ratioVal').textContent=(totalRatio*100).toFixed(1)+'%';
+    document.getElementById('ratioFill').style.width=(totalRatio*100)+'%';
+    const tl=document.getElementById('timeline'); tl.innerHTML='';
+    for(let i=1;i<=28;i++){
+      const d=document.createElement('div'); d.className='tstep';
+      let cls='cacheStep';
+      if(i<=2) cls='warmStep';
+      else if(i <= s.full) cls='fullStep';
+      d.classList.add(cls); d.textContent=i;
+      tl.appendChild(d);
+    }
+  }
+  [fn,bn,tau,scm].forEach(x=>x.addEventListener('input',renderInteractive));
+  renderInteractive();
+</script>
+</body>
+</html>
