@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cosmos 3 Super Architecture Visual Guide</title>
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#111a2e; --panel:#10192b; --panel2:#142038; --ink:#eaf1ff; --muted:#a9b6cf;
+    --blue:#64b5ff; --violet:#b69cff; --orange:#ffb36b; --green:#94df9b; --pink:#f59bdd; --cyan:#7ce7ff;
+    --line:rgba(255,255,255,.18); --soft:rgba(255,255,255,.08); --hot:#fff3a4;
+    --shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;background:
+    radial-gradient(1200px 900px at 10% -10%,rgba(100,181,255,.23),transparent 50%),
+    radial-gradient(900px 700px at 95% 10%,rgba(182,156,255,.2),transparent 45%),
+    linear-gradient(180deg,var(--bg),#070a12 75%);color:var(--ink);line-height:1.55}
+  a{color:var(--cyan);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1220px;margin:0 auto;padding:32px 22px 72px}
+  .hero{border:1px solid var(--line);border-radius:30px;padding:34px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.04));box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .hero:after{content:"";position:absolute;inset:auto -120px -180px auto;width:420px;height:420px;background:radial-gradient(circle,rgba(124,231,255,.22),transparent 65%);filter:blur(6px)}
+  .eyebrow{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(124,231,255,.12);border:1px solid rgba(124,231,255,.3);color:#c6f6ff;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:clamp(34px,5vw,62px);line-height:1.02;margin:18px 0 14px;letter-spacing:-.04em}
+  .subtitle{font-size:clamp(17px,2vw,21px);color:var(--muted);max-width:880px;margin:0}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .chip{border:1px solid var(--line);background:rgba(255,255,255,.06);padding:8px 12px;border-radius:999px;color:#dfe9ff;font-size:14px}
+  .grid{display:grid;gap:18px}.grid.cards{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:22px}.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media(max-width:980px){.grid.cards,.grid.three,.grid.two{grid-template-columns:1fr}.hero{padding:24px}.wrap{padding:18px 14px 50px}}
+  .card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04));border-radius:22px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.16)}
+  .card h3{margin:0 0 8px;font-size:17px}.card p{margin:0;color:var(--muted);font-size:14.5px}.big{font-size:30px;font-weight:900;letter-spacing:-.03em}.blue{color:var(--blue)}.violet{color:var(--violet)}.orange{color:var(--orange)}.green{color:var(--green)}.pink{color:var(--pink)}.cyan{color:var(--cyan)}
+  section{margin-top:28px;border:1px solid var(--line);border-radius:28px;background:rgba(255,255,255,.045);box-shadow:var(--shadow);overflow:hidden}
+  .section-head{padding:24px 26px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(124,231,255,.09),rgba(182,156,255,.06))}
+  .section-head h2{margin:0;font-size:28px;letter-spacing:-.03em}.section-head p{margin:6px 0 0;color:var(--muted)}
+  .content{padding:24px 26px}.note{border-left:4px solid var(--cyan);background:rgba(124,231,255,.08);padding:14px 16px;border-radius:14px;color:#dcefff}.warn{border-left-color:var(--orange);background:rgba(255,179,107,.09)}
+  .archbox{background:linear-gradient(180deg,#0d1425,#0a0f1d);border:1px solid rgba(255,255,255,.13);border-radius:24px;padding:12px;overflow:auto}.archbox svg{min-width:1060px;display:block;margin:auto}.label{font-size:14px;fill:#eaf1ff;font-weight:700}.sublabel{font-size:12px;fill:#a9b6cf}.tiny{font-size:11px;fill:#c6d2ea}.svg-title{font-size:20px;fill:#ffffff;font-weight:900}.arrow{stroke:#d6e4ff;stroke-width:2.1;fill:none;marker-end:url(#arrow)}.arrow2{stroke:#ffbf79;stroke-width:2.3;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:7 7}.boxtext{font-size:12px;fill:#07101f;font-weight:800}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.leg{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}.sw{width:16px;height:12px;border-radius:4px;border:1px solid rgba(255,255,255,.35)}
+  .compare{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:18px;border:1px solid var(--line)}.compare th,.compare td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top}.compare th{background:rgba(255,255,255,.08);text-align:left;color:#f5f8ff}.compare tr:last-child td{border-bottom:0}.compare td{color:#c8d4ec}.compare b{color:white}
+  .flow{counter-reset:step;display:grid;gap:14px}.step{display:grid;grid-template-columns:50px 1fr;gap:14px;align-items:start;border:1px solid var(--line);background:rgba(255,255,255,.045);padding:15px;border-radius:18px}.step:before{counter-increment:step;content:counter(step);width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#06101e;font-weight:900}.step h3{margin:0 0 4px}.step p{margin:0;color:var(--muted)}
+  .mask{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;background:rgba(255,255,255,.08);padding:12px;border-radius:18px;max-width:420px}.cell{aspect-ratio:1;border-radius:5px;background:rgba(255,255,255,.08)}.ar{background:rgba(100,181,255,.62)}.dm{background:rgba(255,179,107,.68)}.blocked{background:rgba(255,255,255,.11)}.mask-label{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;color:var(--muted);font-size:13px}
+  .callout{border:1px solid rgba(255,243,164,.35);background:rgba(255,243,164,.08);border-radius:22px;padding:18px}.callout h3{margin:0 0 8px;color:#fff7c9}.callout p{margin:0;color:#ddd2aa}
+  .tag{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#09101e;background:var(--hot);font-weight:900;border-radius:999px;padding:4px 8px;display:inline-block;margin-bottom:8px}
+  .mini-title{font-size:15px;margin:0 0 6px;color:white}.muted{color:var(--muted)}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;background:rgba(255,255,255,.1);border:1px solid var(--line);border-radius:8px;padding:2px 6px;color:#eef4ff}
+  .sources li{margin:8px 0;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <span class="eyebrow">NVIDIA Cosmos 3 Super - architecture map</span>
+      <h1>Reason first, then generate the world.</h1>
+      <p class="subtitle">Cosmos 3 Super is best understood as a two-path Mixture-of-Transformers model: an autoregressive reasoner builds a discrete understanding of the scene, and a diffusion generator denoises continuous world tokens for image, video, audio, and action outputs.</p>
+      <div class="chips">
+        <span class="chip">64B trainable parameters</span>
+        <span class="chip">32B reasoner + 32B generator</span>
+        <span class="chip">AR + diffusion sequence</span>
+        <span class="chip">Text / image / video / audio / action</span>
+        <span class="chip">Physical AI: robotics, AV, smart spaces</span>
+      </div>
+      <div class="grid cards">
+        <div class="card"><div class="big blue">AR</div><h3>Reasoner</h3><p>Vision-language pathway. Causal attention, next-token text output.</p></div>
+        <div class="card"><div class="big orange">DM</div><h3>Generator</h3><p>Diffusion pathway. Full attention, iterative denoising of continuous tokens.</p></div>
+        <div class="card"><div class="big violet">MoT</div><h3>Mixture-of-Transformers</h3><p>Two parameter paths inside one unified token layout.</p></div>
+        <div class="card"><div class="big green">3D</div><h3>mRoPE</h3><p>Position encoding for spatial and temporal structure across modalities.</p></div>
+        <div class="card"><div class="big pink">1 -> 2</div><h3>One-way guidance</h3><p>Generator sees reasoner context; reasoner remains self-contained.</p></div>
+      </div>
+    </header>
+
+    <section>
+      <div class="section-head">
+        <h2>1. Big picture architecture</h2>
+        <p>Own re-drawn mental model of the Cosmos 3 Super dataflow, not a copy of NVIDIA's figure.</p>
+      </div>
+      <div class="content">
+        <div class="archbox">
+<svg viewBox="0 0 1140 670" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cosmos 3 architecture diagram">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d6e4ff"/></marker>
+    <linearGradient id="gBlue" x1="0" x2="1"><stop stop-color="#8ed3ff"/><stop offset="1" stop-color="#b7e8ff"/></linearGradient>
+    <linearGradient id="gOrange" x1="0" x2="1"><stop stop-color="#ffd09b"/><stop offset="1" stop-color="#ffb36b"/></linearGradient>
+    <linearGradient id="gViolet" x1="0" x2="1"><stop stop-color="#cbbcff"/><stop offset="1" stop-color="#9f8cff"/></linearGradient>
+    <linearGradient id="gGreen" x1="0" x2="1"><stop stop-color="#c0f5c4"/><stop offset="1" stop-color="#8bdf94"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000" flood-opacity=".3"/></filter>
+  </defs>
+
+  <text x="32" y="40" class="svg-title">Cosmos 3 Super: unified sequence + two transformer pathways</text>
+  <text x="32" y="64" class="sublabel">Input modalities are encoded into either AR understanding tokens or DM generation tokens.</text>
+
+  <!-- Inputs -->
+  <rect x="28" y="100" width="186" height="438" rx="24" fill="#111b31" stroke="rgba(255,255,255,.18)"/>
+  <text x="56" y="132" class="label">Raw inputs</text>
+  <g>
+    <rect x="54" y="158" width="132" height="38" rx="12" fill="url(#gViolet)"/><text x="88" y="182" class="boxtext">Text</text>
+    <rect x="54" y="214" width="132" height="38" rx="12" fill="url(#gBlue)"/><text x="86" y="238" class="boxtext">Image</text>
+    <rect x="54" y="270" width="132" height="38" rx="12" fill="url(#gBlue)"/><text x="86" y="294" class="boxtext">Video</text>
+    <rect x="54" y="326" width="132" height="38" rx="12" fill="#f5a7e4"/><text x="86" y="350" class="boxtext">Audio</text>
+    <rect x="54" y="382" width="132" height="38" rx="12" fill="url(#gGreen)"/><text x="83" y="406" class="boxtext">Action</text>
+    <rect x="54" y="454" width="132" height="52" rx="14" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.16)"/>
+    <text x="73" y="477" class="tiny">task prompt decides:</text><text x="72" y="495" class="tiny">understand or generate</text>
+  </g>
+
+  <!-- Encoders -->
+  <rect x="260" y="96" width="220" height="444" rx="24" fill="#101a2f" stroke="rgba(255,255,255,.18)"/>
+  <text x="292" y="132" class="label">Modality encoders</text>
+  <rect x="294" y="158" width="152" height="44" rx="12" fill="rgba(182,156,255,.22)" stroke="#b69cff"/><text x="334" y="184" class="label">Tokenizer</text>
+  <rect x="294" y="226" width="152" height="44" rx="12" fill="rgba(100,181,255,.19)" stroke="#64b5ff"/><text x="324" y="252" class="label">ViT encoder</text>
+  <text x="305" y="286" class="tiny">understanding vision tokens</text>
+  <rect x="294" y="322" width="152" height="44" rx="12" fill="rgba(255,179,107,.19)" stroke="#ffb36b"/><text x="324" y="348" class="label">VAE encoder</text>
+  <text x="302" y="382" class="tiny">generation vision tokens</text>
+  <rect x="294" y="416" width="152" height="44" rx="12" fill="rgba(148,223,155,.18)" stroke="#94df9b"/><text x="315" y="442" class="label">Audio/action proj.</text>
+
+  <path d="M186 177 C225 177 240 177 294 177" class="arrow"/>
+  <path d="M186 233 C225 233 240 248 294 248" class="arrow"/>
+  <path d="M186 289 C225 289 240 248 294 248" class="arrow"/>
+  <path d="M186 345 C225 345 240 438 294 438" class="arrow"/>
+  <path d="M186 401 C225 401 240 438 294 438" class="arrow"/>
+
+  <!-- Unified sequence -->
+  <rect x="520" y="92" width="290" height="448" rx="26" fill="#0d172a" stroke="rgba(255,255,255,.20)" filter="url(#shadow)"/>
+  <text x="548" y="130" class="label">Unified token sequence</text>
+  <text x="548" y="153" class="sublabel">AR subsequence first, DM subsequence second</text>
+
+  <rect x="548" y="184" width="232" height="106" rx="18" fill="rgba(100,181,255,.12)" stroke="#64b5ff"/>
+  <text x="570" y="215" class="label">AR subsequence</text>
+  <text x="570" y="238" class="tiny">text + optional ViT image/video tokens</text>
+  <text x="570" y="260" class="tiny">special tokens: EOS / BOG</text>
+  <g transform="translate(570,272)">
+    <rect width="24" height="16" rx="5" fill="#b69cff"/><rect x="30" width="24" height="16" rx="5" fill="#64b5ff"/><rect x="60" width="24" height="16" rx="5" fill="#64b5ff"/><rect x="90" width="24" height="16" rx="5" fill="#ddd"/><rect x="120" width="24" height="16" rx="5" fill="#ddd"/>
+  </g>
+
+  <rect x="548" y="330" width="232" height="132" rx="18" fill="rgba(255,179,107,.12)" stroke="#ffb36b"/>
+  <text x="570" y="361" class="label">DM subsequence</text>
+  <text x="570" y="384" class="tiny">VAE image/video + audio + action tokens</text>
+  <text x="570" y="406" class="tiny">clean conditioning before noisy targets</text>
+  <g transform="translate(570,426)">
+    <rect width="24" height="16" rx="5" fill="#ffb36b"/><rect x="30" width="24" height="16" rx="5" fill="#ffb36b"/><rect x="60" width="24" height="16" rx="5" fill="#f59bdd"/><rect x="90" width="24" height="16" rx="5" fill="#94df9b"/><rect x="120" width="24" height="16" rx="5" fill="none" stroke="#ddd" stroke-dasharray="4 3"/>
+  </g>
+
+  <path d="M446 180 C480 180 498 210 548 210" class="arrow"/>
+  <path d="M446 248 C485 248 500 236 548 236" class="arrow"/>
+  <path d="M446 344 C485 344 500 372 548 372" class="arrow2"/>
+  <path d="M446 438 C485 438 500 410 548 410" class="arrow2"/>
+
+  <!-- Transformer block -->
+  <rect x="850" y="92" width="262" height="448" rx="26" fill="#10192d" stroke="rgba(255,255,255,.22)" filter="url(#shadow)"/>
+  <text x="882" y="130" class="label">MoT decoder layer × L</text>
+  <rect x="882" y="166" width="198" height="78" rx="16" fill="rgba(100,181,255,.13)" stroke="#64b5ff"/>
+  <text x="902" y="196" class="label">Reasoner path</text>
+  <text x="902" y="218" class="tiny">causal self-attn over AR</text>
+  <rect x="882" y="280" width="198" height="104" rx="16" fill="rgba(255,179,107,.13)" stroke="#ffb36b"/>
+  <text x="902" y="310" class="label">Generator path</text>
+  <text x="902" y="332" class="tiny">full attention over AR + DM</text>
+  <text x="902" y="352" class="tiny">iterative denoising step t -> t-1</text>
+  <rect x="882" y="420" width="198" height="68" rx="16" fill="rgba(124,231,255,.09)" stroke="rgba(124,231,255,.55)"/>
+  <text x="903" y="448" class="label">Shared structure</text>
+  <text x="903" y="469" class="tiny">multimodal attention + 3D mRoPE</text>
+  <path d="M780 230 C822 230 830 205 882 205" class="arrow"/>
+  <path d="M780 392 C822 392 830 333 882 333" class="arrow2"/>
+  <path d="M882 245 C835 268 825 310 882 322" class="arrow2 dash"/>
+
+  <!-- Outputs -->
+  <path d="M1080 204 C1110 204 1110 170 1110 150" class="arrow"/>
+  <text x="970" y="72" class="tiny">Reasoner-only: text answer / plan / grounding</text>
+  <path d="M1080 332 C1115 332 1110 570 1010 570" class="arrow2"/>
+  <rect x="774" y="560" width="238" height="64" rx="18" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)"/>
+  <text x="800" y="586" class="label">Decoded world outputs</text>
+  <text x="800" y="608" class="tiny">image / video / audio / action trajectories</text>
+</svg>
+        </div>
+        <div class="legend">
+          <span class="leg"><span class="sw" style="background:#b69cff"></span>Language/text</span>
+          <span class="leg"><span class="sw" style="background:#64b5ff"></span>Vision understanding tokens</span>
+          <span class="leg"><span class="sw" style="background:#ffb36b"></span>Diffusion visual tokens</span>
+          <span class="leg"><span class="sw" style="background:#f59bdd"></span>Audio</span>
+          <span class="leg"><span class="sw" style="background:#94df9b"></span>Action</span>
+          <span class="leg"><span class="sw" style="background:transparent;border-style:dashed"></span>Noisy target tokens</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>2. Reasoner vs Generator</h2>
+        <p>The two towers are complementary rather than redundant.</p>
+      </div>
+      <div class="content">
+        <table class="compare">
+          <thead><tr><th>Part</th><th>What it consumes</th><th>How attention works</th><th>What it produces</th><th>Typical use</th></tr></thead>
+          <tbody>
+            <tr><td><b class="blue">Reasoner tower</b></td><td>Text plus vision tokens from images/videos.</td><td>Causal self-attention on the AR subsequence. It behaves like a VLM/LLM and predicts the next text token.</td><td>Text: captions, structured reasoning, localization, action plans, physical plausibility judgment.</td><td>Understanding-only tasks, VLM API, prompt upsampling, planning, scene diagnosis.</td></tr>
+            <tr><td><b class="orange">Generator tower</b></td><td>Text/vision/action context plus noisy image/video/audio/action tokens.</td><td>Full attention over its diffusion tokens and the AR context. It repeatedly denoises target tokens.</td><td>Image, video, synchronized sound, future rollouts, robot/agent action chunks.</td><td>Text-to-image/video, image-to-video, forward dynamics, inverse dynamics, policy generation.</td></tr>
+            <tr><td><b class="violet">MoT connection</b></td><td>One packed sequence: AR first, DM second.</td><td>AR cannot look into DM. DM can look back into AR. This makes guidance one-way: reasoner -> generator.</td><td>A single model surface that can act like VLM, video generator, simulator, or action model.</td><td>Avoids stitching several separate models and pipelines for physical AI workflows.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>3. The key trick: asymmetric attention mask</h2><p>Why the generator can use the reasoner's understanding without corrupting autoregressive text reasoning.</p></div>
+      <div class="content grid two">
+        <div>
+          <div class="mask" aria-label="attention mask grid">
+            <!-- 10x10: first 5 AR, last 5 DM -->
+            <script type="application/json" id="mask-data">{}</script>
+            <div class="ar"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div>
+            <div class="ar"></div><div class="ar"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div>
+            <div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div>
+            <div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div>
+            <div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="ar"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div><div class="blocked"></div>
+            <div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div>
+            <div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div>
+            <div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div>
+            <div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div>
+            <div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div><div class="dm"></div>
+          </div>
+          <div class="mask-label"><span><span class="blue">Blue lower triangle:</span> AR causal self-attention.</span><span><span class="orange">Orange full block:</span> DM full attention over AR + DM.</span></div>
+        </div>
+        <div class="callout">
+          <span class="tag">Mental model</span>
+          <h3>Reasoner is the planner; generator is the simulator.</h3>
+          <p>The reasoner builds a compact textual/visual understanding: objects, motion, intent, constraints, and physical context. The generator then uses that AR context as conditioning while denoising the target world tokens. Because DM attends to AR but AR does not attend to DM, generation is guided by reasoning while text reasoning stays a clean next-token process.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>4. How they work together at inference</h2><p>Same checkpoint, different runtime surfaces.</p></div>
+      <div class="content grid two">
+        <div class="flow">
+          <div class="step"><div><h3>Encode task and context</h3><p>Text goes through the tokenizer. Image/video for understanding goes through a ViT into the AR subsequence. Generation targets or conditions are represented as DM tokens by VAE/audio/action encoders.</p></div></div>
+          <div class="step"><div><h3>Reasoner forms the AR context</h3><p>For understanding-only tasks, this path is enough: it decodes text using standard next-token autoregressive generation.</p></div></div>
+          <div class="step"><div><h3>Generator reads the AR context</h3><p>For generation tasks, noisy DM target tokens are appended. The generator tower attends to AR context and all DM tokens, then predicts denoised tokens.</p></div></div>
+          <div class="step"><div><h3>Decode continuous outputs</h3><p>After diffusion steps, decoders map clean tokens back to pixels, video frames, audio streams, or action vectors.</p></div></div>
+        </div>
+        <div>
+          <div class="note"><b>Important runtime distinction.</b> Reasoner can be loaded alone for text-output VLM tasks. Generator-serving paths load the full checkpoint because they need both the Qwen3-VL-based reasoner path and the diffusion generation path.</div>
+          <br />
+          <table class="compare">
+            <tbody>
+              <tr><td><b>Reasoner-only mode</b></td><td><span class="kbd">text/image/video -> text</span><br/><span class="muted">captioning, 2D grounding, temporal localization, physical reasoning.</span></td></tr>
+              <tr><td><b>Generator mode</b></td><td><span class="kbd">text/image/video/action -> image/video/audio/action</span><br/><span class="muted">text-to-video, image-to-video, forward dynamics, inverse dynamics, policy rollouts.</span></td></tr>
+              <tr><td><b>Prompt upsampling</b></td><td><span class="muted">A reasoner/planner can expand short prompts into dense structured prompts before diffusion generation, improving fidelity and physical detail.</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>5. Generation modes as token layouts</h2><p>Different applications mostly change what appears in AR vs DM, not the backbone.</p></div>
+      <div class="content grid three">
+        <div class="card"><h3><span class="violet">Language / VLM</span></h3><p><b>AR only.</b> Text and optional ViT image/video tokens are decoded autoregressively. Diffusion parameters are not activated.</p></div>
+        <div class="card"><h3><span class="orange">Text-to-image / video</span></h3><p><b>AR prompt + noisy DM target.</b> The prompt lives in AR. The generator denoises visual tokens into an image or video.</p></div>
+        <div class="card"><h3><span class="blue">Image-to-video</span></h3><p><b>AR text + clean visual condition + noisy video target.</b> The input image constrains identity/layout; diffusion predicts motion.</p></div>
+        <div class="card"><h3><span class="green">Forward dynamics</span></h3><p><b>State + action -> future observation.</b> Clean action/context condition the DM target video rollout.</p></div>
+        <div class="card"><h3><span class="pink">Inverse dynamics</span></h3><p><b>Observed video -> action.</b> The model infers the action trajectory that explains the visual transition.</p></div>
+        <div class="card"><h3><span class="cyan">Policy mode</span></h3><p><b>Instruction + observation -> action chunk + rollout.</b> Useful for robot policy learning and embodiment-specific control.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>6. Training intuition</h2><p>Why the split helps instead of forcing one transformer behavior onto everything.</p></div>
+      <div class="content grid two">
+        <div class="card"><h3>Reasoner training</h3><p>Large-scale image-text and video-text learning gives the model visual-language grounding. Later supervised tuning specializes it for Physical AI: temporal events, 2D grounding, robot task planning, physical plausibility, and action reasoning.</p></div>
+        <div class="card"><h3>Generator training</h3><p>The diffusion pathway learns to synthesize and simulate continuous modalities. It is trained on image/video/audio/action data and learns to denoise target tokens while conditioned on AR context.</p></div>
+        <div class="card"><h3>Parameter and knowledge transfer</h3><p>Public descriptions indicate both AR and DM paths share the same layer template and multimodal positional scheme, while using separate parameter sets inside transformer layers. This lets the generator inherit semantic/world knowledge but optimize for denoising.</p></div>
+        <div class="card"><h3>Why it matters for kernels</h3><p>The reasoner path resembles LLM/VLM inference with causal attention and KV cache. The generator path resembles diffusion inference: repeated denoising steps, full attention over dense multimodal tokens, and heavier video-token memory pressure.</p></div>
+      </div>
+      <div class="content" style="padding-top:0">
+        <div class="note warn"><b>Caveat.</b> Public docs are still evolving. For exact runtime limits, supported modalities, quantization, and serving flags, check the current Hugging Face model card and NVIDIA/cosmos repository. Some limits vary between the model card, README, and serving integrations.</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Sources used</h2><p>Main public references behind this visualization.</p></div>
+      <div class="content">
+        <ul class="sources">
+          <li>NVIDIA Cosmos 3 Hugging Face model card for Cosmos3-Super: model family, parameter count, architecture type, input/output specifications, and software integrations.</li>
+          <li>NVIDIA/cosmos GitHub README: runtime surfaces, MoT description, causal/full attention behavior, unified 3D mRoPE, generation modes, vLLM/vLLM-Omni notes.</li>
+          <li>NVIDIA Developer Blog: two-tower explanation, reasoner as VLM, generator as diffusion process, one-way reasoner-to-generator guidance, model size selection.</li>
+          <li>Cosmos 3 technical report: detailed MoT token arrangement, AR/DM subsequences, attention mask, and ablation discussion of how the reasoner benefits the generator.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
