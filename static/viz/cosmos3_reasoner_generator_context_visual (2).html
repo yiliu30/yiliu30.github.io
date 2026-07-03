@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cosmos 3 — How the Generator Uses Reasoner Context</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121934;
+      --panel2: #0f1530;
+      --text: #e9eefc;
+      --muted: #aeb8d9;
+      --line: #2a3766;
+      --accent: #8ab4ff;
+      --accent2: #79e3c4;
+      --reasoner: #5aa0ff;
+      --generator: #75d0b6;
+      --warn: #ffd479;
+      --red: #ff9d9d;
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(180deg, #0a0f20 0%, #10183a 100%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap {
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto 48px;
+    }
+    .hero, .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 28px; }
+    h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
+    h1 { font-size: 34px; }
+    h2 { font-size: 24px; margin-bottom: 16px; }
+    h3 { font-size: 18px; margin-bottom: 10px; }
+    p { margin: 10px 0; color: var(--muted); }
+    .subtitle { font-size: 17px; max-width: 1000px; }
+    .pillbar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .pill {
+      padding: 8px 12px; border-radius: 999px; font-size: 13px;
+      border: 1px solid var(--line); color: var(--text); background: rgba(255,255,255,0.03);
+    }
+    .grid { display: grid; gap: 18px; margin-top: 18px; }
+    .g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .card { padding: 22px; }
+    .mini { font-size: 14px; }
+    .keyline {
+      display: flex; gap: 12px; align-items: center; margin-top: 10px;
+      color: var(--muted); font-size: 14px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .r { background: var(--reasoner); }
+    .g { background: var(--generator); }
+    .y { background: var(--warn); }
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--line);
+      color: #dfe8ff;
+      padding: 12px 14px;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+    .flow, .boxes, .token-row {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    }
+    .box {
+      padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03); flex: 1 1 200px;
+    }
+    .reasoner-box { border-color: rgba(90,160,255,0.6); background: rgba(90,160,255,0.10); }
+    .generator-box { border-color: rgba(117,208,182,0.6); background: rgba(117,208,182,0.10); }
+    .arrow { font-size: 24px; color: var(--accent); padding: 0 2px; }
+    .token {
+      min-width: 88px; padding: 10px 10px; text-align: center; border-radius: 12px;
+      border: 1px solid var(--line); font-size: 13px; background: rgba(255,255,255,0.03);
+    }
+    .token.rtok { background: rgba(90,160,255,0.15); border-color: rgba(90,160,255,0.6); }
+    .token.gtok { background: rgba(117,208,182,0.15); border-color: rgba(117,208,182,0.6); }
+    .token.obs { background: rgba(255,212,121,0.13); border-color: rgba(255,212,121,0.5); }
+    .token.noise { background: rgba(255,157,157,0.12); border-color: rgba(255,157,157,0.5); }
+    .section { margin-top: 22px; }
+    .caption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    .attn-grid {
+      display: grid; grid-template-columns: 180px repeat(4, 1fr); gap: 6px; margin-top: 12px;
+    }
+    .attn-grid .h, .attn-grid .c {
+      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); text-align: center;
+      background: rgba(255,255,255,0.03); font-size: 14px;
+    }
+    .attn-grid .h { font-weight: 700; color: var(--text); }
+    .yes { background: rgba(117,208,182,0.15) !important; border-color: rgba(117,208,182,0.6) !important; }
+    .partial { background: rgba(255,212,121,0.14) !important; border-color: rgba(255,212,121,0.55) !important; }
+    .no { opacity: 0.5; }
+    .timeline {
+      display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: stretch; margin-top: 8px;
+    }
+    .step {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+    }
+    .step .n {
+      width: 40px; height: 40px; border-radius: 50%; display: inline-grid; place-items: center;
+      background: rgba(138,180,255,0.2); border: 1px solid rgba(138,180,255,0.5); font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .stack {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .small { font-size: 13px; }
+    .two-col {
+      display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px;
+    }
+    .em { color: var(--text); font-weight: 650; }
+    ul { margin: 8px 0 0 18px; color: var(--muted); }
+    li { margin: 6px 0; }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 13px; }
+
+    .inference-visual {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,0.03);
+    }
+    .stage.reasoner-stage { background: rgba(90,160,255,0.11); border-color: rgba(90,160,255,0.55); }
+    .stage.generator-stage { background: rgba(117,208,182,0.11); border-color: rgba(117,208,182,0.55); }
+    .stage.output-stage { background: rgba(255,212,121,0.10); border-color: rgba(255,212,121,0.45); }
+    .down-arrow {
+      text-align: center;
+      color: var(--accent);
+      font-size: 26px;
+      line-height: 1;
+    }
+    .loop-wrap {
+      border: 1px dashed rgba(117,208,182,0.55);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(117,208,182,0.05);
+    }
+    .denoise-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .mini-step {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(255,255,255,0.03);
+      min-height: 110px;
+    }
+    .reuse-col {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255,255,255,0.03);
+    }
+    .reuse-chip {
+      border: 1px solid rgba(90,160,255,0.55);
+      background: rgba(90,160,255,0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin: 8px 0;
+    }
+    .reuse-arrow {
+      text-align: center;
+      color: var(--accent2);
+      font-size: 22px;
+      margin: 4px 0;
+    }
+
+    @media (max-width: 960px) {
+      .g2, .g3, .two-col, .inference-visual, .denoise-steps { grid-template-columns: 1fr; }
+      .attn-grid { grid-template-columns: 140px repeat(4, minmax(72px, 1fr)); }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Cosmos 3 — How the Generator Uses Reasoner Context</h1>
+      <p class="subtitle">
+        A mechanism-level visualization of how the <span class="em">Reasoner (AR tower)</span> and
+        <span class="em">Generator (DM tower)</span> cooperate inside Cosmos 3. The core idea is that the
+        generator does <span class="em">not</span> simply read a final text answer from the reasoner. Instead, it denoises
+        noisy target tokens while attending to the reasoner’s hidden token context, which acts as a semantic and physical anchor.
+      </p>
+      <div class="pillbar">
+        <div class="pill">Reasoner = scene/task understanding</div>
+        <div class="pill">Generator = diffusion denoising</div>
+        <div class="pill">Conditioning via joint attention</div>
+        <div class="pill">Main information flow: Reasoner → Generator</div>
+      </div>
+    </section>
+
+    <div class="grid g2 section">
+      <section class="card">
+        <h2>1) Big-picture flow</h2>
+        <div class="flow">
+          <div class="box">
+            <h3>Input</h3>
+            <p class="mini">Prompt + observed image/video/action history</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="box reasoner-box">
+            <h3>Reasoner / AR tower</h3>
+            <p class="mini">Builds hidden understanding of the world, task, object relations, motion, and constraints.</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="box generator-box">
+            <h3>Generator / DM tower</h3>
+            <p class="mini">Starts from noisy target latents and repeatedly denoises them using reasoner context.</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="box">
+            <h3>Output</h3>
+            <p class="mini">Generated image / video / audio / action rollout</p>
+          </div>
+        </div>
+        <p class="caption">The generator uses the reasoner as context, not as a detached post-processor.</p>
+      </section>
+
+      <section class="card">
+        <h2>2) What each side is responsible for</h2>
+        <div class="boxes">
+          <div class="box reasoner-box">
+            <h3>Reasoner learns / represents</h3>
+            <ul>
+              <li>what objects are present</li>
+              <li>where they are</li>
+              <li>which objects matter for the goal</li>
+              <li>what action or future state is desired</li>
+              <li>what motion or interaction is plausible</li>
+            </ul>
+          </div>
+          <div class="box generator-box">
+            <h3>Generator learns / represents</h3>
+            <ul>
+              <li>how to turn noisy latents into outputs</li>
+              <li>how to keep objects visually consistent</li>
+              <li>how to produce smooth motion across time</li>
+              <li>how to generate actions or future observations that match the context</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card section">
+      <h2>3) Token-level view: where the context lives</h2>
+      <p>
+        Cosmos 3 conceptually has an <span class="em">AR subsequence</span> and a <span class="em">DM subsequence</span>.
+        The AR side holds the context and reasoning state; the DM side holds the noisy target tokens to be generated.
+      </p>
+      <div class="stack section">
+        <div>
+          <h3>Sequence sketch</h3>
+          <div class="token-row">
+            <div class="token obs">Prompt</div>
+            <div class="token obs">Obs frame 1</div>
+            <div class="token obs">Obs frame 2</div>
+            <div class="token rtok">AR token 1</div>
+            <div class="token rtok">AR token 2</div>
+            <div class="token rtok">AR token 3</div>
+            <div class="token noise">Noise</div>
+            <div class="token gtok">DM token 1</div>
+            <div class="token gtok">DM token 2</div>
+            <div class="token gtok">DM token 3</div>
+          </div>
+          <p class="caption">Observed context and reasoning tokens sit on the AR side; generation targets sit on the DM side.</p>
+        </div>
+        <div class="grid g3">
+          <div class="box">
+            <h3>AR tokens</h3>
+            <p class="mini">Hold scene semantics, task understanding, temporal context, and high-level physical cues.</p>
+          </div>
+          <div class="box">
+            <h3>DM tokens</h3>
+            <p class="mini">Represent noisy target latents for future image/video/audio/action outputs.</p>
+          </div>
+          <div class="box">
+            <h3>Key idea</h3>
+            <p class="mini">Generator queries repeatedly read AR context during denoising.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>4) Attention access pattern</h2>
+      <p>
+        The reasoner side remains the stable context. The generator side can look back to that context while denoising.
+        The table below is a simplified mental model.
+      </p>
+      <div class="attn-grid">
+        <div class="h"></div>
+        <div class="h">Previous AR</div>
+        <div class="h">Current AR</div>
+        <div class="h">AR context</div>
+        <div class="h">DM tokens</div>
+
+        <div class="c"><b>AR query</b></div>
+        <div class="c yes">Yes</div>
+        <div class="c partial">causal/self path</div>
+        <div class="c no">No extra future access</div>
+        <div class="c no">No / limited in this mental model</div>
+
+        <div class="c"><b>DM query</b></div>
+        <div class="c yes">Yes</div>
+        <div class="c yes">Yes</div>
+        <div class="c yes">Main conditioning source</div>
+        <div class="c yes">Yes</div>
+      </div>
+      <p class="caption">Simplified interpretation: the generator can attend to reasoner context while producing/denoising target tokens.</p>
+    </section>
+
+    <section class="card section">
+      <h2>5) What happens during one diffusion step</h2>
+      <div class="timeline">
+        <div class="step"><div class="n">1</div><div class="small">Noisy DM input</div></div>
+        <div class="step">
+          The generator starts from noisy future image/video/audio/action latent tokens.
+          These are incomplete and ambiguous on their own.
+        </div>
+
+        <div class="step"><div class="n">2</div><div class="small">Read AR context</div></div>
+        <div class="step">
+          DM queries attend to AR tokens that encode the task, objects, relations, observed history,
+          and likely future constraints.
+        </div>
+
+        <div class="step"><div class="n">3</div><div class="small">Predict cleaner latents</div></div>
+        <div class="step">
+          Using this context, the generator predicts a less noisy version of the target tokens.
+        </div>
+
+        <div class="step"><div class="n">4</div><div class="small">Repeat</div></div>
+        <div class="step">
+          Over many diffusion steps, the output evolves from noise → coarse structure → objects/motion → final coherent output.
+        </div>
+      </div>
+      <div class="section code">DM query at step t:
+“I am generating this future patch / future action token. What should I become?”
+
+Reads from AR context:
+- prompt meaning
+- observed scene tokens
+- object identities
+- spatial relations
+- temporal history
+- task / action goal
+- plausible physical behavior</div>
+    </section>
+
+    <div class="grid g2 section">
+      <section class="card">
+        <h2>6) Why this helps semantic consistency</h2>
+        <p>
+          Because the generator repeatedly reads the same AR context, it is less likely to drift away from the intended
+          objects, goal, or scene layout.
+        </p>
+        <div class="code">Example prompt:
+“Pick up the red cup and place it next to the bowl”
+
+Reasoner context may encode:
+- red cup = target object
+- bowl = reference destination
+- cup is on the left side of the table
+- action sequence: grasp → lift → move → place</div>
+        <p>
+          During denoising, the generator can keep asking: <span class="em">Which object is the target?</span>
+          <span class="em">Where should it end up?</span> <span class="em">What scene elements must remain consistent?</span>
+        </p>
+        <ul>
+          <li>same red cup across frames</li>
+          <li>same bowl across frames</li>
+          <li>consistent table layout</li>
+          <li>task-aligned motion direction</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>7) Why this helps physical consistency</h2>
+        <p>
+          The reasoner side can anchor the generator with motion and interaction constraints learned from multimodal world data.
+        </p>
+        <ul>
+          <li>objects should remain in plausible places unless acted upon</li>
+          <li>motion should be temporally smooth</li>
+          <li>contact should occur before an object moves with the hand/robot</li>
+          <li>scene changes should follow the requested action causally</li>
+          <li>future observations should remain compatible with prior observations</li>
+        </ul>
+        <p>
+          This is <span class="em">learned physical consistency</span>, not an explicit symbolic or rigid-body physics solver.
+          The model learns these patterns from training data and uses the reasoner context to stabilize generation.
+        </p>
+      </section>
+    </div>
+
+    <section class="card section">
+      <h2>8) Layer-by-layer mental model</h2>
+      <div class="two-col">
+        <div>
+          <div class="code">For each transformer layer:
+
+AR path:
+  update AR tokens
+  preserve / refine scene and task understanding
+
+DM path:
+  update noisy DM tokens
+  attend to AR hidden states
+  produce better denoising features</div>
+          <p>
+            So the generator is not conditioned only once at the beginning. It is conditioned <span class="em">repeatedly</span>
+            across layers and across diffusion timesteps.
+          </p>
+        </div>
+        <div>
+          <div class="code">Across diffusion time:
+
+t = T (very noisy)
+  ↓ use AR context
+rough structure
+  ↓ use AR context again
+objects / motion emerge
+  ↓ use AR context again
+final coherent output</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>9) Simple intuition</h2>
+      <div class="grid g3">
+        <div class="box reasoner-box">
+          <h3>Reasoner = planner / interpreter</h3>
+          <p class="mini">Understands what is happening, what matters, and what should happen next.</p>
+        </div>
+        <div class="box generator-box">
+          <h3>Generator = renderer / rollout maker</h3>
+          <p class="mini">Actually synthesizes the future observation or action sequence.</p>
+        </div>
+        <div class="box">
+          <h3>Together</h3>
+          <p class="mini">“Understand first, then generate while staying anchored to that understanding.”</p>
+        </div>
+      </div>
+    </section>
+
+
+
+    <section class="card section">
+      <h2>11) Generation inference mental model</h2>
+      <p>
+        Yes — during generation inference, the most useful mental model is:
+        the <span class="em">Reasoner</span> first builds hidden/context representations from the prompt and observed multimodal inputs,
+        and then the <span class="em">Generator</span> uses that reasoner context repeatedly during each diffusion denoising step.
+      </p>
+      <div class="two-col">
+        <div>
+          <div class="code">Conceptual inference flow:
+
+1. Reasoner processes:
+   - prompt
+   - observed image / video / action history
+
+2. Reasoner produces hidden context states C
+
+3. Generator initializes noisy target latents x_T
+
+4. For each denoise step t = T ... 1:
+      x_{t-1} = Generator(
+          noisy target = x_t,
+          timestep = t,
+          conditioning context = C
+      )
+
+5. Final output = x_0</div>
+        </div>
+        <div>
+          <div class="code">Important nuance:
+
+The reasoner usually does NOT need to emit
+an explicit final text answer first.
+
+Instead, what matters most is its hidden
+representation / token context.
+
+The generator attends to that context
+repeatedly across diffusion steps.</div>
+        </div>
+      </div>
+      <div class="grid g2 section">
+        <div class="box reasoner-box">
+          <h3>What the Reasoner provides</h3>
+          <ul>
+            <li>object identities</li>
+            <li>scene layout and spatial relations</li>
+            <li>task / intent understanding</li>
+            <li>temporal history from observed frames</li>
+            <li>high-level physical plausibility cues</li>
+          </ul>
+        </div>
+        <div class="box generator-box">
+          <h3>How the Generator uses it</h3>
+          <ul>
+            <li>reads the same context while denoising noisy target tokens</li>
+            <li>uses it again at the next denoise step</li>
+            <li>keeps object identity and motion more consistent</li>
+            <li>aligns generation with the original goal and observations</li>
+          </ul>
+        </div>
+      </div>
+      <div class="code section">Simple pseudocode:
+
+C = Reasoner(prompt, observed_frames, actions, ...)
+x_T = noise
+
+for t in range(T, 0, -1):
+    x_t = Generator(x_t, timestep=t, context=C)
+
+return x_0</div>
+      <p class="caption">
+        In practice, whether the reasoner context is recomputed every denoise step or cached/reused is an implementation detail.
+        The conceptual behavior is that the generator is conditioned on the reasoner context at every denoising step.
+      </p>
+    </section>
+
+
+    <section class="card section">
+      <h2>11b) Visual: generation inference mental model</h2>
+      <p>
+        This diagram shows the core idea visually: the reasoner first builds a stable hidden context,
+        and the generator then reuses that same context while denoising from <span class="em">x<sub>T</sub></span>
+        down to <span class="em">x<sub>0</sub></span>.
+      </p>
+      <div class="inference-visual section">
+        <div class="pipeline">
+          <div class="stage">
+            <h3>Input context</h3>
+            <div class="token-row">
+              <div class="token obs">Prompt</div>
+              <div class="token obs">Obs frame</div>
+              <div class="token obs">Video history</div>
+              <div class="token obs">Action history</div>
+            </div>
+          </div>
+          <div class="down-arrow">↓</div>
+          <div class="stage reasoner-stage">
+            <h3>Reasoner pass</h3>
+            <p class="mini">Build hidden context <span class="em">C</span>:</p>
+            <div class="token-row">
+              <div class="token rtok">objects</div>
+              <div class="token rtok">layout</div>
+              <div class="token rtok">goal</div>
+              <div class="token rtok">history</div>
+              <div class="token rtok">physics cues</div>
+            </div>
+          </div>
+          <div class="down-arrow">↓</div>
+          <div class="loop-wrap">
+            <div class="stage generator-stage">
+              <h3>Generator denoising loop</h3>
+              <p class="mini">Start from noisy target latents and denoise step by step while attending to context <span class="em">C</span>.</p>
+              <div class="denoise-steps">
+                <div class="mini-step">
+                  <b>Step t = T</b>
+                  <p class="small">Input: <span class="em">x<sub>T</sub></span> (very noisy)</p>
+                  <p class="small">Read context <span class="em">C</span></p>
+                  <p class="small">Output: coarse structure</p>
+                </div>
+                <div class="mini-step">
+                  <b>Step t = T-1</b>
+                  <p class="small">Input: less noisy latents</p>
+                  <p class="small">Read context <span class="em">C</span> again</p>
+                  <p class="small">Output: better objects / motion</p>
+                </div>
+                <div class="mini-step">
+                  <b>... repeat ...</b>
+                  <p class="small">Each step reuses the same reasoner context</p>
+                  <p class="small">Noise → structure → coherent output</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="down-arrow">↓</div>
+          <div class="stage output-stage">
+            <h3>Final result</h3>
+            <p class="mini">Generated video / image / audio / action rollout <span class="em">x<sub>0</sub></span></p>
+          </div>
+        </div>
+        <div class="reuse-col">
+          <h3>Context reuse view</h3>
+          <div class="reuse-chip"><b>Context C</b><br><span class="small">Produced by Reasoner once conceptually from the input context</span></div>
+          <div class="reuse-arrow">↘</div>
+          <div class="reuse-chip"><b>Denoise step T</b><br><span class="small">Generator attends to C</span></div>
+          <div class="reuse-arrow">↘</div>
+          <div class="reuse-chip"><b>Denoise step T-1</b><br><span class="small">Generator attends to C again</span></div>
+          <div class="reuse-arrow">↘</div>
+          <div class="reuse-chip"><b>Denoise step T-2</b><br><span class="small">Generator attends to C again</span></div>
+          <div class="reuse-arrow">↘</div>
+          <div class="reuse-chip"><b>...</b><br><span class="small">Same conditioning idea across the whole denoising chain</span></div>
+          <p class="caption">Implementation detail: a runtime may cache this context rather than recomputing it every step.</p>
+        </div>
+      </div>
+      <div class="code section">Compact pseudocode:
+
+C = Reasoner(prompt, observed_frames, actions, ...)
+x_T = noise
+
+for t in range(T, 0, -1):
+    x_{t-1} = Generator(x_t, timestep=t, context=C)
+
+return x_0</div>
+    </section>
+
+    <section class="card section">
+      <h2>10) One-sentence summary</h2>
+      <div class="code">The Generator keeps generation physically and semantically consistent by repeatedly attending to the Reasoner’s hidden token context during every transformer layer and diffusion denoising step.</div>
+      <p class="footer">
+        This visualization is a simplified explanatory view based on the previously discussed Cosmos 3 model description,
+        where the reasoner provides context and the generator uses that context for guided diffusion generation.
+      </p>
+    </section>
+  </div>
+</body>
+</html>
