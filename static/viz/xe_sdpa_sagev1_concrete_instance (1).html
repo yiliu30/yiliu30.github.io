@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Xe SDPA Forward Mainloop — Key Loops and Shapes</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #111a2e;
+    --panel-2: #16213a;
+    --ink: #eaf1ff;
+    --muted: #9fb0cc;
+    --accent: #8cc8ff;
+    --accent-2: #a9f3d0;
+    --accent-3: #ffd08a;
+    --accent-4: #f7a7c4;
+    --line: rgba(255,255,255,0.14);
+    --code: #0d1426;
+    --good: #b5f6cb;
+    --warn: #ffe29a;
+    --shadow: 0 18px 45px rgba(0,0,0,.25);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 10% 10%, rgba(140,200,255,.18), transparent 30%),
+      radial-gradient(circle at 88% 0%, rgba(169,243,208,.14), transparent 28%),
+      linear-gradient(180deg, #08101f, var(--bg) 36%, #070b14 100%);
+    line-height: 1.45;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 32px 22px 64px; }
+  .hero {
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, rgba(17,26,46,.92), rgba(22,33,58,.78));
+    border-radius: 28px;
+    padding: 34px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: relative;
+  }
+  .hero:after {
+    content: "";
+    position: absolute;
+    right: -80px; top: -80px;
+    width: 280px; height: 280px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(140,200,255,.25), transparent 65%);
+  }
+  h1 { margin: 0 0 10px; font-size: clamp(30px, 4vw, 54px); letter-spacing: -0.04em; line-height: 1.02; }
+  h2 { font-size: 26px; letter-spacing: -.02em; margin: 36px 0 16px; }
+  h3 { font-size: 18px; margin: 0 0 10px; }
+  p { color: var(--muted); margin: 8px 0; }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .pill {
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.055);
+    padding: 8px 11px;
+    border-radius: 999px;
+    color: var(--ink);
+    font-size: 13px;
+  }
+  .grid { display: grid; gap: 18px; }
+  .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; } .hero { padding: 24px; } }
+  .card {
+    border: 1px solid var(--line);
+    background: rgba(17,26,46,.78);
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.16);
+  }
+  .card.light { background: rgba(255,255,255,.045); }
+  .note { border-left: 4px solid var(--accent); padding-left: 14px; color: var(--muted); }
+  .shape {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 92px; min-height: 34px;
+    padding: 6px 10px; border-radius: 10px;
+    background: rgba(140,200,255,.13);
+    border: 1px solid rgba(140,200,255,.35);
+    color: #dff1ff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  .shape.green { background: rgba(169,243,208,.12); border-color: rgba(169,243,208,.35); color: #ddffeb; }
+  .shape.yellow { background: rgba(255,208,138,.12); border-color: rgba(255,208,138,.35); color: #fff0d2; }
+  .shape.pink { background: rgba(247,167,196,.12); border-color: rgba(247,167,196,.35); color: #ffe5ef; }
+  .arrow { color: var(--muted); font-size: 24px; display: flex; align-items: center; justify-content: center; }
+  .flow-row {
+    display: grid; grid-template-columns: 1fr 46px 1fr 46px 1fr;
+    gap: 12px; align-items: stretch;
+  }
+  @media (max-width: 900px) { .flow-row { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); } }
+  .stage {
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    border-radius: 18px;
+    padding: 16px;
+    min-height: 126px;
+  }
+  .stage .num {
+    width: 28px; height: 28px; border-radius: 999px;
+    background: rgba(140,200,255,.2); border: 1px solid rgba(140,200,255,.4);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; margin-bottom: 10px;
+  }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  pre {
+    margin: 0; white-space: pre-wrap; background: var(--code); border: 1px solid var(--line);
+    padding: 18px; border-radius: 18px; overflow-x: auto; color: #d9e8ff;
+  }
+  .tiny { font-size: 12px; color: var(--muted); }
+  .table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px; }
+  .table th, .table td { border-bottom: 1px solid var(--line); padding: 12px 10px; text-align: left; vertical-align: top; }
+  .table th { color: var(--ink); background: rgba(255,255,255,.06); }
+  .table td { color: var(--muted); }
+  .loop-visual {
+    display: grid; grid-template-columns: 250px 1fr; gap: 20px; align-items: start;
+  }
+  @media (max-width: 980px) { .loop-visual { grid-template-columns: 1fr; } }
+  .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+  @media (max-width: 800px) { .controls { grid-template-columns: 1fr 1fr; } }
+  .control {
+    border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 14px; padding: 12px;
+  }
+  .control label { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  input[type=range] { width: 100%; }
+  .matrix {
+    display: grid;
+    gap: 6px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(0,0,0,.13);
+  }
+  .tile {
+    border: 1px solid rgba(255,255,255,.2);
+    background: rgba(140,200,255,.13);
+    border-radius: 10px;
+    min-height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; color: #dff1ff;
+  }
+  .tile.k { background: rgba(169,243,208,.12); border-color: rgba(169,243,208,.35); color: #ddffeb; }
+  .tile.v { background: rgba(255,208,138,.12); border-color: rgba(255,208,138,.35); color: #fff0d2; }
+  .tile.p { background: rgba(247,167,196,.12); border-color: rgba(247,167,196,.35); color: #ffe5ef; }
+  .tile.dimmed { opacity: .45; }
+  .lane { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kblock {
+    min-width: 82px;
+    border: 1px solid rgba(169,243,208,.38);
+    border-radius: 16px;
+    padding: 10px;
+    background: rgba(169,243,208,.09);
+  }
+  .kblock strong { display: block; color: #ddffeb; margin-bottom: 8px; }
+  .d-slices { display: grid; gap: 4px; }
+  .d-slice {
+    height: 22px; border-radius: 7px; background: rgba(169,243,208,.2);
+    border: 1px solid rgba(169,243,208,.28);
+    font-size: 11px; display: flex; align-items: center; justify-content: center;
+    color: #e8fff2;
+  }
+  .timeline { display: grid; gap: 10px; }
+  .time-row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; }
+  .time-label { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px; border-radius: 14px; background: rgba(255,255,255,.035); border: 1px solid var(--line);
+  }
+  .tag { padding: 6px 9px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.055); }
+  .tag.compute { border-color: rgba(140,200,255,.4); color: #dff1ff; }
+  .tag.prefetch { border-color: rgba(169,243,208,.4); color: #ddffeb; }
+  .tag.v { border-color: rgba(255,208,138,.45); color: #fff0d2; }
+  .big-equation {
+    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    padding: 18px; border-radius: 18px; background: rgba(255,255,255,.035); border: 1px solid var(--line);
+  }
+
+  .stage.source-step {
+    padding: 0;
+    overflow: hidden;
+  }
+  .stage.source-step .step-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 0;
+  }
+  .stage.source-step .step-body {
+    display: grid;
+    grid-template-columns: minmax(230px, .86fr) minmax(310px, 1.14fr);
+    gap: 14px;
+    padding: 12px 16px 16px;
+  }
+  @media (max-width: 980px) {
+    .stage.source-step .step-body { grid-template-columns: 1fr; }
+  }
+  .shape-pane {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 13px;
+    background: rgba(255,255,255,.035);
+  }
+  .source-pane { min-width: 0; }
+  .source-pane .src-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 0 0 6px;
+  }
+  .source-pane pre {
+    padding: 12px;
+    border-radius: 14px;
+    font-size: 11.5px;
+    line-height: 1.42;
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre;
+  }
+  .source-note {
+    margin: 0 0 12px;
+    color: var(--muted);
+  }
+
+
+  .skeleton-map{display:grid;grid-template-columns:1fr;gap:18px;align-items:stretch}
+  @media(max-width:980px){.skeleton-map{grid-template-columns:1fr}}
+  .tree-card{border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:20px;padding:18px}
+  .tree-title{color:var(--ink);font-weight:700;margin:0 0 12px}
+  .tree{display:grid;gap:10px}
+  .tree-node{border:1px solid var(--line);background:rgba(13,20,38,.62);border-radius:14px;padding:12px 13px}
+  .tree-node strong{color:var(--ink);display:block;margin-bottom:4px}
+  .tree-node span{color:var(--muted);font-size:13px}
+  .tree-node.l1{margin-left:22px;border-color:rgba(140,200,255,.32)}
+  .tree-node.l2{margin-left:48px;border-color:rgba(169,243,208,.30)}
+  .tree-node.l3{margin-left:74px;border-color:rgba(255,208,138,.30)}
+  .tree-node.hot{background:linear-gradient(135deg,rgba(140,200,255,.13),rgba(247,167,196,.08));border-color:rgba(140,200,255,.46)}
+  .operator-flow{display:grid;gap:12px}
+  .flow-step{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;border:1px solid var(--line);background:rgba(13,20,38,.62);border-radius:16px;padding:13px}
+  .flow-step .bubble{width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:rgba(140,200,255,.2);border:1px solid rgba(140,200,255,.42);color:#dff1ff;font-weight:700;font-size:13px}
+  .flow-step h4{margin:0 0 5px;font-size:15px;color:var(--ink)}
+  .flow-step p{margin:0;font-size:13px}
+  .mini-pipeline{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .mini-pipeline .mini{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:rgba(255,255,255,.05);color:var(--muted);font-size:12px}
+  .mini-pipeline .main{color:#dff1ff;border-color:rgba(140,200,255,.42);background:rgba(140,200,255,.12)}
+  .file-skeleton-svg{width:100%;height:auto;display:block;margin-top:16px;border:1px solid var(--line);border-radius:20px;background:rgba(0,0,0,.11)}
+
+  .runtime-source-grid {
+    display: grid;
+    gap: 12px;
+  }
+  .source-flow-step {
+    display: grid;
+    grid-template-columns: 34px minmax(160px, .72fr) minmax(260px, 1.28fr);
+    gap: 12px;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    background: rgba(13,20,38,.62);
+    border-radius: 16px;
+    padding: 13px;
+  }
+  @media (max-width: 980px) {
+    .source-flow-step { grid-template-columns: 34px 1fr; }
+    .source-flow-step .source-code-side { grid-column: 1 / -1; }
+  }
+  .source-flow-step .bubble {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(140,200,255,.2);
+    border: 1px solid rgba(140,200,255,.42);
+    color: #dff1ff;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .source-flow-step h4 {
+    margin: 0 0 5px;
+    font-size: 15px;
+    color: var(--ink);
+  }
+  .source-flow-step p {
+    margin: 0;
+    font-size: 13px;
+  }
+  .source-code-side pre {
+    padding: 11px 12px;
+    border-radius: 13px;
+    font-size: 11px;
+    line-height: 1.38;
+    max-height: 172px;
+    overflow: auto;
+    white-space: pre;
+    background: rgba(7,11,20,.92);
+  }
+
+  .mainloop-source-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .mainloop-source-list .stage.source-step {
+    width: 100%;
+  }
+
+  .source-code-side .src-label {
+    color: var(--muted);
+    font-size: 11.5px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+
+
+  .example-board {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  @media (max-width: 980px) {
+    .example-board { grid-template-columns: 1fr; }
+  }
+  .example-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .example-table th,
+  .example-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 10px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .example-table th {
+    color: var(--ink);
+    font-weight: 700;
+    background: rgba(255,255,255,.035);
+  }
+  .example-table td code {
+    white-space: nowrap;
+  }
+  .flow-chain {
+    display: grid;
+    gap: 9px;
+  }
+  .chain-item {
+    border: 1px solid var(--line);
+    background: rgba(13,20,38,.62);
+    border-radius: 14px;
+    padding: 11px 12px;
+  }
+  .chain-item strong {
+    display: block;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .chain-item span {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .count-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 980px) {
+    .count-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .count-grid { grid-template-columns: 1fr; }
+  }
+  .count-card {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255,255,255,.045);
+  }
+  .count-card .num {
+    font-size: 28px;
+    line-height: 1;
+    color: var(--ink);
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .count-card .label {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .loop-diagram {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 16px;
+    background: rgba(0,0,0,.12);
+  }
+  .loop-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 10px;
+    align-items: center;
+    margin: 9px 0;
+  }
+  .loop-label {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .loop-cells {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .loop-cell {
+    border: 1px solid rgba(140,200,255,.35);
+    background: rgba(140,200,255,.11);
+    color: #dff1ff;
+    border-radius: 10px;
+    padding: 8px 9px;
+    font-size: 12px;
+  }
+  .loop-cell.green {
+    border-color: rgba(169,243,208,.32);
+    background: rgba(169,243,208,.10);
+  }
+  .loop-cell.yellow {
+    border-color: rgba(255,208,138,.32);
+    background: rgba(255,208,138,.10);
+  }
+
+  .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Xe SDPA Forward Mainloop<br/>Key Loops + Shapes</h1>
+      <p>Scope: simplified <b>non-KV-cache</b> and <b>non-paged</b> path. The kernel streams K/V blocks, keeps score/probability tiles in register fragments, and updates online softmax state across K blocks.</p>
+      <div class="pill-row">
+        <span class="pill">Q: [Sq, D]</span>
+        <span class="pill">K: [Sk, D]</span>
+        <span class="pill">V storage: [Dv, Sk]</span>
+        <span class="pill">S / P tile: [BQ, BK]</span>
+        <span class="pill">O split: [BQ, BV]</span>
+      </div>
+    </section>
+
+
+
+    <section>
+      <h2>Accuracy notes</h2>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>Scope</h3>
+          <p>The loop and shape sections intentionally use the <b>non-cache, non-paged</b> mental model. Optional cache and paged-KV fields are only shown in the whole-file skeleton.</p>
+        </div>
+        <div class="card">
+          <h3>Dispatch policy</h3>
+          <p>The actual policy tag is <code>XeDefault&lt;Stages&gt;</code>. <code>VTiles</code> is a separate template parameter of the mainloop specialization.</p>
+        </div>
+        <div class="card">
+          <h3>QK notation</h3>
+          <p>The source comment says <code>S = K * Q</code>. The diagrams use the logical attention-shape view <code>Q [BQ,BD] × Kᵀ [BD,BK] → S [BQ,BK]</code>.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <section>
+      <h2>Whole-file high-level skeleton</h2>
+      <p class="note">This map shows how the header is organized. The static file structure is shown first; the runtime skeleton with key source-code excerpts is shown after it.</p>
+
+      <div class="skeleton-map">
+        <div class="tree-card">
+          <h3 class="tree-title">Static structure of <code>xe_sdpa_fwd_mainloop.hpp</code></h3>
+          <div class="tree">
+            <div class="tree-node"><strong>1. Includes + namespaces</strong><span>Pulls in CUTLASS/CUTE GEMM, subgroup, and MMA helpers, then opens the SDPA and FMHA collective namespaces.</span></div>
+            <div class="tree-node l1"><strong>2. Dispatch policy: <code>XeDefault&lt;Stages&gt;</code></strong><span>Compile-time tag selecting the Intel Xe SDPA forward mainloop implementation.</span></div>
+            <div class="tree-node l1"><strong>3. Generic fallback template</strong><span><code>SDPAFwdMainloop&lt;...&gt;</code> default version only contains a compile-time “no specialization found” assertion.</span></div>
+            <div class="tree-node l1 hot"><strong>4. XeDefault specialization</strong><span>The real implementation. Most of the file lives inside this specialization.</span></div>
+            <div class="tree-node l2"><strong>4.1 Type aliases + compile-time flags</strong><span>Tile shapes, copy policies, MMA layouts, tensor element types, <code>CausalMask</code>, <code>CachedKV</code>, <code>PagedKV</code>, and <code>VTiles</code>.</span></div>
+            <div class="tree-node l2"><strong>4.2 Fragment / accumulator types</strong><span><code>FragS</code> for QK score tile, <code>FragA</code> for PV output accumulator, row fragments for online softmax.</span></div>
+            <div class="tree-node l2"><strong>4.3 Runtime args / params</strong><span><code>scale</code>, optional mask, optional page-table metadata. <code>to_underlying_arguments()</code> converts scale for <code>exp2</code>.</span></div>
+            <div class="tree-node l2"><strong>4.4 Helpers</strong><span><code>can_implement()</code>, optional <code>get_physical_k_tile()</code> for paged KV, and constructor wiring.</span></div>
+            <div class="tree-node l2 hot"><strong>4.5 <code>operator()</code></strong><span>Main execution path: builds tiled tensor views, copy/MMA objects, register fragments, prefetch objects, and launches K-block loops.</span></div>
+            <div class="tree-node l3 hot"><strong><code>mainloop_body</code> lambda</strong><span>Processes one K block: QK → V prefetch → mask → softmax → PV → future-K prefetch.</span></div>
+            <div class="tree-node l2"><strong>4.6 <code>softmax()</code> helper</strong><span>Blocked online softmax: row max, rescale, exp2, row sum update.</span></div>
+          </div>
+        </div>
+
+        <div class="tree-card">
+          <h3 class="tree-title">Runtime skeleton + key source code</h3>
+          <p class="source-note">Right-side snippets are shortened study excerpts. They show where each high-level skeleton piece appears in the file, while omitting cache/paged branches and some template details.</p>
+
+          <div class="runtime-source-grid">
+            <div class="source-flow-step">
+              <span class="bubble">1</span>
+              <div>
+                <h4>Dispatch policy + fallback</h4>
+                <p>Policy tag selects the Xe implementation. Generic template fails if no matching specialization exists.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>compile-time dispatch</span></div>
+                <pre>template &lt;int Stages&gt;
+class XeDefault {};
+
+template &lt;class DispatchPolicy, ...&gt;
+struct SDPAFwdMainloop {
+  static_assert(...,
+    &quot;Could not find a mainloop specialization.&quot;);
+};</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">2</span>
+              <div>
+                <h4>XeDefault specialization</h4>
+                <p>The real implementation is the large specialization parameterized by masks, cache mode, MMA policies, tensor types, copy policies, and VTiles.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>main struct</span></div>
+                <pre>template &lt;int Stages, bool FullMask_, bool CausalMask_,
+          bool CachedKV_, bool PagedKV_, class TiledMMAQK_, ...&gt;
+struct SDPAFwdMainloop&lt;
+    sdpa::XeDefault&lt;Stages&gt;,
+    CausalMask_, FullMask_, CachedKV_, PagedKV_,
+    TiledMMAQK_, TiledMMAPV_, VTiles_, ...&gt; {
+  ...
+};</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">3</span>
+              <div>
+                <h4>Type aliases + fragments</h4>
+                <p>Compile-time tile shapes and register fragments are defined before runtime execution.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>types / fragments</span></div>
+                <pre>using TileShapeQK = decltype(TiledMMAQK{}.tile_mnk());
+using TileShapePV = decltype(TiledMMAPV{}.tile_mnk());
+
+using FragS    = ...;  // QK score tile
+using FragSRow = ...;  // row max/sum state
+using FragA    = ...;  // PV output accumulator</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">4</span>
+              <div>
+                <h4>Arguments / params</h4>
+                <p>Runtime arguments carry scale, optional full mask, and optional paged-KV metadata. Scale is converted for <code>exp2</code>.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>runtime args</span></div>
+                <pre>struct Arguments {
+  ElementS const scale;
+  ElementM const* mask = nullptr;
+  int const* ptr_page_table = nullptr;
+  int page_size = 0;
+  int const* num_pages_per_seq = nullptr;
+};
+
+static Params to_underlying_arguments(Arguments const&amp; args) {
+  Params params = args;
+  params.scale *= log2(e);   // softmax uses exp2()
+  return params;
+}</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">5</span>
+              <div>
+                <h4><code>operator()</code> setup</h4>
+                <p>Builds coordinate tensors, local tiles, copy objects, MMA objects, and thread-local fragments.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>operator setup</span></div>
+                <pre>Tensor cQ = make_identity_tensor(Q_2D.shape());
+Tensor cK = make_identity_tensor(K_2D.shape());
+Tensor cV = make_identity_tensor(V_2D.shape());
+Tensor cP = make_identity_tensor(...);  // (q,k)
+
+Tensor gQ = local_tile(Q_2D, tile_shape_q, ...);
+Tensor gK = local_tile(K_2D, tile_shape_k, ...);
+Tensor gV_split = local_tile(V_2D, tile_shape_v, ...);
+
+TiledCopyQ copy_q{Q_2D};
+TiledCopyK copy_k{K_2D};
+TiledCopyV copy_v{V_2D};
+TiledMMAQK mma_qk{};
+TiledMMAPV mma_pv{};</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">6</span>
+              <div>
+                <h4>Startup prefetch + init</h4>
+                <p>Prefetch Q and first <code>Stages</code> K blocks, then initialize O accumulator and online-softmax row state for the first block.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>before K loop</span></div>
+                <pre>int kblocks_cache = ceil_div(seq_len_kv_cache, get&lt;1&gt;(TileShapeQK{}));
+
+prefetch(prefetch_q, pQgQ(...));
+
+for (int D = 0; D &lt; size&lt;4&gt;(pKgK); D++) {
+  for (int K = 0; K &lt; Stages; K++) {
+    // non-cache path: kblocks_cache == 0, so this is normal K
+    prefetch(prefetch_k, pKgK(_, _, _, K, D));
+  }
+}
+
+if (blk_k0 == 0) {
+  clear(tArA);
+  fill(tA_max, -INFINITY);
+  clear(tA_sum);
+}</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">7</span>
+              <div>
+                <h4><code>mainloop_body(K)</code></h4>
+                <p>One call handles one K block: QK, V prefetch, masks, softmax, PV, and future-K prefetch.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>one K block</span></div>
+                <pre>auto mainloop_body = [&amp;](auto is_cache, int K, ...) {
+  /* GEMM 1: S = K * Q */
+  // logical shape view: Q[BQ,BD] x K^T[BD,BK]
+  clear(tSrS);
+  for (int D = 0; D &lt; size&lt;4&gt;(tKgK); D++) {
+    copy(... Q ..., tQrQ);
+    copy(... K ..., tKrK);
+    reorder(tQrQ, tSrQ);
+    reorder(tKrK, tSrK);
+    cute::gemm(mma_qk, tSrQ, tSrK, tSrS);
+  }
+
+  // mask + softmax
+  ...
+  auto rescale = softmax(K == blk_k0, tSrS, tA_max, tA_sum);
+  reorder(tSrS, tArP);
+
+  // GEMM 2: A += P * V
+  for (int VV = 0; VV &lt; VTiles; VV++) {
+    copy(... V ..., tVrV);
+    reorder(tVrV, tArV);
+    cute::gemm(mma_pv, tArP, tArV, tArA(_,_,_,VV));
+  }
+};</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">8</span>
+              <div>
+                <h4>Outer K-block loop</h4>
+                <p>Ignoring cache/paged mode, this loop repeatedly calls <code>mainloop_body</code> for normal K blocks.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>stream K blocks</span></div>
+                <pre>for (int K = max(blk_k0, kblocks_cache);
+     K &lt; blk_k1; K++) {
+  mainloop_body(cute::false_type{}, K,
+                copy_k, copy_v,
+                ...);
+}</pre>
+              </div>
+            </div>
+
+            <div class="source-flow-step">
+              <span class="bubble">9</span>
+              <div>
+                <h4><code>softmax()</code> helper</h4>
+                <p>Updates online row max/sum and returns <code>rescale [BQ]</code> for previous O accumulator correction.</p>
+              </div>
+              <div class="source-code-side">
+                <div class="src-label"><span>Source skeleton</span><span>online softmax</span></div>
+                <pre>FragSRow softmax(bool first_block,
+                 FragS&amp; tS,
+                 FragSRow&amp; tS_max,
+                 FragSRow&amp; tS_sum) {
+  auto tS_bmax = reduce&lt;1&gt;(tS, sycl::maximum{});
+
+  // new max, rescale old max/sum
+  tS_max(i) = max(tS_max(i), params.scale * tS_bmax(i));
+  rescale(i) = exp2(old_max - tS_max(i));
+
+  // convert score tile into exp/softmax numerator
+  tS(i) = sycl::native::exp2(params.scale * tS(i) - tS_max(...));
+
+  auto tS_bsum = reduce&lt;1&gt;(tS, sycl::plus{});
+  if (!first_block) tS_sum(i) *= rescale(i);
+  tS_sum(i) += tS_bsum(i);
+  return rescale;
+}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-pipeline">
+            <span class="mini">policy</span>
+            <span class="mini">specialization</span>
+            <span class="mini">types</span>
+            <span class="mini main">operator()</span>
+            <span class="mini main">mainloop_body(K)</span>
+            <span class="mini main">softmax()</span>
+            <span class="mini">outer K loop</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <section>
+      <h2>SageV1 concrete instance: head_dim=128, seq_q=512, seq_k=512</h2>
+      <p class="note">This section connects the launcher dispatch, instantiated tile shapes, and actual loop counts for the SageV1 prefill path. Assumption: non-varlen, non-cache, non-paged prefill with <code>head_size_qk = head_size_vo = 128</code>.</p>
+
+      <div class="example-board">
+        <div class="card">
+          <h3>Who decides the instantiated mainloop?</h3>
+          <div class="flow-chain">
+            <div class="chain-item"><strong>1. Public entry</strong><span><code>sage_prefill(...)</code> builds <code>Options</code>, including dtype, PV dtype, head_dim, causal flag, scale pointers, and <code>use_int8_pv</code>.</span></div>
+            <div class="chain-item"><strong>2. Launcher selection</strong><span><code>select_sage_prefill_launcher(q_dtype, pv_dtype, head_dim, use_int8_pv)</code> chooses the 64- or 128-head-dim launcher. For <code>head_dim=128</code>, it selects a <code>*_128_sage</code> launcher.</span></div>
+            <div class="chain-item"><strong>3. Tile-shape definition</strong><span><code>launch_sage_prefill_kernel_128</code> defines <code>ShapeQK</code>, <code>ShapePV</code>, <code>ShapeOut</code>, <code>SubgroupLayoutQK</code>, and <code>PipelineStages</code>.</span></div>
+            <div class="chain-item"><strong>4. SageConfig</strong><span><code>SageConfig</code> builds <code>TiledMMAQK</code> / <code>TiledMMAPV</code>, derives <code>VTiles</code>, and instantiates <code>SAGEV1FwdMainloop</code>.</span></div>
+            <div class="chain-item"><strong>5. Runtime variant</strong><span><code>SageConfig::run(options)</code> selects varlen/cache/paged/scheduler template parameters. In this example: <code>isVarLen=false</code>, <code>CachedKV=false</code>, <code>PagedKV=false</code>.</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Key source skeleton</h3>
+          <pre>KernelLauncher launcher =
+  select_sage_prefill_launcher(q_dtype, pv_dtype,
+                               head_dim, use_int8_pv);
+
+inline int launch_sage_prefill_kernel_128(...) {
+  constexpr int PipelineStages = 2;
+
+  using ShapeQK  = Shape&lt;_256, _64, _32&gt;;
+  using ShapePV  = Shape&lt;_256, _32, _64&gt;;
+  using ShapeOut = Shape&lt;_256, _128&gt;;
+  using SubgroupLayoutQK = Layout&lt;Shape&lt;_16, _1, _1&gt;&gt;;
+
+  return options.is_causal
+    ? SageConfig&lt;true,  ..., ShapeQK, ShapePV, ShapeOut, ...&gt;::run(options)
+    : SageConfig&lt;false, ..., ShapeQK, ShapePV, ShapeOut, ...&gt;::run(options);
+}
+
+constexpr int VTiles =
+  get&lt;1&gt;(ShapeOut{}) / get&lt;1&gt;(ShapePV{});  // 128 / 32 = 4
+
+using MainloopDispatchPolicy =
+  cutlass::sage::XeDefault&lt;PipelineStages&gt;;
+
+using CollectiveMainloop =
+  SAGEV1FwdMainloop&lt;MainloopDispatchPolicy, ..., TiledMMAQK,
+                    TiledMMAPV, VTiles, ...&gt;;</pre>
+        </div>
+      </div>
+
+      <div class="grid cols-3" style="margin-top:18px">
+        <div class="card">
+          <h3>QK tile shape</h3>
+          <p><code>ShapeQK = Shape&lt;256, 64, 32&gt;</code></p>
+          <p class="tiny">GEMM order: <code>M,N,K</code>. Here <code>M=256</code> query rows, <code>N=64</code> key-token columns, and <code>K=32</code> head-dim reduction chunk.</p>
+        </div>
+        <div class="card">
+          <h3>PV tile shape</h3>
+          <p><code>ShapePV = Shape&lt;256, 32, 64&gt;</code></p>
+          <p class="tiny">GEMM order: <code>M,N,K</code>. Here <code>M=256</code> query rows, <code>N=32</code> output/value-dim split, and <code>K=64</code> key-token reduction.</p>
+        </div>
+        <div class="card">
+          <h3>Output tile shape</h3>
+          <p><code>ShapeOut = Shape&lt;256, 128&gt;</code></p>
+          <p class="tiny">One output tile covers <code>256</code> query rows and the full <code>128</code> V/O head dimension. Since PV covers only <code>32</code> output dims each time, <code>VTiles = 4</code>.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h3>Shape interpretation</h3>
+        <table class="example-table">
+          <thead>
+            <tr><th>Object</th><th>Meaning</th><th>Concrete operation</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>ShapeQK&lt;256,64,32&gt;</code></td>
+              <td>QK GEMM tile: <code>M=query</code>, <code>N=key</code>, <code>K=head dim chunk</code></td>
+              <td><code>Q [256,32] × Kᵀ [32,64]</code></td>
+              <td><code>S [256,64]</code></td>
+            </tr>
+            <tr>
+              <td><code>ShapePV&lt;256,32,64&gt;</code></td>
+              <td>PV GEMM tile: <code>M=query</code>, <code>N=output dim split</code>, <code>K=key</code></td>
+              <td><code>P [256,64] × V [64,32]</code></td>
+              <td><code>O_split [256,32]</code></td>
+            </tr>
+            <tr>
+              <td><code>ShapeOut&lt;256,128&gt;</code></td>
+              <td>Full output tile for one Q block</td>
+              <td><code>4 × O_split [256,32]</code></td>
+              <td><code>O [256,128]</code></td>
+            </tr>
+            <tr>
+              <td><code>PipelineStages = 2</code></td>
+              <td>K prefetch pipeline depth</td>
+              <td>Startup prefetches <code>K0,K1</code>; processing <code>Kx</code> prefetches <code>Kx+2</code></td>
+              <td>K pipeline stays two blocks ahead when in range</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:22px">Loop counts for seq_q=512, seq_k=512, head_dim=128</h3>
+      <div class="count-grid">
+        <div class="count-card"><div class="num">2</div><div class="label">Q blocks<br/><code>512 / 256</code></div></div>
+        <div class="count-card"><div class="num">8</div><div class="label">K blocks<br/><code>512 / 64</code></div></div>
+        <div class="count-card"><div class="num">4</div><div class="label">D-loop chunks per K block<br/><code>128 / 32</code></div></div>
+        <div class="count-card"><div class="num">4</div><div class="label">PV/VV loops per K block<br/><code>128 / 32</code></div></div>
+      </div>
+
+      <div class="example-board" style="margin-top:18px">
+        <div class="loop-diagram">
+          <h3>One Q block timeline</h3>
+          <div class="loop-row">
+            <div class="loop-label">Q tile</div>
+            <div class="loop-cells">
+              <span class="loop-cell">Q [256,128]</span>
+            </div>
+          </div>
+          <div class="loop-row">
+            <div class="loop-label">K stream</div>
+            <div class="loop-cells">
+              <span class="loop-cell green">K0 0:64</span>
+              <span class="loop-cell green">K1 64:128</span>
+              <span class="loop-cell green">K2 128:192</span>
+              <span class="loop-cell green">K3 192:256</span>
+              <span class="loop-cell green">K4 256:320</span>
+              <span class="loop-cell green">K5 320:384</span>
+              <span class="loop-cell green">K6 384:448</span>
+              <span class="loop-cell green">K7 448:512</span>
+            </div>
+          </div>
+          <div class="loop-row">
+            <div class="loop-label">Per K block</div>
+            <div class="loop-cells">
+              <span class="loop-cell">4 × QK D-loop</span>
+              <span class="loop-cell yellow">S/P [256,64]</span>
+              <span class="loop-cell">4 × PV VV-loop</span>
+              <span class="loop-cell yellow">O update [256,128]</span>
+            </div>
+          </div>
+          <div class="loop-row">
+            <div class="loop-label">Prefetch</div>
+            <div class="loop-cells">
+              <span class="loop-cell">startup: K0,K1</span>
+              <span class="loop-cell">K0 → prefetch K2</span>
+              <span class="loop-cell">K1 → prefetch K3</span>
+              <span class="loop-cell">...</span>
+              <span class="loop-cell">K5 → prefetch K7</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Operation counts</h3>
+          <table class="example-table">
+            <thead><tr><th>Scope</th><th>QK MMA tiles</th><th>PV MMA tiles</th><th>Softmax tiles</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>One K block inside one Q block</td>
+                <td><code>4</code></td>
+                <td><code>4</code></td>
+                <td><code>1 × [256,64]</code></td>
+              </tr>
+              <tr>
+                <td>One Q block</td>
+                <td><code>8 K blocks × 4 = 32</code></td>
+                <td><code>8 K blocks × 4 = 32</code></td>
+                <td><code>8</code></td>
+              </tr>
+              <tr>
+                <td>Full sequence per batch/head</td>
+                <td><code>2 Q blocks × 32 = 64</code></td>
+                <td><code>2 Q blocks × 32 = 64</code></td>
+                <td><code>2 × 8 = 16</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="tiny" style="margin-top:12px">These counts are conceptual tile-level counts for the selected mainloop shape. Actual issued hardware instructions are further determined by <code>TiledMMAHelper</code>, MMA atom, subgroup layout, and compiler lowering.</p>
+        </div>
+      </div>
+
+      <div class="card light" style="margin-top:18px">
+        <h3>Compact summary</h3>
+        <pre>SageV1 prefill, head_dim=128, seq_q=512, seq_k=512:
+
+Selected launcher:
+  launch_sage_prefill_kernel_128
+
+Instantiated compile-time shapes:
+  ShapeQK  = Shape&lt;256, 64, 32&gt;   // QK GEMM: M=query, N=key, K=head-dim chunk
+  ShapePV  = Shape&lt;256, 32, 64&gt;   // PV GEMM: M=query, N=value/output split, K=key
+  ShapeOut = Shape&lt;256, 128&gt;      // output tile
+  Stages   = 2
+  VTiles   = 128 / 32 = 4
+
+Loop counts:
+  Q blocks = 512 / 256 = 2
+  K blocks = 512 / 64  = 8
+  D loops  = 128 / 32  = 4 per K block
+  VV loops = 128 / 32  = 4 per K block
+
+Per Q block:
+  8 K blocks
+  32 QK MMA tiles
+  32 PV MMA tiles
+  8 softmax tiles [256,64]
+
+Full sequence per batch/head:
+  64 QK MMA tiles
+  64 PV MMA tiles
+  16 softmax tiles [256,64]</pre>
+      </div>
+    </section>
+
+
+    <section>
+      <h2>Shape legend</h2>
+      <div class="grid cols-4">
+        <div class="card"><h3>Sequence dims</h3><p><b>Sq</b>: query length<br/><b>Sk</b>: key/value length</p></div>
+        <div class="card"><h3>Head dims</h3><p><b>D</b>: Q/K head dim<br/><b>Dv</b>: V/output head dim</p></div>
+        <div class="card"><h3>Tile dims</h3><p><b>BQ</b>: Q tile rows<br/><b>BK</b>: K tile rows<br/><b>BD</b>: inner D slice<br/><b>BV</b>: V split width</p></div>
+        <div class="card"><h3>Loop knobs</h3><p><b>Stages</b>: prefetched future K blocks<br/><b>VTiles</b>: V/output head-dim splits</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>One outer K-block iteration</h2>
+      <div class="big-equation">
+        <span class="shape">Q [BQ, D]</span>
+        <span>×</span>
+        <span class="shape green">Kᵀ [D, BK]</span>
+        <span>→</span>
+        <span class="shape pink">S/P [BQ, BK]</span>
+        <span>×</span>
+        <span class="shape yellow">V [BK, BV]</span>
+        <span>→</span>
+        <span class="shape">O [BQ, BV]</span>
+      </div>
+      <p class="note">The full attention matrix is not materialized. Each K block produces one score/probability tile <code>[BQ, BK]</code>, which is immediately consumed by the PV GEMM.</p>
+    </section>
+
+    <section>
+      <h2>Interactive prefetch view</h2>
+      <div class="card light">
+        <p>The startup prefetch covers the first <b>Stages</b> K blocks. For each prefetched K block, it walks all D/head-dim slices.</p>
+        <div class="controls">
+          <div class="control"><label>Stages <b id="stagesVal">3</b></label><input id="stages" type="range" min="1" max="5" value="3" /></div>
+          <div class="control"><label>D tiles <b id="dtilesVal">4</b></label><input id="dtiles" type="range" min="1" max="8" value="4" /></div>
+          <div class="control"><label>VTiles <b id="vtilesVal">4</b></label><input id="vtiles" type="range" min="1" max="6" value="4" /></div>
+          <div class="control"><label>K timeline rows <b id="rowsVal">5</b></label><input id="rows" type="range" min="3" max="8" value="5" /></div>
+        </div>
+        <h3 style="margin-top:18px">Startup K prefetch</h3>
+        <div id="startupPrefetch" class="lane"></div>
+        <p class="tiny">Each small D cell represents one <code>[BK, BD]</code> K slice. A whole K block is <code>[BK, D]</code>.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Key loop pipeline</h2>
+      <div class="loop-visual">
+        <div class="card">
+          <h3>Read this as</h3>
+          <p><span class="tag compute">compute</span> current K block</p>
+          <p><span class="tag v">V prefetch / PV</span> current K block's V</p>
+          <p><span class="tag prefetch">prefetch</span> future K block <code>K + Stages</code></p>
+          <p class="tiny">Assume <code>kblocks_cache = 0</code>. So the non-cache loop directly processes normal K blocks.</p>
+        </div>
+        <div class="card light">
+          <div id="timeline" class="timeline"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Mainloop body with shapes + key source code</h2>
+      <p class="source-note">Left side shows the logical shape transition. Right side shows the corresponding shortened source-code region from <code>mainloop_body</code> or <code>softmax()</code>. Ellipses mean cache/paged branches or bounds details are omitted for readability.</p>
+
+      <div class="mainloop-source-list">
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">1</span>
+            <h3>QK D-loop</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>Loop over Q/K head-dim slices.</p>
+              <p><span class="shape">Q [BQ, BD]</span> × <span class="shape green">Kᵀ [BD, BK]</span> → <span class="shape pink">S [BQ, BK]</span></p>
+              <p class="tiny">Logical attention view is <code>Q × Kᵀ</code>. The source comment says <code>S = K * Q</code> because of the MMA operand/layout convention. Repeated over all D tiles; each partial MMA accumulates into <code>tSrS</code>.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: GEMM 1</span><span>shape: [BQ,BD]×[BD,BK]</span></div>
+              <pre>/* GEMM 1: S = K * Q */
+clear(tSrS);
+for (int D = 0; D &lt; size&lt;4&gt;(tKgK); D++) {
+  copy(copy_q, tQgQ(_, _, _, D), tQrQ);
+  copy(copy_k_cur, tKgK_cur(_, _, _, k_idx, D), tKrK);
+  reorder(tQrQ, tSrQ);
+  reorder(tKrK, tSrK);
+  cute::gemm(mma_qk, tSrQ, tSrK, tSrS);
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">2</span>
+            <h3>V prefetch VV-loop</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>Before PV GEMM, prefetch V splits for the current K block.</p>
+              <p><span class="shape yellow">V split storage [BV, BK]</span></p>
+              <p class="tiny">Math view is effectively <code>[BK, BV]</code> after MMA-layout reorder.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: V prefetch</span><span>shape: per VV [BV,BK]</span></div>
+              <pre>for (int VV = 0; VV &lt; VTiles; VV++) {
+  prefetch(prefetch_v_cur,
+           pVgV_cur(_, _, _, VV, k_idx));
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">3</span>
+            <h3>Mask</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>Elementwise update of score tile.</p>
+              <p><span class="shape pink">S [BQ, BK]</span> → <span class="shape pink">S [BQ, BK]</span></p>
+              <p class="tiny">Depending on compile-time flags and boundary conditions, causal, full, or remainder masking changes score values but not the logical tile shape.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: mask branches</span><span>shape unchanged</span></div>
+              <pre>if constexpr (!is_cache &amp;&amp; CausalMask) {
+  ...
+  tSrS(i) = ElementS(-INFINITY);
+}
+
+if (check_remainder_k &amp;&amp; K == total_blk - 1) {
+  ...
+  tSrS(i) = sycl::fmin(tSrS(i), ...);
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">4</span>
+            <h3>Online softmax</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>Reduce over K columns, then broadcast row state back to the score tile.</p>
+              <p><span class="shape pink">S [BQ, BK]</span> → <span class="shape green">row_max [BQ]</span> + <span class="shape green">row_sum [BQ]</span> → <span class="shape pink">P [BQ, BK]</span></p>
+              <p class="tiny"><code>softmax()</code> returns <code>rescale [BQ]</code>; then <code>tSrS</code> is reordered into the PV A-operand layout <code>tArP</code>.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: softmax + reorder</span><span>[BQ,BK] → [BQ]</span></div>
+              <pre>auto rescale = softmax(K == blk_k0,
+                       tSrS, tA_max, tA_sum);
+reorder(tSrS, tArP);
+
+// inside softmax()
+auto tS_bmax = reduce&lt;1&gt;(tS, sycl::maximum{});
+tS(i) = sycl::native::exp2(params.scale * tS(i) - ...);
+auto tS_bsum = reduce&lt;1&gt;(tS, sycl::plus{});
+tS_sum(i) += tS_bsum(i);</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">5</span>
+            <h3>PV VV-loop</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>Loop over V/output splits.</p>
+              <p><span class="shape pink">P [BQ, BK]</span> × <span class="shape yellow">V [BK, BV]</span> → <span class="shape">O_split [BQ, BV]</span></p>
+              <p class="tiny">If this is not the first K block, old O is row-rescaled by <code>rescale [BQ]</code> before adding the current PV result.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: GEMM 2</span><span>[BQ,BK]×[BK,BV]</span></div>
+              <pre>for (int VV = 0; VV &lt; VTiles; VV++) {
+  copy(copy_v_cur, tVgV_cur(_, _, _, VV, k_idx), tVrV);
+  reorder(tVrV, tArV);
+
+  if (K != blk_k0)
+    tArA(_, _, _, VV)(i) *= broadcast&lt;0&gt;(rescale, ...);
+
+  cute::gemm(mma_pv, tArP, tArV, tArA(_, _, _, VV));
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage source-step">
+          <div class="step-head">
+            <span class="num">6</span>
+            <h3>Future-K prefetch D-loop</h3>
+          </div>
+          <div class="step-body">
+            <div class="shape-pane">
+              <p>After processing current K, request the future K block.</p>
+              <p><span class="shape green">K_next = K + Stages</span> → all <span class="shape green">[BK, BD]</span> slices</p>
+              <p class="tiny">This keeps the K pipeline ahead of compute.</p>
+            </div>
+            <div class="source-pane">
+              <div class="src-title"><span>Source: K prefetch</span><span>future [BK,D]</span></div>
+              <pre>int K_next = K + Stages;
+for (int D = 0; D &lt; size&lt;4&gt;(pKgK); D++) {
+  prefetch(prefetch_k,
+           pKgK(_, _, _, K_next - kblocks_cache, D));
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Full simplified pseudocode</h2>
+      <pre>// Global logical tensors
+// Q: [Sq, D], K: [Sk, D], V storage: [Dv, Sk], O: [Sq, Dv]
+
+// Startup
+prefetch Q tile                         // [BQ, D] as D slices [BQ, BD]
+for D_tile in all_D_tiles:
+  for k_prefetch in 0 .. Stages-1:
+    prefetch K[k_prefetch, D_tile]       // [BK, BD]
+
+if first_K_block:
+  O_acc   = 0                            // per split: [BQ, BV]
+  row_max = -inf                         // [BQ]
+  row_sum = 0                            // [BQ]
+
+// Main non-cache K loop
+for K_block in K_blocks:
+
+  // 1. QK GEMM
+  S = 0                                  // [BQ, BK]
+  for D_tile in all_D_tiles:
+    Q_frag = Q[:, D_tile]                // [BQ, BD]
+    K_frag = K[K_block, D_tile]          // [BK, BD]
+    S += Q_frag @ K_frag.T               // [BQ, BK]
+
+  // 2. V prefetch
+  for VV in VTiles:
+    prefetch V[VV, K_block]              // storage [BV, BK]
+
+  // 3. Mask
+  S = apply_mask(S)                      // [BQ, BK]
+
+  // 4. Online softmax
+  block_max = max(S, axis=K)             // [BQ]
+  new_max   = max(row_max, block_max)    // [BQ]
+  rescale   = exp(old_max - new_max)     // [BQ]
+  P         = exp(S - new_max[:, None])  // [BQ, BK]
+  row_sum   = row_sum * rescale + sum(P, axis=K) // [BQ]
+  row_max   = new_max                    // [BQ]
+
+  // 5. PV GEMM, split along V/output dimension
+  for VV in VTiles:
+    V_frag = V[VV, K_block]              // storage [BV, BK], math [BK, BV]
+    O_acc[VV] *= rescale[:, None]        // [BQ, BV]
+    O_acc[VV] += P @ V_frag.T            // [BQ, BV]
+
+  // 6. Future-K prefetch
+  for D_tile in all_D_tiles:
+    prefetch K[K_block + Stages, D_tile] // [BK, BD]</pre>
+    </section>
+
+    <section>
+      <h2>Compact shape table</h2>
+      <div class="card light">
+        <table class="table">
+          <thead><tr><th>Loop / operation</th><th>Input shape</th><th>Output / state shape</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Startup Q prefetch</td><td>Q tile <code>[BQ, D]</code></td><td>D slices <code>[BQ, BD]</code></td><td>Bring query tile ahead of QK compute.</td></tr>
+            <tr><td>Startup K prefetch</td><td>first <code>Stages</code> K blocks</td><td>each block split as <code>[BK, BD]</code></td><td>Warm K pipeline before mainloop starts.</td></tr>
+            <tr><td>QK D-loop</td><td><code>[BQ, BD] × [BD, BK]</code></td><td><code>S [BQ, BK]</code></td><td>Accumulate score tile over D.</td></tr>
+            <tr><td>Mask</td><td><code>S [BQ, BK]</code></td><td><code>S [BQ, BK]</code></td><td>Set invalid scores to negative infinity, apply a full mask when that path is enabled, or handle the last partial K tile.</td></tr>
+            <tr><td>Softmax</td><td><code>S [BQ, BK]</code></td><td><code>P [BQ, BK]</code>, <code>row_max/sum [BQ]</code></td><td>Online row-wise stable softmax.</td></tr>
+            <tr><td>PV VV-loop</td><td><code>P [BQ, BK] × V [BK, BV]</code></td><td><code>O_split [BQ, BV]</code></td><td>Accumulate output split.</td></tr>
+            <tr><td>Future K prefetch</td><td><code>K_block + Stages</code></td><td>all D slices <code>[BK, BD]</code></td><td>Keep next K blocks ready for later iterations.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Mental model</h2>
+      <div class="flow-row">
+        <div class="stage"><span class="num">A</span><h3>Prefetch window</h3><p>Before compute starts: request first <code>Stages</code> K blocks, each across all D slices.</p></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">B</span><h3>Streaming score tile</h3><p>For one K block, build <code>S [BQ, BK]</code> by looping over D slices.</p></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">C</span><h3>Consume immediately</h3><p>Softmax turns <code>S</code> into <code>P</code>, then <code>P @ V</code> updates output. No full attention matrix is stored.</p></div>
+      </div>
+    </section>
+
+    <div class="footer">
+      Source inspected: Intel AutoRound <code>xe_sdpa_fwd_mainloop.hpp</code>. This visualization intentionally ignores KV cache and paged attention branches and explains the normal K/V path only.
+    </div>
+  </div>
+
+<script>
+  const stages = document.getElementById('stages');
+  const dtiles = document.getElementById('dtiles');
+  const vtiles = document.getElementById('vtiles');
+  const rows = document.getElementById('rows');
+  const stagesVal = document.getElementById('stagesVal');
+  const dtilesVal = document.getElementById('dtilesVal');
+  const vtilesVal = document.getElementById('vtilesVal');
+  const rowsVal = document.getElementById('rowsVal');
+  const startup = document.getElementById('startupPrefetch');
+  const timeline = document.getElementById('timeline');
+
+  function kBlockHTML(k, dCount, dimmed=false) {
+    let slices = '';
+    for (let d = 0; d < dCount; d++) {
+      slices += `<div class="d-slice">D${d}: [BK,BD]</div>`;
+    }
+    return `<div class="kblock ${dimmed ? 'dimmed' : ''}"><strong>K${k} [BK,D]</strong><div class="d-slices">${slices}</div></div>`;
+  }
+
+  function render() {
+    const s = Number(stages.value);
+    const d = Number(dtiles.value);
+    const vv = Number(vtiles.value);
+    const r = Number(rows.value);
+    stagesVal.textContent = s;
+    dtilesVal.textContent = d;
+    vtilesVal.textContent = vv;
+    rowsVal.textContent = r;
+
+    startup.innerHTML = '';
+    for (let k = 0; k < s; k++) {
+      startup.insertAdjacentHTML('beforeend', kBlockHTML(k, d));
+    }
+
+    timeline.innerHTML = '';
+    for (let k = 0; k < r; k++) {
+      const next = k + s;
+      let vvTags = '';
+      for (let i = 0; i < vv; i++) vvTags += `<span class="tag v">PV VV${i}: [BQ,BV]</span>`;
+      const html = `<div class="time-row">
+        <div class="time-label">K = ${k}</div>
+        <div class="bar">
+          <span class="tag compute">QK: Q[BQ,D] × K${k}ᵀ[D,BK] → S[BQ,BK]</span>
+          <span class="tag compute">softmax → P[BQ,BK]</span>
+          ${vvTags}
+          <span class="tag prefetch">prefetch K${next} all D slices</span>
+        </div>
+      </div>`;
+      timeline.insertAdjacentHTML('beforeend', html);
+    }
+  }
+
+  [stages, dtiles, vtiles, rows].forEach(el => el.addEventListener('input', render));
+  render();
+</script>
+</body>
+</html>
