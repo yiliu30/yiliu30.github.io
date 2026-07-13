@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DeepSeek-V4 CSA — How 4 Tokens Become 1 Compressed KV Entry</title>
+<style>
+  :root {
+    --bg: #07111f;
+    --bg2: #0a1628;
+    --panel: rgba(16, 30, 50, 0.90);
+    --panel2: rgba(24, 41, 65, 0.88);
+    --line: rgba(164, 194, 230, 0.18);
+    --text: #edf5ff;
+    --muted: #9fb3ca;
+    --blue: #62b5ff;
+    --blue2: #2b7fdd;
+    --cyan: #65e6db;
+    --green: #83e6a7;
+    --amber: #ffd36b;
+    --orange: #ff9a62;
+    --pink: #f58fc7;
+    --violet: #ad9cff;
+    --danger: #ff7d8c;
+    --shadow: 0 22px 70px rgba(0,0,0,.28);
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 8% 4%, rgba(43,127,221,.22), transparent 27rem),
+      radial-gradient(circle at 92% 18%, rgba(101,230,219,.13), transparent 29rem),
+      linear-gradient(150deg, var(--bg), var(--bg2) 68%, #07101b);
+  }
+  a { color: var(--cyan); }
+  code, pre, .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  .page {
+    width: min(1220px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 24px 0 70px;
+  }
+  .topbar {
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(7,17,31,.76);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.16);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    box-shadow: 0 0 25px rgba(98,181,255,.35);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: "4→1";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 900;
+    color: #04101e;
+  }
+  .brand strong { font-size: 13px; letter-spacing: .02em; }
+  .navlinks { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .navlinks a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 12px;
+    padding: 7px 9px;
+    border-radius: 9px;
+  }
+  .navlinks a:hover { color: var(--text); background: rgba(255,255,255,.06); }
+
+  .hero {
+    padding: 52px 42px 36px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    background:
+      linear-gradient(145deg, rgba(22,41,68,.92), rgba(8,19,34,.94)),
+      radial-gradient(circle at 80% 20%, rgba(101,230,219,.15), transparent 22rem);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: relative;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    right: -180px;
+    top: -230px;
+    border-radius: 50%;
+    border: 1px solid rgba(101,230,219,.25);
+    box-shadow: inset 0 0 80px rgba(101,230,219,.08);
+  }
+  .eyebrow {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-weight: 800;
+    font-size: 12px;
+  }
+  h1 {
+    margin: 15px 0 14px;
+    max-width: 980px;
+    font-size: clamp(34px, 6vw, 72px);
+    line-height: .98;
+    letter-spacing: -.045em;
+  }
+  .hero p {
+    max-width: 860px;
+    margin: 0;
+    font-size: clamp(16px, 2.1vw, 20px);
+    line-height: 1.6;
+    color: #c4d2e3;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.35fr .65fr;
+    gap: 20px;
+    margin-top: 30px;
+  }
+  .key-callout {
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(101,230,219,.25);
+    background: rgba(101,230,219,.07);
+  }
+  .key-callout b { color: var(--cyan); }
+  .mini-stat {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .stat {
+    padding: 17px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(255,255,255,.035);
+  }
+  .stat .num { font-size: 27px; font-weight: 900; }
+  .stat .label { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+  section { margin-top: 22px; }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(145deg, var(--panel), rgba(9,21,38,.92));
+    box-shadow: 0 16px 45px rgba(0,0,0,.18);
+    overflow: hidden;
+  }
+  .card-head {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 24px 26px 16px;
+  }
+  .card-head h2 {
+    margin: 0 0 6px;
+    font-size: clamp(22px, 3vw, 34px);
+    letter-spacing: -.025em;
+  }
+  .card-head p { margin: 0; color: var(--muted); line-height: 1.55; max-width: 760px; }
+  .badge {
+    flex: none;
+    padding: 7px 10px;
+    border-radius: 999px;
+    color: var(--cyan);
+    border: 1px solid rgba(101,230,219,.25);
+    background: rgba(101,230,219,.07);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .body-pad { padding: 0 26px 26px; }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: 1.05fr auto 1.1fr auto 1.2fr auto 1.05fr auto .9fr;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 0 6px;
+  }
+  .stage {
+    min-height: 140px;
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    padding: 15px;
+    background: rgba(255,255,255,.028);
+    transition: .2s ease;
+    position: relative;
+  }
+  .stage.active {
+    transform: translateY(-4px);
+    border-color: rgba(98,181,255,.65);
+    background: rgba(98,181,255,.09);
+    box-shadow: 0 13px 30px rgba(43,127,221,.18);
+  }
+  .stage .n {
+    width: 24px; height: 24px; border-radius: 8px;
+    display: grid; place-items: center;
+    color: #07111f; background: var(--blue);
+    font-size: 11px; font-weight: 900;
+    margin-bottom: 9px;
+  }
+  .stage h3 { font-size: 14px; margin: 0 0 8px; }
+  .stage p { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; }
+  .shape {
+    margin-top: 10px;
+    color: var(--amber);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .arrow { color: #57708c; font-size: 22px; font-weight: 700; }
+  .step-buttons { display: flex; flex-wrap: wrap; gap: 7px; padding: 18px 0 0; }
+  button, input { font: inherit; }
+  .step-buttons button, .entry-buttons button, .toggle button {
+    border: 1px solid var(--line);
+    color: var(--muted);
+    background: rgba(255,255,255,.035);
+    padding: 8px 11px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .step-buttons button:hover, .entry-buttons button:hover, .toggle button:hover {
+    color: var(--text); border-color: rgba(98,181,255,.38);
+  }
+  .step-buttons button.active, .entry-buttons button.active, .toggle button.active {
+    color: #06111f;
+    background: var(--blue);
+    border-color: var(--blue);
+    font-weight: 800;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.25fr .75fr;
+    gap: 18px;
+  }
+  .concept-box {
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    padding: 18px;
+    background: rgba(255,255,255,.025);
+  }
+  .concept-box h3 { margin: 0 0 9px; font-size: 16px; }
+  .concept-box p { color: var(--muted); line-height: 1.55; margin: 0; font-size: 13px; }
+  .not-merged {
+    border-color: rgba(255,125,140,.30);
+    background: rgba(255,125,140,.055);
+  }
+  .not-merged h3 { color: var(--danger); }
+  .is-compressed {
+    border-color: rgba(131,230,167,.28);
+    background: rgba(131,230,167,.055);
+  }
+  .is-compressed h3 { color: var(--green); }
+
+  .token-strip {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(44px, 1fr));
+    gap: 7px;
+    margin-top: 14px;
+  }
+  .tok {
+    height: 56px;
+    border-radius: 12px;
+    border: 1px solid rgba(98,181,255,.28);
+    background: rgba(98,181,255,.08);
+    display: grid;
+    place-items: center;
+    color: #cfe6ff;
+    font-weight: 800;
+    font-size: 12px;
+    position: relative;
+    transition: .2s ease;
+  }
+  .tok small {
+    position: absolute;
+    bottom: 4px;
+    font-size: 8px;
+    color: #6f8eae;
+    font-weight: 600;
+  }
+  .tok.prev {
+    border-color: rgba(245,143,199,.70);
+    background: rgba(245,143,199,.16);
+    color: #ffd8ec;
+    transform: translateY(-3px);
+  }
+  .tok.curr {
+    border-color: rgba(101,230,219,.72);
+    background: rgba(101,230,219,.14);
+    color: #cafff9;
+    transform: translateY(-3px);
+  }
+  .tok.dim { opacity: .28; transform: scale(.96); }
+
+  .overlap-demo { margin-top: 18px; }
+  .entry-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; }
+  .candidate-grid {
+    display: grid;
+    grid-template-columns: 110px repeat(4, 1fr);
+    gap: 8px;
+    align-items: stretch;
+  }
+  .row-label {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .candidate {
+    min-height: 76px;
+    padding: 10px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    text-align: center;
+    background: rgba(255,255,255,.025);
+    display: grid;
+    align-content: center;
+    gap: 4px;
+  }
+  .candidate b { font-size: 14px; }
+  .candidate span { color: var(--muted); font-size: 10px; }
+  .candidate.previous { border-color: rgba(245,143,199,.38); background: rgba(245,143,199,.07); }
+  .candidate.current { border-color: rgba(101,230,219,.38); background: rgba(101,230,219,.07); }
+  .candidate.pad { opacity: .38; border-style: dashed; }
+  .merge-arrow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 13px;
+    margin-top: 17px;
+  }
+  .line { height: 1px; background: linear-gradient(90deg, transparent, #45617f); }
+  .line.rev { background: linear-gradient(90deg, #45617f, transparent); }
+  .compressed-pill {
+    border: 1px solid rgba(255,211,107,.42);
+    background: rgba(255,211,107,.09);
+    color: var(--amber);
+    border-radius: 14px;
+    padding: 14px 18px;
+    text-align: center;
+    font-weight: 900;
+  }
+  .explain-line {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.55;
+    margin-top: 14px;
+  }
+
+  .control-row {
+    display: grid;
+    grid-template-columns: 180px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--blue); }
+  .value-pill {
+    min-width: 82px;
+    text-align: center;
+    color: var(--amber);
+    border: 1px solid rgba(255,211,107,.28);
+    background: rgba(255,211,107,.06);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-weight: 800;
+  }
+  .weight-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+    align-items: end;
+    min-height: 235px;
+    padding-top: 15px;
+  }
+  .bar-col { display: grid; grid-template-rows: 150px auto auto; gap: 8px; min-width: 0; }
+  .bar-track {
+    height: 150px;
+    border-radius: 11px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+  .bar {
+    width: 100%;
+    min-height: 2px;
+    background: linear-gradient(180deg, var(--cyan), var(--blue2));
+    transition: height .25s ease;
+    border-radius: 8px 8px 0 0;
+  }
+  .bar-label { text-align: center; color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .bar-value { text-align: center; color: var(--text); font-size: 11px; font-weight: 800; }
+  .formula {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid rgba(173,156,255,.28);
+    border-radius: 14px;
+    background: rgba(173,156,255,.06);
+    color: #ded8ff;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 11px;
+  }
+
+  .shape-flow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .shape-node {
+    padding: 16px 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255,255,255,.026);
+    position: relative;
+    min-height: 145px;
+  }
+  .shape-node:not(:last-child)::after {
+    content: "→";
+    position: absolute;
+    right: -16px;
+    top: 56px;
+    z-index: 2;
+    color: #5c7591;
+    font-size: 18px;
+  }
+  .shape-node .title { font-size: 13px; font-weight: 800; }
+  .shape-node .tensor { color: var(--amber); font-size: 12px; margin: 11px 0 8px; }
+  .shape-node .desc { color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+  .length-tool {
+    display: grid;
+    grid-template-columns: .9fr 1.1fr;
+    gap: 16px;
+    margin-top: 18px;
+  }
+  .length-result {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+  }
+  .result-tile {
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 13px;
+    text-align: center;
+    background: rgba(255,255,255,.024);
+  }
+  .result-tile strong { font-size: 21px; display: block; }
+  .result-tile span { color: var(--muted); font-size: 10px; }
+
+  .code-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .code-card {
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    overflow: hidden;
+    background: #07101b;
+  }
+  .code-title {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    line-height: 1.6;
+    font-size: 12px;
+    color: #c9ddf4;
+  }
+  .kw { color: var(--pink); }
+  .fn { color: var(--cyan); }
+  .cm { color: #607892; }
+  .nm { color: var(--amber); }
+  .toggle { display: flex; gap: 7px; margin: 0 0 14px; }
+
+  .attn-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1.25fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+  }
+  .attn-node {
+    min-height: 115px;
+    padding: 15px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255,255,255,.027);
+  }
+  .attn-node h3 { margin: 0 0 8px; font-size: 14px; }
+  .attn-node p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.48; }
+  .attn-node.local { border-color: rgba(131,230,167,.30); background: rgba(131,230,167,.055); }
+  .attn-node.index { border-color: rgba(173,156,255,.30); background: rgba(173,156,255,.055); }
+  .attn-node.core { border-color: rgba(98,181,255,.35); background: rgba(98,181,255,.06); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: #d9e9fb; background: rgba(255,255,255,.025); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  td { color: var(--muted); }
+  td:first-child { color: var(--text); font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+
+  .sources {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .sources ol { padding-left: 20px; }
+  .sources a { overflow-wrap: anywhere; }
+
+  .footer {
+    margin-top: 22px;
+    text-align: center;
+    color: #6f86a0;
+    font-size: 11px;
+  }
+
+  @media (max-width: 1040px) {
+    .pipeline { grid-template-columns: 1fr; }
+    .pipeline .arrow { transform: rotate(90deg); text-align: center; }
+    .stage { min-height: auto; }
+    .shape-flow { grid-template-columns: 1fr; }
+    .shape-node:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -18px; }
+    .attn-flow { grid-template-columns: 1fr; }
+    .attn-flow .arrow { transform: rotate(90deg); text-align: center; }
+  }
+  @media (max-width: 800px) {
+    .hero { padding: 36px 22px 28px; }
+    .hero-grid, .two-col, .length-tool, .code-grid { grid-template-columns: 1fr; }
+    .token-strip { grid-template-columns: repeat(6, 1fr); }
+    .candidate-grid { grid-template-columns: 82px repeat(4, 1fr); }
+    .weight-grid { grid-template-columns: repeat(4, 1fr); }
+    .control-row { grid-template-columns: 1fr; }
+    .card-head { padding: 20px 18px 14px; }
+    .body-pad { padding: 0 18px 20px; }
+    .navlinks { display: none; }
+  }
+  @media (max-width: 520px) {
+    .page { width: min(100% - 18px, 1220px); }
+    .mini-stat, .length-result { grid-template-columns: 1fr; }
+    .token-strip { grid-template-columns: repeat(4, 1fr); }
+    .candidate-grid { grid-template-columns: 1fr 1fr; }
+    .row-label { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <strong>DeepSeek-V4 CSA visual guide</strong>
+    </div>
+    <nav class="navlinks" aria-label="Page navigation">
+      <a href="#overview">Overview</a>
+      <a href="#overlap">Overlap</a>
+      <a href="#gating">Gating</a>
+      <a href="#shapes">Shapes</a>
+      <a href="#decode">Code path</a>
+      <a href="#attention">Attention</a>
+    </nav>
+  </div>
+
+  <header class="hero">
+    <div class="eyebrow">Compressed Sparse Attention · ratio m = 4</div>
+    <h1>How DeepSeek compresses <span style="color:var(--cyan)">4 tokens</span> into <span style="color:var(--amber)">1 KV entry</span></h1>
+    <p>
+      The model keeps every token in the residual stream. What shrinks is the historical
+      <b>KV-cache sequence dimension</b>: one compressed entry is emitted every four tokens,
+      using overlapping, learned, per-feature gated pooling.
+    </p>
+    <div class="hero-grid">
+      <div class="key-callout">
+        <b>Most precise mental model:</b><br/>
+        “4 → 1” describes the number of stored compressed KV positions—not a merger of four
+        text tokens, not a reduction in query count, and not ordinary average pooling.
+      </div>
+      <div class="mini-stat">
+        <div class="stat"><div class="num">N → N/4</div><div class="label">compressed KV positions</div></div>
+        <div class="stat"><div class="num">8 → 1</div><div class="label">candidate vectors per output</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="overview" class="card">
+    <div class="card-head">
+      <div>
+        <h2>The full compression path</h2>
+        <p>Click a step to focus it. Shapes use the released Flash configuration: hidden size 4096 and compressed KV width 512.</p>
+      </div>
+      <div class="badge">Prefill view</div>
+    </div>
+    <div class="body-pad">
+      <div class="pipeline" id="pipeline">
+        <div class="stage active" data-step="1">
+          <div class="n">1</div>
+          <h3>Token hidden states</h3>
+          <p>All original token states remain available to the Transformer.</p>
+          <div class="shape mono">x: [B, N, 4096]</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage" data-step="2">
+          <div class="n">2</div>
+          <h3>Two KV + gate branches</h3>
+          <p>Each token produces branch A, branch B, and matching feature-wise gate logits.</p>
+          <div class="shape mono">kv, score: [B, N, 1024]</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage" data-step="3">
+          <div class="n">3</div>
+          <h3>Group with stride 4</h3>
+          <p>Four tokens form each current block; branch B from the previous block is brought forward.</p>
+          <div class="shape mono">[B, N/4, 8, 512]</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage" data-step="4">
+          <div class="n">4</div>
+          <h3>Per-feature softmax pool</h3>
+          <p>For every output feature, eight logits normalize into eight weights, then weighted vectors are summed.</p>
+          <div class="shape mono">softmax over candidate axis</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage" data-step="5">
+          <div class="n">5</div>
+          <h3>Normalize + RoPE + cache</h3>
+          <p>The result is normalized, rotary position is applied, then it is stored as one compressed KV entry.</p>
+          <div class="shape mono">C: [B, N/4, 512]</div>
+        </div>
+      </div>
+      <div class="step-buttons" id="stepButtons">
+        <button class="active" data-step="1">1 · hidden states</button>
+        <button data-step="2">2 · projections</button>
+        <button data-step="3">3 · overlap</button>
+        <button data-step="4">4 · gated pooling</button>
+        <button data-step="5">5 · cache</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>What is—and is not—compressed</h2>
+        <p>This distinction prevents the most common misunderstanding.</p>
+      </div>
+    </div>
+    <div class="body-pad two-col">
+      <div class="concept-box not-merged">
+        <h3>✕ Not merged</h3>
+        <p>
+          The four input tokens do not become one vocabulary token. Their residual hidden states,
+          query vectors, and token-level outputs remain separate.
+        </p>
+      </div>
+      <div class="concept-box is-compressed">
+        <h3>✓ Compressed</h3>
+        <p>
+          The historical key/value representation stored for attention is reduced from
+          <span class="mono">N</span> positions to approximately <span class="mono">N/4</span>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="overlap" class="card">
+    <div class="card-head">
+      <div>
+        <h2>Why one output uses eight candidates</h2>
+        <p>Choose a compressed entry. Pink tokens feed its previous-block branch; cyan tokens feed its current-block branch.</p>
+      </div>
+      <div class="badge">Overlap only when ratio = 4</div>
+    </div>
+    <div class="body-pad">
+      <div class="entry-buttons" id="entryButtons">
+        <button class="active" data-entry="0">Compressed C₀</button>
+        <button data-entry="1">Compressed C₁</button>
+        <button data-entry="2">Compressed C₂</button>
+      </div>
+
+      <div class="token-strip" id="tokenStrip"></div>
+
+      <div class="overlap-demo">
+        <div class="candidate-grid" id="candidateGrid"></div>
+        <div class="merge-arrow">
+          <div class="line"></div>
+          <div class="compressed-pill" id="compressedLabel">C₀ · one 512-D KV entry</div>
+          <div class="line rev"></div>
+        </div>
+        <p class="explain-line" id="entryExplanation"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="gating" class="card">
+    <div class="card-head">
+      <div>
+        <h2>Per-channel gated pooling</h2>
+        <p>
+          The gate is not one scalar per token. Each of the 512 output features gets its own
+          eight-way softmax. Move the feature slider to see an illustrative weight pattern.
+        </p>
+      </div>
+      <div class="badge">Illustrative weights</div>
+    </div>
+    <div class="body-pad">
+      <div class="control-row">
+        <label for="channelSlider"><b>Output feature k</b><br/><span style="color:var(--muted);font-size:11px">0 … 511</span></label>
+        <input id="channelSlider" type="range" min="0" max="511" value="137" />
+        <div class="value-pill mono" id="channelValue">k = 137</div>
+      </div>
+      <div class="weight-grid" id="weightGrid"></div>
+      <div class="formula mono" id="formula"></div>
+      <div class="note">
+        These bars are a deterministic teaching example, not extracted model weights. The real logits come from
+        <span class="mono">wgate(x) + positional bias</span> and differ by token, layer, entry, and feature.
+      </div>
+    </div>
+  </section>
+
+  <section id="shapes" class="card">
+    <div class="card-head">
+      <div>
+        <h2>Tensor-shape walkthrough</h2>
+        <p>The sequence length shrinks only at the final pooling stage.</p>
+      </div>
+    </div>
+    <div class="body-pad">
+      <div class="shape-flow">
+        <div class="shape-node">
+          <div class="title">Input</div>
+          <div class="tensor mono">[B, N, 4096]</div>
+          <div class="desc">One hidden vector per original token.</div>
+        </div>
+        <div class="shape-node">
+          <div class="title">KV / gate projections</div>
+          <div class="tensor mono">[B, N, 1024]</div>
+          <div class="desc">1024 = 2 branches × 512 features.</div>
+        </div>
+        <div class="shape-node">
+          <div class="title">Group four tokens</div>
+          <div class="tensor mono">[B, N/4, 4, 1024]</div>
+          <div class="desc">The group axis identifies offsets 0–3.</div>
+        </div>
+        <div class="shape-node">
+          <div class="title">Overlap transform</div>
+          <div class="tensor mono">[B, N/4, 8, 512]</div>
+          <div class="desc">Previous B branch + current A branch, with 8 candidates total.</div>
+        </div>
+        <div class="shape-node">
+          <div class="title">Weighted reduction</div>
+          <div class="tensor mono">[B, N/4, 512]</div>
+          <div class="desc">Softmax and sum over the candidate axis.</div>
+        </div>
+      </div>
+
+      <div class="length-tool">
+        <div class="concept-box">
+          <h3>Try a sequence length</h3>
+          <p>Use a multiple of four to see the prefill shape exactly.</p>
+          <div style="margin-top:14px">
+            <input id="lengthSlider" type="range" min="4" max="4096" step="4" value="16" />
+          </div>
+        </div>
+        <div class="length-result">
+          <div class="result-tile"><strong id="nInput">16</strong><span>input token positions</span></div>
+          <div class="result-tile"><strong id="nOutput">4</strong><span>compressed positions</span></div>
+          <div class="result-tile"><strong id="nCandidates">32</strong><span>candidate uses across outputs*</span></div>
+        </div>
+      </div>
+      <div class="note">
+        *Counts eight candidate slots per compressed output, including the padded previous branch for the first entry.
+        Unique source tokens are not reduced to this count because adjacent entries overlap.
+      </div>
+    </div>
+  </section>
+
+  <section id="decode" class="card">
+    <div class="card-head">
+      <div>
+        <h2>Prefill and decode use the same rule</h2>
+        <p>Prefill reshapes a full sequence. Decode buffers tokens and emits a new compressed entry every fourth token.</p>
+      </div>
+    </div>
+    <div class="body-pad">
+      <div class="toggle" id="modeToggle">
+        <button class="active" data-mode="prefill">Prefill</button>
+        <button data-mode="decode">Decode</button>
+      </div>
+      <div class="code-grid">
+        <div class="code-card">
+          <div class="code-title"><span id="leftCodeTitle">Shape operations</span><span class="mono">pseudocode</span></div>
+          <pre id="leftCode"></pre>
+        </div>
+        <div class="code-card">
+          <div class="code-title"><span id="rightCodeTitle">Meaning</span><span class="mono">shape trace</span></div>
+          <pre id="rightCode"></pre>
+        </div>
+      </div>
+      <div class="note">
+        This is concise pseudocode mapped to the released implementation, not a verbatim copy.
+        In the actual code, compression arithmetic is promoted to FP32 before normalization and cache quantization.
+      </div>
+    </div>
+  </section>
+
+  <section id="attention" class="card">
+    <div class="card-head">
+      <div>
+        <h2>Where the compressed entry goes next</h2>
+        <p>CSA combines exact recent context with sparsely selected compressed history.</p>
+      </div>
+      <div class="badge">Core attention path</div>
+    </div>
+    <div class="body-pad">
+      <div class="attn-flow">
+        <div class="attn-node local">
+          <h3>Recent exact KV</h3>
+          <p>Sliding-window cache keeps 128 recent token-level KV entries.</p>
+        </div>
+        <div class="arrow">+</div>
+        <div class="attn-node index">
+          <h3>Compressed history</h3>
+          <p>A separate 128-D indexer compressor scores historical compressed positions.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="attn-node">
+          <h3>Top-k selection</h3>
+          <p>For CSA layers, the released Flash configuration selects up to 512 compressed positions per query.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="attn-node core">
+          <h3>Shared-KV multi-query attention</h3>
+          <p>64 query heads attend to a shared 512-D KV entry for each selected position.</p>
+        </div>
+      </div>
+      <div class="formula mono" style="margin-top:18px">
+        candidates_for_query = recent_128_exact_KV + topk_512_compressed_KV
+        &nbsp;&nbsp;→&nbsp;&nbsp; sparse_attn(Q, shared_KV)
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Released Flash configuration</h2>
+        <p>Values below come from the model configuration and released inference implementation.</p>
+      </div>
+    </div>
+    <div class="body-pad" style="padding-left:0;padding-right:0;padding-bottom:0">
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Why it matters here</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Hidden size</td><td class="mono">4096</td><td>Width of each input token hidden state.</td></tr>
+          <tr><td>Attention / compressed KV width</td><td class="mono">512</td><td>One compressed KV entry has 512 features.</td></tr>
+          <tr><td>RoPE sub-dimension</td><td class="mono">64</td><td>RoPE is applied after pooling to the rotary slice.</td></tr>
+          <tr><td>CSA compression ratio</td><td class="mono">4</td><td>One output position is emitted per four input positions.</td></tr>
+          <tr><td>HCA compression ratio</td><td class="mono">128</td><td>Other interleaved layers compress more aggressively and use dense attention.</td></tr>
+          <tr><td>Sliding window</td><td class="mono">128</td><td>Preserves recent token-level detail.</td></tr>
+          <tr><td>Indexer heads × width</td><td class="mono">64 × 128</td><td>Used only to score compressed positions.</td></tr>
+          <tr><td>Indexer top-k</td><td class="mono">512</td><td>Maximum selected compressed historical positions per query.</td></tr>
+          <tr><td>KV heads</td><td class="mono">1 shared KV</td><td>Queries are multi-head; compressed K/V is shared.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>One-sentence takeaway</h2>
+      </div>
+    </div>
+    <div class="body-pad">
+      <div class="key-callout" style="font-size:17px;line-height:1.6">
+        Every four tokens advance the compressed cache by one position, but that position is an
+        <b>overlapping learned mixture of eight branch-specific candidate vectors</b>, with a separate
+        softmax for every one of its 512 features.
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Sources</h2>
+        <p>Primary paper and released DeepSeek-V4-Flash implementation.</p>
+      </div>
+    </div>
+    <div class="body-pad sources">
+      <ol>
+        <li>
+          DeepSeek-V4 technical report, §2.3.1 and equations 9–12:
+          <a href="https://arxiv.org/pdf/2606.19348" target="_blank" rel="noreferrer">arxiv.org/pdf/2606.19348</a>
+        </li>
+        <li>
+          Released compressor, indexer, and attention code:
+          <a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash/blob/main/inference/model.py" target="_blank" rel="noreferrer">DeepSeek-V4-Flash/inference/model.py</a>
+        </li>
+        <li>
+          Released model configuration:
+          <a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash/blob/main/config.json" target="_blank" rel="noreferrer">DeepSeek-V4-Flash/config.json</a>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <div class="footer">Self-contained educational visualization · generated 2026-07-13</div>
+</div>
+
+<script>
+(function () {
+  const stages = [...document.querySelectorAll(".stage")];
+  const stepButtons = [...document.querySelectorAll("#stepButtons button")];
+  function setStep(step) {
+    stages.forEach(s => s.classList.toggle("active", Number(s.dataset.step) === step));
+    stepButtons.forEach(b => b.classList.toggle("active", Number(b.dataset.step) === step));
+  }
+  stages.forEach(s => s.addEventListener("click", () => setStep(Number(s.dataset.step))));
+  stepButtons.forEach(b => b.addEventListener("click", () => setStep(Number(b.dataset.step))));
+
+  const tokenStrip = document.getElementById("tokenStrip");
+  for (let i = 0; i < 12; i++) {
+    const el = document.createElement("div");
+    el.className = "tok";
+    el.dataset.token = i;
+    el.innerHTML = `x<sub>${i}</sub><small>token ${i}</small>`;
+    tokenStrip.appendChild(el);
+  }
+
+  const candidateGrid = document.getElementById("candidateGrid");
+  const compressedLabel = document.getElementById("compressedLabel");
+  const entryExplanation = document.getElementById("entryExplanation");
+  const entryButtons = [...document.querySelectorAll("#entryButtons button")];
+
+  function renderEntry(entry) {
+    const currStart = entry * 4;
+    const prevStart = currStart - 4;
+    document.querySelectorAll(".tok").forEach(t => {
+      const i = Number(t.dataset.token);
+      t.className = "tok";
+      if (entry > 0 && i >= prevStart && i < prevStart + 4) t.classList.add("prev");
+      else if (i >= currStart && i < currStart + 4) t.classList.add("curr");
+      else t.classList.add("dim");
+    });
+
+    candidateGrid.innerHTML = "";
+    const prevLabel = document.createElement("div");
+    prevLabel.className = "row-label";
+    prevLabel.innerHTML = "Previous block<br/><b>branch B</b>";
+    candidateGrid.appendChild(prevLabel);
+
+    for (let j = 0; j < 4; j++) {
+      const c = document.createElement("div");
+      const idx = prevStart + j;
+      c.className = "candidate previous" + (entry === 0 ? " pad" : "");
+      c.innerHTML = entry === 0
+        ? `<b>padding</b><span>KV = 0, gate = −∞</span>`
+        : `<b>C<sup>b</sup><sub>${idx}</sub></b><span>token x${idx}, offset ${j}</span>`;
+      candidateGrid.appendChild(c);
+    }
+
+    const currLabel = document.createElement("div");
+    currLabel.className = "row-label";
+    currLabel.innerHTML = "Current block<br/><b>branch A</b>";
+    candidateGrid.appendChild(currLabel);
+
+    for (let j = 0; j < 4; j++) {
+      const c = document.createElement("div");
+      const idx = currStart + j;
+      c.className = "candidate current";
+      c.innerHTML = `<b>C<sup>a</sup><sub>${idx}</sub></b><span>token x${idx}, offset ${j}</span>`;
+      candidateGrid.appendChild(c);
+    }
+
+    compressedLabel.textContent = `C${entry} · one 512-D KV entry`;
+    if (entry === 0) {
+      entryExplanation.innerHTML =
+        `For <b>C₀</b>, the missing previous block is padded: candidate vectors are zero and gate logits are −∞. ` +
+        `The effective information comes from tokens x₀…x₃, but the operation still has eight candidate slots.`;
+    } else {
+      entryExplanation.innerHTML =
+        `<b>C${entry}</b> mixes branch B from tokens x${prevStart}…x${prevStart + 3} with branch A from ` +
+        `tokens x${currStart}…x${currStart + 3}. The next compressed entry reuses the current block through its other branch.`;
+    }
+    entryButtons.forEach(b => b.classList.toggle("active", Number(b.dataset.entry) === entry));
+  }
+  entryButtons.forEach(b => b.addEventListener("click", () => renderEntry(Number(b.dataset.entry))));
+  renderEntry(0);
+
+  const channelSlider = document.getElementById("channelSlider");
+  const channelValue = document.getElementById("channelValue");
+  const weightGrid = document.getElementById("weightGrid");
+  const formula = document.getElementById("formula");
+
+  function softmax(xs) {
+    const m = Math.max(...xs);
+    const ex = xs.map(x => Math.exp(x - m));
+    const sum = ex.reduce((a,b) => a+b, 0);
+    return ex.map(x => x / sum);
+  }
+  function renderWeights(k) {
+    const logits = Array.from({length: 8}, (_, i) =>
+      Math.sin((k + 11) * (i + 2) * 0.071) * 1.35 +
+      Math.cos((k + 3) * (i + 1) * 0.037) * 0.75 +
+      (i === (k % 8) ? 0.85 : 0)
+    );
+    const weights = softmax(logits);
+    const names = ["B₋₄","B₋₃","B₋₂","B₋₁","A₀","A₁","A₂","A₃"];
+    weightGrid.innerHTML = "";
+    weights.forEach((w, i) => {
+      const col = document.createElement("div");
+      col.className = "bar-col";
+      col.innerHTML = `
+        <div class="bar-track"><div class="bar" style="height:${Math.max(2, w * 100)}%"></div></div>
+        <div class="bar-label mono">${names[i]}</div>
+        <div class="bar-value">${(w * 100).toFixed(1)}%</div>`;
+      weightGrid.appendChild(col);
+    });
+    const terms = weights.map((w,i) => `${w.toFixed(3)}·${names[i]}[${k}]`).join(" + ");
+    formula.innerHTML =
+      `C<sub>i</sub>[${k}] = ${terms}<br/>` +
+      `<span style="color:var(--muted)">The eight weights sum to ${weights.reduce((a,b)=>a+b,0).toFixed(3)} for feature ${k}.</span>`;
+    channelValue.textContent = `k = ${k}`;
+  }
+  channelSlider.addEventListener("input", () => renderWeights(Number(channelSlider.value)));
+  renderWeights(Number(channelSlider.value));
+
+  const lengthSlider = document.getElementById("lengthSlider");
+  const nInput = document.getElementById("nInput");
+  const nOutput = document.getElementById("nOutput");
+  const nCandidates = document.getElementById("nCandidates");
+  function updateLength() {
+    const n = Number(lengthSlider.value);
+    nInput.textContent = n.toLocaleString();
+    nOutput.textContent = (n / 4).toLocaleString();
+    nCandidates.textContent = (n / 4 * 8).toLocaleString();
+  }
+  lengthSlider.addEventListener("input", updateLength);
+  updateLength();
+
+  const leftCode = document.getElementById("leftCode");
+  const rightCode = document.getElementById("rightCode");
+  const leftCodeTitle = document.getElementById("leftCodeTitle");
+  const rightCodeTitle = document.getElementById("rightCodeTitle");
+  const modeButtons = [...document.querySelectorAll("#modeToggle button")];
+
+  const codeModes = {
+    prefill: {
+      leftTitle: "Prefill operations",
+      rightTitle: "Prefill shapes",
+      left:
+`<span class="cm"># project two candidate and gate branches</span>
+kv    = <span class="fn">Wkv</span>(x)
+score = <span class="fn">Wgate</span>(x) + position_bias
+
+<span class="cm"># group every four input positions</span>
+kv, score = <span class="fn">group_by_4</span>(kv, score)
+
+<span class="cm"># previous-B + current-A → 8 candidates</span>
+kv, score = <span class="fn">overlap_transform</span>(kv, score)
+
+weights = <span class="fn">softmax</span>(score, axis=candidate)
+C = <span class="fn">sum</span>(kv * weights, axis=candidate)
+
+C = <span class="fn">RMSNorm</span>(C)
+C.rope_slice = <span class="fn">RoPE</span>(C.rope_slice)
+cache.<span class="fn">append</span>(C)`,
+      right:
+`x                 [B, N, <span class="nm">4096</span>]
+kv / score        [B, N, <span class="nm">1024</span>]
+grouped           [B, N/4, <span class="nm">4</span>, 1024]
+overlapped        [B, N/4, <span class="nm">8</span>, 512]
+softmax weights   [B, N/4, <span class="nm">8</span>, 512]
+compressed C      [B, N/4, <span class="nm">512</span>]
+
+<span class="cm">Reduction axis: the 8 candidate positions.
+The 512 feature dimensions remain.</span>`
+    },
+    decode: {
+      leftTitle: "Decode operations",
+      rightTitle: "Decode timeline",
+      left:
+`<span class="cm"># one new token at a time</span>
+slot = position % <span class="nm">4</span>
+current_buffer[slot] = <span class="fn">W</span>(x_position)
+
+<span class="kw">if</span> (position + 1) % <span class="nm">4</span> == 0:
+    candidates = previous_B + current_A
+    weights = <span class="fn">softmax</span>(gate_logits, axis=token)
+    C = <span class="fn">weighted_sum</span>(candidates, weights)
+    cache.<span class="fn">append</span>(<span class="fn">RoPE</span>(<span class="fn">Norm</span>(C)))
+
+    previous_buffer = current_buffer`,
+      right:
+`token 0  ┐
+token 1  │  buffer only; no compressed output
+token 2  │
+token 3  ┘  emit C₀
+
+token 4  ┐
+token 5  │  keep C₀; build next current block
+token 6  │
+token 7  ┘  emit C₁ from tokens 0…7
+
+<span class="cm">The compressed-cache index advances once
+for every four decoded tokens.</span>`
+    }
+  };
+  function setMode(mode) {
+    const m = codeModes[mode];
+    leftCodeTitle.textContent = m.leftTitle;
+    rightCodeTitle.textContent = m.rightTitle;
+    leftCode.innerHTML = m.left;
+    rightCode.innerHTML = m.right;
+    modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  }
+  modeButtons.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  setMode("prefill");
+})();
+</script>
+</body>
+</html>
