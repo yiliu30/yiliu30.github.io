@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DLO Resident + Streaming Layers</title>
+<style>
+:root{
+  --bg:#09111f; --panel:#101b2f; --panel2:#0c1628; --line:#273956;
+  --text:#eef5ff; --muted:#94a7c5; --green:#56e6a5; --orange:#ffbb67;
+  --blue:#72a7ff; --purple:#b695ff; --red:#ff7b8a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:
+  radial-gradient(circle at 18% -10%,rgba(114,167,255,.18),transparent 32%),
+  radial-gradient(circle at 92% 10%,rgba(86,230,165,.10),transparent 28%),var(--bg);
+  color:var(--text);font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+}
+.wrap{max-width:1160px;margin:auto;padding:36px 22px 64px}
+h1{font-size:42px;line-height:1.08;letter-spacing:-.035em;margin:0 0 10px}
+h2{font-size:21px;margin:0 0 16px}
+p{color:var(--muted);margin:0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.card{background:linear-gradient(180deg,rgba(16,27,47,.97),rgba(12,22,40,.97));
+ border:1px solid var(--line);border-radius:20px;padding:25px;margin-top:20px;
+ box-shadow:0 18px 55px rgba(0,0,0,.28)}
+.hero{display:grid;grid-template-columns:1.4fr .8fr;gap:18px}
+.tag{display:inline-block;padding:5px 10px;border-radius:99px;border:1px solid #35507d;
+ color:#bed5ff;background:#13213b;font-size:12px;font-weight:800;margin-bottom:16px}
+.bigidea{font-size:18px;margin-top:20px;padding:15px 17px;border-radius:13px;background:#0a1426;border:1px solid #294163}
+.bigidea b{color:var(--green)}
+.controls label{display:flex;justify-content:space-between;margin:10px 0 7px}
+.controls input{width:100%;accent-color:var(--blue)}
+.btnrow{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+button{border:1px solid #355078;background:#14233e;color:#eaf2ff;padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+button:hover{background:#1a2d4d}
+.legend{display:flex;gap:17px;flex-wrap:wrap;margin-bottom:16px}
+.legend span{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%}
+.layers{display:grid;grid-template-columns:repeat(50,1fr);gap:3px}
+.layer{height:35px;border-radius:5px;transition:.2s;position:relative}
+.res{background:linear-gradient(#62e9ad,#37b980)}
+.str{background:#273651}
+.str.active{background:linear-gradient(#ffd08b,#ee9d3e);box-shadow:0 0 18px rgba(255,187,103,.35)}
+.axis{display:flex;justify-content:space-between;font-size:11px;color:#7185a7;margin-top:7px}
+.stage{display:grid;grid-template-columns:240px 1fr;gap:22px;align-items:stretch}
+.cpu,.gpu{border:1px solid #2a3d5d;border-radius:16px;background:#091527;padding:18px}
+.cpu h3,.gpu h3{margin:0 0 12px}
+.cpu-stack{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cpu-block{font-size:11px;padding:7px 2px;text-align:center;border:1px solid #344664;border-radius:7px;color:#9eafc8}
+.cpu-block.active{border-color:var(--orange);color:#ffd7a3;background:rgba(255,187,103,.09)}
+.gpu{display:grid;grid-template-rows:auto auto auto;gap:15px}
+.residentbox{border:1px solid rgba(86,230,165,.45);background:rgba(86,230,165,.07);border-radius:13px;padding:14px}
+.residentgrid{display:grid;grid-template-columns:repeat(20,1fr);gap:4px;margin-top:10px}
+.rblock{height:22px;border-radius:4px;background:var(--green);opacity:.82}
+.buffers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.buffer{min-height:105px;border-radius:14px;border:2px dashed #405676;background:#0c182b;padding:14px;position:relative;transition:.25s}
+.buffer.current{border-color:var(--orange);background:rgba(255,187,103,.07)}
+.buffer.prefetch{border-color:var(--blue);background:rgba(114,167,255,.07)}
+.buffer .title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.buffer .blockname{font-size:24px;font-weight:850;margin-top:10px}
+.badge{font-size:11px;padding:3px 7px;border-radius:99px;display:inline-block;margin-top:6px}
+.compute{color:#ffd6a0;background:rgba(255,187,103,.14)}
+.prefetchb{color:#c5d8ff;background:rgba(114,167,255,.14)}
+.free{color:#9caecc;background:#17233a}
+.timeline{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.tick{border:1px solid #2c3d5a;border-radius:10px;background:#0a1527;padding:10px;min-height:82px}
+.tick strong{display:block;margin-bottom:5px}
+.tick small{color:var(--muted)}
+.arrowbox{text-align:center;color:#7f94b5;font-size:14px;padding:8px 0}
+.callout{border-left:3px solid var(--blue);background:#0a1527;padding:13px 15px;border-radius:0 12px 12px 0;color:#b8c8e2;margin-top:15px}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sum{padding:16px;border:1px solid #2a3d5d;background:#0a1527;border-radius:13px}
+.sum b{display:block;font-size:18px;margin-bottom:4px}
+.green{color:var(--green)}.orange{color:var(--orange)}.blue{color:var(--blue)}
+@media(max-width:850px){
+ .hero,.stage,.summary{grid-template-columns:1fr}
+ .residentgrid{grid-template-columns:repeat(10,1fr)}
+ .layers{gap:2px}.layer{height:26px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="card" style="margin-top:0">
+      <div class="tag">vLLM-Omni DLO mental model</div>
+      <h1>Resident blocks stay.<br>Tail blocks <span class="orange">flow through buffers.</span></h1>
+      <p>Example: <code>--dlo-resident-layers 20</code> on a 50-block DiT.</p>
+      <div class="bigidea"><b>Important:</b> streamed blocks are not copied back to CPU after compute. Their CPU weights already exist. The GPU buffer is simply overwritten by a later block.</div>
+    </div>
+    <div class="card controls" style="margin-top:0">
+      <h2>Animation</h2>
+      <label><span>Current tail block</span><strong id="curLabel">20</strong></label>
+      <input id="cur" type="range" min="20" max="49" value="20">
+      <label><span>Denoise step</span><strong id="stepLabel">1</strong></label>
+      <input id="step" type="range" min="1" max="50" value="1">
+      <div class="btnrow">
+        <button id="prev">← Previous</button>
+        <button id="play">▶ Play</button>
+        <button id="next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>1. Weight placement</h2>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--green)"></i>Blocks 0–19: resident</span>
+      <span><i class="dot" style="background:var(--orange)"></i>Current streamed block</span>
+      <span><i class="dot" style="background:#273651"></i>Other CPU-backed tail blocks</span>
+    </div>
+    <div id="layers" class="layers"></div>
+    <div class="axis"><span>Block 0</span><span>Block 49</span></div>
+  </section>
+
+  <section class="card">
+    <h2>2. What is physically happening</h2>
+    <div class="stage">
+      <div class="cpu">
+        <h3>CPU pinned memory</h3>
+        <p style="font-size:12px;margin-bottom:12px">Master/offloaded tail weights remain here.</p>
+        <div id="cpuStack" class="cpu-stack"></div>
+      </div>
+
+      <div class="gpu">
+        <div class="residentbox">
+          <strong class="green">GPU resident region — Blocks 0–19</strong>
+          <p style="font-size:12px">Loaded once when denoising begins; reused across all denoising steps.</p>
+          <div class="residentgrid" id="residentGrid"></div>
+        </div>
+
+        <div class="arrowbox" id="transferText">CPU → H2D prefetch → GPU buffer A</div>
+
+        <div class="buffers">
+          <div id="bufA" class="buffer current">
+            <div class="title">GPU buffer A</div>
+            <div class="blockname" id="bufAName">Block 20</div>
+            <span id="bufABadge" class="badge compute">compute now</span>
+          </div>
+          <div id="bufB" class="buffer prefetch">
+            <div class="title">GPU buffer B</div>
+            <div class="blockname" id="bufBName">Block 21</div>
+            <span id="bufBBadge" class="badge prefetchb">prefetch next</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" id="overwriteCallout"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. Ping-pong buffer timeline</h2>
+    <div id="timeline" class="timeline"></div>
+    <div class="callout">
+      Buffer A holds block 20, then later gets <b>overwritten by block 22</b>. Buffer B holds block 21, then later gets <b>overwritten by block 23</b>. No GPU→CPU weight copy is needed.
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>4. Across denoising steps</h2>
+    <div class="summary">
+      <div class="sum">
+        <b class="green">Blocks 0–19</b>
+        <p>Stay on GPU throughout the denoising stage.</p>
+      </div>
+      <div class="sum">
+        <b class="orange">Blocks 20–49</b>
+        <p>Stream from CPU again on every denoising step.</p>
+      </div>
+      <div class="sum">
+        <b class="blue">After denoising</b>
+        <p>Resident layers can be released before VAE decode so VAE reuses HBM.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const cur = document.getElementById('cur');
+const step = document.getElementById('step');
+let timer = null;
+
+function init(){
+  const layers=document.getElementById('layers');
+  for(let i=0;i<50;i++){
+    const d=document.createElement('div');
+    d.id='layer'+i;
+    d.className='layer '+(i<20?'res':'str');
+    d.title='Block '+i;
+    layers.appendChild(d);
+  }
+
+  const cpu=document.getElementById('cpuStack');
+  for(let i=20;i<50;i++){
+    const d=document.createElement('div');
+    d.id='cpu'+i;
+    d.className='cpu-block';
+    d.textContent=i;
+    cpu.appendChild(d);
+  }
+
+  const rg=document.getElementById('residentGrid');
+  for(let i=0;i<20;i++){
+    const d=document.createElement('div');
+    d.className='rblock'; d.title='Block '+i;
+    rg.appendChild(d);
+  }
+}
+
+function renderTimeline(c){
+  const t=document.getElementById('timeline');
+  t.innerHTML='';
+  const start=Math.max(20,Math.min(c-2,44));
+  for(let i=start;i<Math.min(start+6,50);i++){
+    const a=i%2===0?'A':'B';
+    const next=i+1<50?`While computing ${i}, prefetch ${i+1}`:'Final tail block';
+    t.innerHTML += `<div class="tick"><strong>Block ${i} → Buffer ${a}</strong><small>${next}</small></div>`;
+  }
+}
+
+function render(){
+  const c=+cur.value;
+  const s=+step.value;
+  document.getElementById('curLabel').textContent=c;
+  document.getElementById('stepLabel').textContent=s;
+
+  for(let i=20;i<50;i++){
+    document.getElementById('layer'+i).classList.toggle('active',i===c);
+    document.getElementById('cpu'+i).classList.toggle('active',i===c || i===c+1);
+  }
+
+  const currentBuf = c%2===0?'A':'B';
+  const nextBuf = currentBuf==='A'?'B':'A';
+  const next = c<49 ? c+1 : null;
+
+  const A=document.getElementById('bufA'), B=document.getElementById('bufB');
+  A.className='buffer'; B.className='buffer';
+
+  function fill(buf,name,badge,role,block){
+    document.getElementById(name).textContent=block===null?'—':`Block ${block}`;
+    const be=document.getElementById(badge);
+    if(role==='compute'){
+      buf.classList.add('current');be.className='badge compute';be.textContent='compute now';
+    } else if(role==='prefetch'){
+      buf.classList.add('prefetch');be.className='badge prefetchb';be.textContent='prefetch next';
+    } else {
+      be.className='badge free';be.textContent='available / old data overwritten';
+    }
+  }
+
+  if(currentBuf==='A'){
+    fill(A,'bufAName','bufABadge','compute',c);
+    fill(B,'bufBName','bufBBadge',next!==null?'prefetch':'free',next);
+  } else {
+    fill(B,'bufBName','bufBBadge','compute',c);
+    fill(A,'bufAName','bufABadge',next!==null?'prefetch':'free',next);
+  }
+
+  document.getElementById('transferText').textContent =
+    next!==null
+      ? `Denoise step ${s}: compute Block ${c} while H2D-prefetching Block ${next} into Buffer ${nextBuf}`
+      : `Denoise step ${s}: compute final tail Block 49`;
+
+  if(c>=22){
+    const old=c-2;
+    document.getElementById('overwriteCallout').innerHTML =
+      `<b>Buffer reuse:</b> Block ${old}'s GPU storage is no longer needed. Buffer ${currentBuf} is now holding Block ${c}; the old contents were simply overwritten. CPU still has Block ${old}'s weights for the next denoise step.`;
+  } else {
+    document.getElementById('overwriteCallout').innerHTML =
+      `<b>Start of the streamed tail:</b> Block ${c} is in Buffer ${currentBuf}. ${next!==null?`Block ${next} is prefetched into Buffer ${nextBuf} while Block ${c} computes.`:''}`;
+  }
+
+  renderTimeline(c);
+}
+
+function advance(delta){
+  let v=+cur.value+delta;
+  if(v>49){
+    v=20;
+    step.value=Math.min(50,+step.value+1);
+  }
+  if(v<20){
+    v=49;
+    step.value=Math.max(1,+step.value-1);
+  }
+  cur.value=v; render();
+}
+
+document.getElementById('next').onclick=()=>advance(1);
+document.getElementById('prev').onclick=()=>advance(-1);
+document.getElementById('play').onclick=()=>{
+  const b=document.getElementById('play');
+  if(timer){clearInterval(timer);timer=null;b.textContent='▶ Play';}
+  else{timer=setInterval(()=>advance(1),800);b.textContent='⏸ Pause';}
+};
+cur.oninput=render; step.oninput=render;
+init(); render();
+</script>
+</body>
+</html>
