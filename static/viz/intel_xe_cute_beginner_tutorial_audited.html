@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Intel Xe CuTe — Audited Beginner Tutorial</title>
+<style>
+:root{
+  --bg:#07111f; --panel:#0d1b2a; --panel2:#10243a; --text:#e9f2fb; --muted:#9bb0c5;
+  --cyan:#32d6ff; --blue:#6ca8ff; --green:#70e1a1; --amber:#ffc66d; --pink:#ff8cc6;
+  --line:#223b55; --code:#06101c; --shadow:0 16px 50px rgba(0,0,0,.26);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#06101b,#071522 45%,#08111c);color:var(--text);
+     font:16px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:var(--cyan);text-decoration:none} a:hover{text-decoration:underline}
+#progress{position:fixed;left:0;top:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--green));width:0;z-index:100}
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1440px;margin:auto}
+aside{position:sticky;top:0;height:100vh;padding:28px 20px;border-right:1px solid var(--line);background:rgba(5,15,25,.88);backdrop-filter:blur(16px)}
+.brand{font-weight:800;letter-spacing:.02em;font-size:18px;margin-bottom:4px}
+.brand b{color:var(--cyan)} .small{font-size:12px;color:var(--muted)}
+nav{margin-top:24px;display:grid;gap:5px}
+nav a{padding:8px 10px;border-radius:9px;color:#b9c9d8;font-size:13px;text-decoration:none}
+nav a:hover,nav a.active{background:#11283d;color:white}
+main{min-width:0}
+.hero{padding:76px clamp(24px,6vw,80px) 56px;border-bottom:1px solid var(--line);
+background:
+radial-gradient(circle at 82% 18%,rgba(50,214,255,.16),transparent 28%),
+radial-gradient(circle at 66% 35%,rgba(112,225,161,.10),transparent 24%)}
+.eyebrow{font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--cyan)}
+h1{font-size:clamp(40px,6vw,76px);line-height:1.02;margin:14px 0 20px;max-width:980px;letter-spacing:-.045em}
+.hero p{font-size:20px;max-width:850px;color:#b9ccdd}
+.pills{display:flex;gap:9px;flex-wrap:wrap;margin-top:26px}.pill{border:1px solid #31506b;background:#0d2032;padding:7px 11px;border-radius:999px;font-size:12px;color:#c8d8e7}
+.content{padding:0 clamp(24px,6vw,80px) 100px}
+section{padding:66px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+h2{font-size:34px;line-height:1.15;margin:0 0 15px;letter-spacing:-.02em}
+h3{font-size:21px;margin:30px 0 10px} p{max-width:900px}
+.lead{font-size:18px;color:#c2d1de}.muted{color:var(--muted)}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{background:linear-gradient(180deg,rgba(16,36,58,.9),rgba(10,27,43,.9));border:1px solid #24425e;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.card h3{margin-top:0}.kicker{font:700 11px/1 ui-monospace,monospace;color:var(--cyan);text-transform:uppercase;letter-spacing:.12em}
+.callout{border-left:3px solid var(--cyan);background:rgba(50,214,255,.07);padding:15px 18px;border-radius:0 12px 12px 0;margin:20px 0;max-width:900px}
+.warn{border-color:var(--amber);background:rgba(255,198,109,.07)}
+.good{border-color:var(--green);background:rgba(112,225,161,.07)}
+code{font-family:"SFMono-Regular",Consolas,monospace;color:#d9efff}
+pre{margin:14px 0;background:var(--code);border:1px solid #1b3650;border-radius:13px;padding:18px;overflow:auto;line-height:1.5;font-size:13px}
+table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+th,td{padding:11px 12px;border-bottom:1px solid #27405a;text-align:left;vertical-align:top}
+th{color:#fff;background:#10243a;position:sticky;top:0} td{color:#c4d2df}
+.term{color:var(--cyan);font-family:ui-monospace,monospace}
+.diagram{background:#081725;border:1px solid #294863;border-radius:16px;padding:24px;overflow:auto}
+.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.node{min-width:130px;padding:13px 15px;border:1px solid #35536e;border-radius:12px;background:#0d2235;text-align:center}
+.node strong{display:block}.node small{color:var(--muted)}.arrow{color:var(--cyan);font-size:22px}
+.levels{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px}
+.level{padding:16px;border-radius:13px;border:1px solid #30506e;background:#0d2133;text-align:center}
+.level b{display:block;color:white}.level span{font-size:12px;color:var(--muted)}
+.badge{display:inline-block;padding:2px 7px;border-radius:6px;background:#16314a;color:var(--cyan);font:12px ui-monospace,monospace}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0}
+button{border:1px solid #365a76;background:#10263b;color:white;border-radius:9px;padding:8px 11px;cursor:pointer}
+button:hover,button.on{border-color:var(--cyan);background:#13344c}
+.layout-grid{display:grid;grid-template-columns:repeat(4,58px);gap:5px;margin-top:14px}
+.cell{height:58px;border:1px solid #35536e;border-radius:9px;background:#0d2235;display:flex;align-items:center;justify-content:center;
+font:12px ui-monospace,monospace;cursor:pointer;position:relative}
+.cell:hover{border-color:var(--cyan)}.cell i{position:absolute;right:5px;bottom:3px;color:#6f8da8;font-size:9px;font-style:normal}
+.big-number{font-size:44px;font-weight:800;letter-spacing:-.04em;color:var(--cyan)}
+.pipeline{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:16px 0}
+.pipe{padding:14px 8px;min-height:72px;display:flex;flex-direction:column;justify-content:center;border:1px solid #31506b;border-radius:10px;text-align:center;font-size:12px;background:#0a1d2d;transition:.2s}
+.pipe.hot{background:#12374c;border-color:var(--cyan);transform:translateY(-2px)}
+.quiz button{display:block;width:100%;text-align:left;margin:7px 0}.quiz .answer{display:none;color:var(--green);margin-top:8px}
+.timeline{display:grid;gap:12px}.step{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+.num{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#143653;color:var(--cyan);font-weight:800}
+.source-list li{margin:8px 0}.source-list a{overflow-wrap:anywhere}
+footer{padding:32px clamp(24px,6vw,80px);color:#7f96aa;font-size:12px}
+@media (max-width:980px){.shell{display:block}aside{display:none}.g2,.g3{grid-template-columns:1fr}.levels{grid-template-columns:1fr 1fr}.pipeline{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:560px){.hero{padding-top:52px}.levels{grid-template-columns:1fr}.layout-grid{grid-template-columns:repeat(4,50px)}.cell{height:50px}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="shell">
+<aside>
+<div class="brand">Intel Xe <b>CuTe</b></div>
+<div class="small">Visual beginner tutorial</div>
+<nav>
+<a href="#start">0 · Mental model</a>
+<a href="#vocab">1 · Vocabulary</a>
+<a href="#layout">2 · Layout</a>
+<a href="#tensor">3 · Tensor</a>
+<a href="#xe">4 · Xe building blocks</a>
+<a href="#mma">5 · DPAS / XMX</a>
+<a href="#gemm">6 · GEMM walkthrough</a>
+<a href="#copies">7 · 2D block copies</a>
+<a href="#perf">8 · Performance</a>
+<a href="#code">9 · Read xe_gemm.cpp</a>
+<a href="#quiz">10 · Check yourself</a>
+<a href="#sources">Sources</a>
+</nav>
+</aside>
+<main>
+<header class="hero">
+<div class="eyebrow">SYCL*TLA · CuTe · Intel Xe · Audited against current repository docs</div>
+<h1>From Layout Algebra to Intel Xe XMX GEMM</h1>
+<p>A practical tutorial for engineers who know GPU programming but are new to the Intel Xe path in SYCL*TLA. The core mental model is <b>Layout → Tensor → Tile → 2D block copy → register fragment → DPAS/XMX → store</b>.</p>
+<div class="pills"><span class="pill">16-work-item subgroups</span><span class="pill">XE_LOAD_2D*</span><span class="pill">XE_DPAS_TT</span><span class="pill">TiledMMAHelper</span><span class="pill">Global memory → GRF</span></div>
+</header>
+<div class="content">
+<section id="start">
+<div class="kicker">0 · Start here</div>
+<h2>The one picture to keep in your head</h2>
+<p class="lead">CuTe is a C++ template library for describing and operating on hierarchical multidimensional layouts of data and execution. Its central abstractions are <code>Layout</code> and <code>Tensor</code>; Intel's Xe path adds Xe-specific copy and MMA atoms that plug into the same CuTe layout machinery.</p>
+<div class="callout warn"><b>Scope note:</b> statements such as “16-work-item subgroup” and the copy/MMA constraints below refer to the Intel Xe path documented by the current SYCL*TLA repository. They should not be read as universal statements about every Intel GPU API or every possible kernel implementation.</div>
+<div class="diagram">
+<div class="flow">
+<div class="node"><strong>Global tensors</strong><small>A(M,K), B(N,K), C(M,N)</small></div><div class="arrow">→</div>
+<div class="node"><strong>local_tile()</strong><small>select a work-group tile</small></div><div class="arrow">→</div>
+<div class="node"><strong>2D block load</strong><small>global/L1 → GRF</small></div><div class="arrow">→</div>
+<div class="node"><strong>reorder() if needed</strong><small>copy layout → MMA layout</small></div><div class="arrow">→</div>
+<div class="node"><strong>gemm()</strong><small>DPAS on XMX</small></div><div class="arrow">→</div>
+<div class="node"><strong>2D store</strong><small>GRF partition → global</small></div>
+</div>
+</div>
+<div class="callout good"><b>Beginner rule:</b> when a CuTe type looks intimidating, first ask: <b>what is its shape?</b> <b>what is its layout/stride?</b> and <b>which work-items or subgroups participate in it?</b></div>
+</section>
+<section id="vocab">
+<div class="kicker">1 · Translation layer</div>
+<h2>CUDA/CUTLASS words vs Intel/SYCL words</h2>
+<p>The SYCL*TLA documentation inherits substantial terminology from upstream CUTLASS. The table below is a programming analogy, not a claim that NVIDIA and Intel hardware structures are physically identical.</p>
+<table>
+<thead><tr><th>CUDA / CUTLASS term</th><th>Intel / SYCL*TLA term</th><th>Correct mental model for this tutorial</th></tr></thead>
+<tbody>
+<tr><td>thread</td><td><span class="term">work-item</span></td><td>One SYCL execution item.</td></tr>
+<tr><td>warp</td><td><span class="term">sub_group</span></td><td>The lockstep execution group used by this Xe path; the documented kernels require 16 work-items per subgroup.</td></tr>
+<tr><td>CTA / threadblock</td><td><span class="term">work-group</span></td><td>A group of work-items that can synchronize and, when used, share local memory.</td></tr>
+<tr><td>shared memory (SMEM)</td><td><span class="term">Shared Local Memory (SLM)</span></td><td>On-chip work-group-shared scratchpad memory.</td></tr>
+<tr><td>register file / register fragments</td><td><span class="term">GRF</span></td><td>General Register File storage holding copy fragments, MMA fragments, and accumulators.</td></tr>
+<tr><td>Tensor Core</td><td><span class="term">XMX</span></td><td>Xe Matrix Extensions, the hardware matrix engine used by DPAS.</td></tr>
+<tr><td><code>mma.sync</code> / HMMA</td><td><span class="term">DPAS / <code>XE_DPAS_TT</code></span></td><td>The matrix multiply-accumulate instruction/atom used by this CuTe Xe path.</td></tr>
+<tr><td><code>cp.async</code> / TMA</td><td><span class="term">Xe 2D block operations</span></td><td>An analogy for optimized data movement only; Xe 2D loads/prefetches have their own semantics and constraints.</td></tr>
+</tbody>
+</table>
+</section>
+<section id="layout">
+<div class="kicker">2 · CuTe core</div>
+<h2>Layout = Shape + Stride = coordinate → index mapping</h2>
+<p class="lead">A CuTe <code>Layout</code> is a pair of <code>Shape</code> and <code>Stride</code>. Semantically, it maps a logical coordinate inside the shape to an index. Shapes and strides can contain static compile-time integers, dynamic runtime integers, or hierarchical tuples of them.</p>
+<div class="grid g2">
+<div class="card">
+<h3>Example</h3>
+<pre><code>// 4 × 4; mode 0 has stride 1
+using L = Layout&lt;
+  Shape&lt;_4,_4&gt;,
+  Stride&lt;_1,_4&gt;
+&gt;;</code></pre>
+<p>For coordinate <code>(m,n)</code>, this layout maps to <code>m*1 + n*4</code>. Swapping the two strides changes the mapping without changing the logical coordinate interface.</p>
+</div>
+<div class="card">
+<h3>Interactive layout explorer</h3>
+<div class="controls">
+<button class="on" id="colBtn">Stride (1,4)</button>
+<button id="rowBtn">Stride (4,1)</button>
+</div>
+<div class="layout-grid" id="layoutGrid"></div>
+<div class="small" id="layoutMsg">Tap a cell to inspect its coordinate → index mapping.</div>
+</div>
+</div>
+<h3>Why layout algebra matters</h3>
+<div class="grid g3">
+<div class="card"><span class="badge">composition</span><p>Functional composition is central to CuTe. For scalar coordinates, if <code>R = A ∘ B</code>, then <code>R(c) = A(B(c))</code>.</p></div>
+<div class="card"><span class="badge">tile / divide</span><p>Layout algebra can factor a larger logical domain into tiles and residual coordinates. <code>local_tile()</code> is a convenient tensor-level operation for selecting a tile from a larger tensor.</p></div>
+<div class="card"><span class="badge">partition</span><p><code>TiledMMA</code> and <code>TiledCopy</code> partition functions map logical tensor coordinates onto the work-items/subgroups participating in an operation.</p></div>
+</div>
+<div class="callout"><b>Key insight:</b> CuTe moves much of the address, tiling, and ownership logic into composable layouts instead of handwritten index arithmetic.</div>
+</section>
+<section id="tensor">
+<div class="kicker">3 · Put data behind the mapping</div>
+<h2>Tensor = Engine + Layout</h2>
+<p>A CuTe <code>Tensor</code> combines a layout with an engine. The engine is a wrapper around an iterator or array; the layout maps logical coordinates to indices used to access that engine. Data may live in global memory, shared/local memory, register memory, or be transformed/generated on the fly.</p>
+<div class="diagram">
+<div class="flow">
+<div class="node"><strong>coordinate</strong><small>(m,k)</small></div><div class="arrow">→</div>
+<div class="node"><strong>Layout</strong><small>shape + stride</small></div><div class="arrow">→</div>
+<div class="node"><strong>index</strong><small>logical → linear</small></div><div class="arrow">→</div>
+<div class="node"><strong>Engine</strong><small>iterator / storage</small></div><div class="arrow">→</div>
+<div class="node"><strong>value</strong><small>A(m,k)</small></div>
+</div>
+</div>
+<h3>CuTe GEMM mode convention</h3>
+<p>For GEMM, CuTe uses the logical tensor modes <code>A(M,K)</code>, <code>B(N,K)</code>, and <code>C(M,N)</code>. This differs from the conventional BLAS view of B as <code>(K,N)</code>. Keeping K as the second mode of both inputs lets generic implementations reduce over the same logical mode for A and B. The <b>physical memory layout is still determined by each tensor's strides</b>.</p>
+</section>
+<section id="xe">
+<div class="kicker">4 · Intel-specific pieces</div>
+<h2>What the Intel Xe path adds to upstream CuTe</h2>
+<div class="levels">
+<div class="level"><b>Work-group</b><span>computes an output tile</span></div>
+<div class="level"><b>16-work-item subgroup</b><span>collective execution unit used here</span></div>
+<div class="level"><b>2D copy atom</b><span>rectangular global↔register operation</span></div>
+<div class="level"><b>SubgroupTensor</b><span>subgroup-distributed register abstraction</span></div>
+<div class="level"><b>XE_DPAS_TT</b><span>XMX MMA atom</span></div>
+</div>
+<div class="grid g2" style="margin-top:18px">
+<div class="card">
+<h3><code>XE_LOAD_2D*</code>, <code>XE_PREFETCH_2D</code>, <code>XE_STORE_2D</code></h3>
+<p>Parameterized Xe copy atoms wrap hardware 2D block operations. Loads can be normal, VNNI-transformed, or transposed where supported; prefetch has no destination fragment and hints data into cache.</p>
+</div>
+<div class="card">
+<h3><code>TiledMMAHelper</code></h3>
+<p>Constructs a <code>TiledMMA</code> from an MMA atom, a work-group tile layout, and a subgroup layout, including the permutation used to map subgroup work onto the tile.</p>
+</div>
+<div class="card">
+<h3><code>SubgroupTensor</code></h3>
+<p>An Intel-specific tensor abstraction that models storage distributed across subgroup lanes. It appears in Intel Xe partitioning, copy, and MMA machinery.</p>
+</div>
+<div class="card">
+<h3>Standard direct-to-GRF mainloop</h3>
+<p>The documented standard Xe GEMM mainloop streams data from global memory (often after prefetch to L1/L2) into GRF with 2D block loads. SLM is skipped in that path; it may still be useful for designs that need cross-subgroup sharing, tiles beyond 2D-load limits, or explicit multi-buffer staging.</p>
+</div>
+</div>
+</section>
+<section id="mma">
+<div class="kicker">5 · Compute atom</div>
+<h2>DPAS: the matrix operation underneath <code>gemm()</code></h2>
+<p class="lead"><code>XE_DPAS_TT&lt;M,...&gt;</code> is the current CuTe Xe atom wrapping a DPAS matrix multiply-accumulate. In the documented API, <b>M is 1–8</b>, <b>N is fixed at 16</b>, and <b>K = 256 / max(bit-width(A), bit-width(B))</b>.</p>
+<div class="grid g2">
+<div class="card">
+<h3>DPAS K explorer</h3>
+<div class="controls" id="dtypeBtns">
+<button class="on" data-bits="16">BF16 / FP16</button>
+<button data-bits="32">TF32</button>
+<button data-bits="8">INT8</button>
+<button data-bits="4">INT4</button>
+</div>
+<div class="big-number" id="kVal">K = 16</div>
+<div class="small">K = 256 / max(input element bit widths)</div>
+</div>
+<div class="card">
+<h3>One DPAS atom computes</h3>
+<pre><code>D[M × 16] += A[M × K] × B[K × 16]</code></pre>
+<p>Examples from the documented formula: BF16/FP16 → K=16, TF32 → K=8, INT8 → K=32, INT4 → K=64. With BF16 and <code>M=8</code>, the atom shape is therefore <code>8×16×16</code>.</p>
+</div>
+</div>
+<h3>From one atom to a tiled MMA</h3>
+<pre><code>// Documented BF16 starting configuration
+using WGTile   = Shape&lt;_256,_256,_32&gt;;
+using SGLayout = Layout&lt;Shape&lt;_8,_4,_1&gt;,
+                        Stride&lt;_4,_1,_0&gt;&gt;;
+
+using Tiled = typename TiledMMAHelper&lt;
+    MMA_Atom&lt;XE_DPAS_TT&lt;8, float, bfloat16_t&gt;&gt;,
+    Layout&lt;WGTile&gt;,
+    SGLayout
+&gt;::TiledMMA;</code></pre>
+<p>This BF16 starting configuration uses a 256×256 output tile and 32 subgroups arranged as an 8×4 grid over M×N. In the pure <code>xe_gemm.cpp</code> tutorial, however, the K tile is selected programmatically as either <code>op.K</code> or <code>2*op.K</code> depending on operand type/layout conditions; <code>_32</code> is therefore a useful BF16 baseline, not a universal K tile.</p>
+</section>
+<section id="gemm">
+<div class="kicker">6 · End-to-end kernel</div>
+<h2>Walk through the Intel Xe CuTe GEMM dataflow</h2>
+<div class="timeline">
+<div class="step"><div class="num">1</div><div><b>Receive CuTe tensors A, B, and C.</b><br/><span class="muted">The tutorial kernel sees <code>A(M,K)</code>, <code>B(N,K)</code>, and <code>C(M,N)</code>, then creates identity-coordinate proxy tensors for tiling.</span></div></div>
+<div class="step"><div class="num">2</div><div><b>Choose the MMA atom and tiled MMA.</b><br/><span class="muted"><code>choose_mma_op()</code> selects a supported <code>XE_DPAS_TT</code> (or a BF16/FP16 fallback), and <code>choose_tiled_mma()</code> chooses the K tile and subgroup layout.</span></div></div>
+<div class="step"><div class="num">3</div><div><b>Use <code>local_tile()</code> to select this work-group's coordinates.</b><br/><span class="muted">The proxy tensors become <code>gA(BLK_M,BLK_K,k)</code>, <code>gB(BLK_N,BLK_K,k)</code>, and <code>gC(BLK_M,BLK_N)</code>.</span></div></div>
+<div class="step"><div class="num">4</div><div><b>Create 2D <code>TiledCopy</code> objects.</b><br/><span class="muted">Factory functions select copy atoms according to element width, tensor layout, and MMA requirements.</span></div></div>
+<div class="step"><div class="num">5</div><div><b>Slice MMA and copy operations with <code>local_id</code>.</b><br/><span class="muted"><code>get_slice(local_id)</code> maps each work-item into its role in the collective MMA/copy operation.</span></div></div>
+<div class="step"><div class="num">6</div><div><b>Allocate separate copy and MMA register fragments.</b><br/><span class="muted">Copy fragments match the layout produced by the 2D load; MMA fragments match the layout required by DPAS.</span></div></div>
+<div class="step"><div class="num">7</div><div><b>Warm the prefetch pipeline.</b><br/><span class="muted"><code>XE_PREFETCH_2D</code> issues cache hints for future K tiles and has no register destination.</span></div></div>
+<div class="step"><div class="num">8</div><div><b>Run the K loop.</b><br/><span class="muted">Split-barrier arrive → 2D loads → future prefetch → optional register reorder → DPAS accumulation → split-barrier wait.</span></div></div>
+<div class="step"><div class="num">9</div><div><b>Store the accumulator partitions.</b><br/><span class="muted">The output <code>TiledCopy</code> maps each register-resident accumulator partition to the appropriate 2D store operation(s); this should not be interpreted as one instruction storing the entire work-group tile.</span></div></div>
+</div>
+<h3>The K-loop as a pipeline</h3>
+<div class="pipeline" id="pipeline">
+<div class="pipe">1<br/><b>barrier arrive</b></div>
+<div class="pipe">2<br/><b>2D load</b></div>
+<div class="pipe">3<br/><b>prefetch ahead</b></div>
+<div class="pipe">4<br/><b>reorder if needed</b></div>
+<div class="pipe">5<br/><b>DPAS</b></div>
+<div class="pipe">6<br/><b>barrier wait</b></div>
+</div>
+<button id="playPipe">Animate one iteration</button>
+<pre><code>// Guarded teaching version of the documented mainloop
+int prefetch_k = 0;
+
+for (; prefetch_k &lt; min(prefetch_dist, k_tile_count); ++prefetch_k) {
+  prefetch(prefetch_a, A_prefetch_tile(prefetch_k));
+  prefetch(prefetch_b, B_prefetch_tile(prefetch_k));
+}
+
+for (int k_tile = 0; k_tile &lt; k_tile_count; ++k_tile, ++prefetch_k) {
+  barrier_arrive(barrier_scope);
+
+  copy(copy_a, A_tile(k_tile), a_copy_regs);
+  copy(copy_b, B_tile(k_tile), b_copy_regs);
+
+  if (prefetch_k &lt; k_tile_count) {
+    prefetch(prefetch_a, A_prefetch_tile(prefetch_k));
+    prefetch(prefetch_b, B_prefetch_tile(prefetch_k));
+  }
+
+  reorder(a_copy_regs, a_mma_regs);
+  reorder(b_copy_regs, b_mma_regs);
+  gemm(mma, a_mma_regs, b_mma_regs, accum);
+
+  barrier_wait(barrier_scope);
+}
+
+copy(copy_c, accum, C_partition);</code></pre>
+<div class="callout warn"><b>Why two fragment layouts?</b> The 2D copy atom and the MMA atom can require different register distributions. If the layouts match, the compiler can elide <code>reorder()</code>; otherwise it becomes a subgroup-scope register-to-register shuffle. The Intel performance guide describes this shuffle as replacing an SLM store-and-reload alternative.</div>
+</section>
+<section id="copies">
+<div class="kicker">7 · Data movement</div>
+<h2>Understand Xe 2D block copies before tuning GEMM</h2>
+<p>Xe 2D block I/O is subgroup-cooperative: 16 work-items cooperate on a rectangular memory region. CuTe exposes these operations through parameterized copy atoms and maps their results into subgroup-distributed register fragments.</p>
+<div class="callout"><b>API-version note:</b> <code>xe_2d_copy.md</code> still explains the legacy <code>XE_2D_*</code> names. The current API uses parameterized atoms such as <code>XE_LOAD_2D</code>, <code>XE_LOAD_2D_VNNI</code>, <code>XE_LOAD_2D_TRANSPOSE</code>, <code>XE_PREFETCH_2D</code>, and <code>XE_STORE_2D</code>. The data-distribution concepts in the legacy document still apply.</div>
+<table>
+<thead><tr><th>Current CuTe atom</th><th>Purpose</th><th>Important current constraint / role</th></tr></thead>
+<tbody>
+<tr><td><code>XE_LOAD_2D</code></td><td>Normal rectangular 2D load</td><td>General row-major-style block load; supports block counts 1, 2, or 4.</td></tr>
+<tr><td><code>XE_LOAD_2D_VNNI</code></td><td>2D load with VNNI transform</td><td>Used for B-style VNNI packing; <code>Bits</code> must be 8 or 16.</td></tr>
+<tr><td><code>XE_LOAD_2D_TRANSPOSE</code></td><td>2D load with transpose</td><td>Current parameterized atom supports 32- or 64-bit elements and has additional width/shape limits.</td></tr>
+<tr><td><code>XE_PREFETCH_2D</code></td><td>2D cache prefetch</td><td>No destination fragment; hints future data into L1/L2.</td></tr>
+<tr><td><code>XE_STORE_2D</code></td><td>Rectangular 2D store</td><td>Store height is limited to 8 rows.</td></tr>
+</tbody>
+</table>
+<div class="grid g2">
+<div class="card">
+<h3>Legacy 32×16 U16 distribution example</h3>
+<p>For the documented unpacked <code>XE_2D_U16x32x16_LD_N</code> example, a 16-work-item subgroup loads 32 rows × 16 columns, and each work-item receives one column containing 32 elements.</p>
+<div class="diagram"><code>work-item 0  → column 0<br/>work-item 1  → column 1<br/>…<br/>work-item 15 → column 15</code></div>
+</div>
+<div class="card">
+<h3>What VNNI means here</h3>
+<p>VNNI combines elements from multiple rows of one column and packs them into 32-bit values. It changes the register/storage format; it does not numerically transform the element values.</p>
+</div>
+</div>
+<h3>Current 2D-operation limits highlighted by the performance guide</h3>
+<table>
+<thead><tr><th>Constraint</th><th>Value</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Base pointer alignment</td><td><b>64 bytes</b></td><td>All 2D operations.</td></tr>
+<tr><td>Pitch/stride alignment</td><td><b>16 bytes</b></td><td>The guide notes that 4 bytes may work on some PVC configurations.</td></tr>
+<tr><td>Width alignment</td><td><b>4 bytes</b></td><td>All 2D operations.</td></tr>
+<tr><td>Maximum load/prefetch height</td><td><b>32 rows</b></td><td>Normal, VNNI, transpose loads, and prefetch.</td></tr>
+<tr><td>Maximum store height</td><td><b>8 rows</b></td><td><code>XE_STORE_2D</code>.</td></tr>
+<tr><td>Maximum total width</td><td><b>64 bytes</b></td><td><code>Bits × Width ≤ 512</code>.</td></tr>
+<tr><td>Supported element widths</td><td><b>8 / 16 / 32 / 64 bits</b></td><td><code>Bits</code> describes element width for the memory operation, not necessarily a unique C++ numeric type.</td></tr>
+</tbody>
+</table>
+</section>
+<section id="perf">
+<div class="kicker">8 · First performance model</div>
+<h2>Tune only after you can explain the dataflow</h2>
+<table>
+<thead><tr><th>Knob</th><th>Why increase/change it?</th><th>What to watch</th></tr></thead>
+<tbody>
+<tr><td>M / N tile</td><td>More compute per work-group can improve XMX utilization.</td><td>Larger accumulator footprint, possible GRF spill, and fewer concurrent work-groups.</td></tr>
+<tr><td>K tile</td><td>Fewer 2D-load issues across the full K reduction can amortize load overhead.</td><td>Larger copy fragments and GRF pressure; K must be a multiple of the DPAS K dimension.</td></tr>
+<tr><td>Subgroup count/layout</td><td>Changes how the work-group tile is distributed and can improve utilization/locality.</td><td>Smaller per-subgroup tiles and diminishing returns; the documented baseline uses 32 subgroups.</td></tr>
+<tr><td>Prefetch depth</td><td>Prefetch future K blocks while current data computes on XMX.</td><td>Too few stages expose memory latency; deeper staged pipelines can increase live state/GRF pressure. <code>XE_PREFETCH_2D</code> itself has no register destination.</td></tr>
+<tr><td>Copy ↔ MMA layout match</td><td>A matching layout lets the compiler remove <code>reorder()</code>.</td><td>A mismatch becomes a register-to-register subgroup shuffle.</td></tr>
+<tr><td>SLM staging</td><td>Useful for designs needing sharing, explicit buffering, or data beyond direct 2D-load limits.</td><td>Extra copies and synchronization can negate the benefit.</td></tr>
+</tbody>
+</table>
+<div class="callout good"><b>Documented BF16/BMG starting point:</b> <code>Shape&lt;_256,_256,_32&gt;</code>, an <code>8×4</code> subgroup layout (32 subgroups), and <code>PipelineStages = 2</code> in the referenced BMG GEMM example. The pure <code>xe_gemm.cpp</code> tutorial separately uses a prefetch distance of 3. These are starting points, not universal optima.</div>
+<h3>Correctness-first tuning sequence</h3>
+<ol>
+<li>Verify the required 16-work-item subgroup configuration.</li>
+<li>Verify 2D-copy base-pointer, pitch, width, and shape constraints.</li>
+<li>Profile whether the kernel is bandwidth-bound or compute-bound.</li>
+<li>Adjust M/N/K tile dimensions one change at a time and watch GRF spill.</li>
+<li>Adjust prefetch depth and measure rather than assuming more stages are better.</li>
+<li>Inspect whether <code>reorder()</code> is compiled away or remains a shuffle.</li>
+</ol>
+</section>
+<section id="code">
+<div class="kicker">9 · Source-reading guide</div>
+<h2>How to read <code>examples/cute/tutorial/xe_gemm.cpp</code></h2>
+<p>For a first pass, follow the dataflow instead of reading every template declaration in file order:</p>
+<div class="timeline">
+<div class="step"><div class="num">A</div><div><b><code>gemm_cute()</code></b> — inspect launch geometry and the explicit kernel properties <code>sub_group_size&lt;16&gt;</code> and <code>grf_size&lt;256&gt;</code>.</div></div>
+<div class="step"><div class="num">B</div><div><b><code>choose_mma_op()</code></b> — see how A/B/C element types select a supported <code>XE_DPAS_TT&lt;8,...&gt;</code>, with BF16 or FP16 fallback paths.</div></div>
+<div class="step"><div class="num">C</div><div><b><code>choose_tiled_mma()</code></b> — see how the source chooses <code>_K = op.K</code> or <code>2*op.K</code> and chooses an 8×4 or 4×8 subgroup layout.</div></div>
+<div class="step"><div class="num">D</div><div><b><code>gemm_device()</code> setup</b> — identify the identity tensors, <code>local_tile()</code>, copy factories, slices, partitions, and register fragments.</div></div>
+<div class="step"><div class="num">E</div><div><b>The K loop</b> — follow split barrier → 2D load → prefetch → reorder → <code>gemm()</code> → split-barrier wait.</div></div>
+<div class="step"><div class="num">F</div><div><b>Output copy</b> — inspect <code>tCrC</code>, <code>tCgC</code>, and <code>copy(copy_c, tCrC, tCgC)</code>.</div></div>
+</div>
+<h3>Three source-faithful lines that unlock the file</h3>
+<pre><code>auto wg_tile = mma.tile_mnk();          // work-group M/N/K tile
+auto thr_mma = mma.get_slice(local_id); // this work-item's MMA slice
+gemm(mma, tCrA, tCrB, tCrC);           // DPAS-backed accumulation</code></pre>
+</section>
+<section class="quiz" id="quiz">
+<div class="kicker">10 · Check yourself</div>
+<h2>Five questions before you write your own kernel</h2>
+<button data-a="a1">1. Why is CuTe B logically shaped as (N,K), not (K,N)?</button>
+<div class="answer" id="a1">CuTe keeps K in the second mode of both A and B, so generic GEMM code reduces over the same logical mode. Physical row/column organization is still determined by strides.</div>
+<button data-a="a2">2. Why does the documented standard Xe GEMM mainloop skip SLM?</button>
+<div class="answer" id="a2">Its subgroups can load their required tiles directly from global memory/L1 into GRF with 2D block loads. SLM remains useful for other designs, such as cross-subgroup sharing or tiles beyond direct 2D-load limits.</div>
+<button data-a="a3">3. Why does reorder() exist?</button>
+<div class="answer" id="a3">The copy atom's register layout can differ from the MMA atom's required layout. Matching layouts let the compiler remove the reorder; otherwise it becomes a subgroup register shuffle.</div>
+<button data-a="a4">4. What is DPAS K for BF16, TF32, INT8, and INT4 in the documented formula?</button>
+<div class="answer" id="a4">BF16/FP16: 16; TF32: 8; INT8: 32; INT4: 64.</div>
+<button data-a="a5">5. What should you check first when a CuTe tensor type becomes hard to read?</button>
+<div class="answer" id="a5">Its logical shape, layout/stride, memory/storage role, and which work-items/subgroups own or participate in each fragment.</div>
+</section>
+<section id="sources">
+<div class="kicker">References · audited 2026-08-17</div>
+<h2>Source trail and audit scope</h2>
+<p class="muted">Technical statements in this page were rechecked against the current <code>main</code> branch of Intel SYCL*TLA on August 17, 2026, plus the upstream CuTe GEMM convention where needed. The code blocks labeled as teaching versions are intentionally simplified; source-faithful snippets are labeled explicitly.</p>
+<ul class="source-list">
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/10_intel_overview.md">Intel — CuTe in SYCL*TLA: Intel Overview</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/11_intel_gemm_companion.md">Intel — Intel Xe GPU GEMM Companion</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/12_intel_performance_guide.md">Intel — Performance Tuning Guide for CuTe on Xe</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/01_layout.md">CuTe Layout tutorial</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/02_layout_algebra.md">CuTe Layout Algebra tutorial</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/03_tensor.md">CuTe Tensor tutorial</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/media/docs/cpp/cute/xe_2d_copy.md">Intel Xe 2D Copy Operations (legacy naming, still useful for data distribution)</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/examples/cute/tutorial/xe_gemm.cpp">Reference source — examples/cute/tutorial/xe_gemm.cpp</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/include/cute/arch/mma_xe.hpp">Current Xe MMA atom definitions — mma_xe.hpp</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/include/cute/arch/copy_xe_2d.hpp">Current parameterized Xe 2D copy atoms — copy_xe_2d.hpp</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/include/cute/atom/copy_traits_xe_2d.hpp">Xe 2D copy selection/traits — copy_traits_xe_2d.hpp</a></li>
+<li><a href="https://github.com/intel/sycl-tla/blob/main/include/cute/arch/reorder_xe.hpp">Xe register reorder implementation — reorder_xe.hpp</a></li>
+<li><a href="https://docs.nvidia.com/cutlass/latest/media/docs/cpp/cute/0x_gemm_tutorial.html">Upstream CuTe dense GEMM tutorial — A(M,K), B(N,K), C(M,N) convention</a></li>
+<li><a href="https://github.khronos.org/SPIRV-Registry/extensions/INTEL/SPV_INTEL_2d_block_io.html">Khronos — SPV_INTEL_2d_block_io</a></li>
+</ul>
+</section>
+</div>
+<footer>Audited standalone learning page · Technical scope: current Intel Xe path in SYCL*TLA · No external JavaScript or CSS dependencies.</footer>
+</main>
+</div>
+<script>
+const progress=document.getElementById('progress');
+window.addEventListener('scroll',()=>{
+  const h=document.documentElement.scrollHeight-innerHeight;
+  progress.style.width=(h?scrollY/h*100:0)+'%';
+  const sections=[...document.querySelectorAll('section')];
+  let cur=sections[0]?.id;
+  for(const s of sections){ if(s.getBoundingClientRect().top<140) cur=s.id; }
+  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+});
+
+let mode='col';
+function drawLayout(){
+  const g=document.getElementById('layoutGrid'); g.innerHTML='';
+  for(let m=0;m<4;m++) for(let n=0;n<4;n++){
+    const idx=mode==='col' ? m+n*4 : m*4+n;
+    const d=document.createElement('div'); d.className='cell';
+    d.innerHTML=`${idx}<i>${m},${n}</i>`;
+    d.onclick=()=>document.getElementById('layoutMsg').textContent=`coord (${m},${n}) → index ${idx} using stride ${mode==='col'?'(1,4)':'(4,1)'}`;
+    g.appendChild(d);
+  }
+}
+drawLayout();
+document.getElementById('colBtn').onclick=()=>{mode='col';colBtn.classList.add('on');rowBtn.classList.remove('on');drawLayout()};
+document.getElementById('rowBtn').onclick=()=>{mode='row';rowBtn.classList.add('on');colBtn.classList.remove('on');drawLayout()};
+
+document.querySelectorAll('#dtypeBtns button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#dtypeBtns button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  document.getElementById('kVal').textContent='K = '+(256/Number(b.dataset.bits));
+});
+
+let animating=false;
+document.getElementById('playPipe').onclick=async()=>{
+  if(animating)return; animating=true;
+  const xs=[...document.querySelectorAll('.pipe')];
+  for(const x of xs){xs.forEach(y=>y.classList.remove('hot'));x.classList.add('hot');await new Promise(r=>setTimeout(r,360))}
+  xs.forEach(y=>y.classList.remove('hot')); animating=false;
+};
+
+document.querySelectorAll('.quiz button').forEach(b=>b.onclick=()=>{
+  const a=document.getElementById(b.dataset.a); a.style.display=a.style.display==='block'?'none':'block';
+});
+</script>
+</body>
+</html>
