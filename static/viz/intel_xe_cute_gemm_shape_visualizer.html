@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intel Xe CuTe GEMM Shape Visualizer</title>
+<style>
+:root{
+  --bg:#07111f; --panel:#0d1c2b; --panel2:#10253a; --text:#eaf3fb; --muted:#9eb2c5;
+  --cyan:#35d7ff; --green:#6ee7a5; --amber:#ffc86b; --red:#ff7d8f; --line:#28445e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#06101b,#071522 60%,#08121d);color:var(--text);
+font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1320px;margin:auto;padding:40px 26px 80px}
+h1{font-size:clamp(34px,5vw,64px);line-height:1.02;margin:8px 0 14px;letter-spacing:-.04em}
+h2{font-size:28px;margin:0 0 16px} h3{margin:0 0 8px}
+p{color:#bfd0de;max-width:920px}
+.eyebrow{color:var(--cyan);font:700 12px ui-monospace,monospace;letter-spacing:.13em;text-transform:uppercase}
+.hero{padding:24px 0 36px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}.pill{border:1px solid #31516c;background:#0d2235;padding:6px 10px;border-radius:999px;font-size:12px}
+section{border-top:1px solid var(--line);padding:42px 0}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{background:linear-gradient(180deg,#102338,#0b1a29);border:1px solid #294965;border-radius:16px;padding:18px}
+.kicker{font:700 11px ui-monospace,monospace;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.big{font-size:40px;font-weight:800;letter-spacing:-.04em}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#dff3ff}
+pre{background:#06101b;border:1px solid #1e3951;border-radius:12px;padding:16px;overflow:auto}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:18px 0}
+.node{border:1px solid #35556f;border-radius:12px;background:#0c2133;padding:13px 16px;min-width:150px;text-align:center}
+.node strong{display:block}.node small{color:var(--muted)}.arrow{font-size:23px;color:var(--cyan)}
+.eq{font:700 18px ui-monospace,monospace;background:#071827;border:1px solid #24435c;padding:14px 16px;border-radius:12px;overflow:auto}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.control{background:#0b1c2b;border:1px solid #29465f;border-radius:12px;padding:13px}
+.control label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}
+input{width:100%;font:700 18px ui-monospace,monospace;background:#071522;border:1px solid #36546d;color:white;border-radius:8px;padding:8px 10px}
+.matrix{display:grid;gap:6px;min-width:360px}
+.sg{height:54px;background:#0f2a41;border:1px solid #3a617e;border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 12px ui-monospace,monospace;transition:.15s}
+.sg:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.diagram{overflow:auto;background:#081725;border:1px solid #294862;border-radius:16px;padding:20px}
+.status{padding:13px 15px;border-radius:10px;font-weight:700;margin-top:14px}
+.ok{background:rgba(110,231,165,.09);border:1px solid rgba(110,231,165,.5);color:var(--green)}
+.bad{background:rgba(255,125,143,.09);border:1px solid rgba(255,125,143,.5);color:var(--red)}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{padding:10px 11px;border-bottom:1px solid #29445d;text-align:left} th{background:#10243a}
+.muted{color:var(--muted)} .cyan{color:var(--cyan)} .green{color:var(--green)} .amber{color:var(--amber)}
+.repeat-grid{display:grid;gap:5px;margin-top:12px}.atom{height:42px;border:1px solid #3d607a;background:#10283c;border-radius:7px;display:grid;place-items:center;font:11px ui-monospace,monospace}
+.callout{border-left:3px solid var(--cyan);background:rgba(53,215,255,.06);padding:14px 16px;border-radius:0 10px 10px 0;margin-top:16px}
+@media(max-width:850px){.g2,.g3,.controls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header class="hero">
+  <div class="eyebrow">Intel Xe · CuTe · GEMM</div>
+  <h1>GEMM Shape Hierarchy Visualizer</h1>
+  <p>See how the shapes required by an Intel Xe CuTe GEMM relate to each other, from the full problem down to one DPAS atom.</p>
+  <div class="pills">
+    <span class="pill">Problem (M,N,K)</span>
+    <span class="pill">WGTile (BM,BN,BK)</span>
+    <span class="pill">SGLayout (SGM,SGN,1)</span>
+    <span class="pill">SGTile</span>
+    <span class="pill">DPAS Atom</span>
+    <span class="pill">MMA Repeats</span>
+  </div>
+</header>
+
+<section>
+  <div class="kicker">1 · The complete hierarchy</div>
+  <h2>One picture</h2>
+  <div class="flow">
+    <div class="node"><strong>Problem</strong><small>M × N × K</small></div><div class="arrow">→</div>
+    <div class="node"><strong>WGTile</strong><small>BM × BN × BK</small></div><div class="arrow">→</div>
+    <div class="node"><strong>SGLayout</strong><small>SGM × SGN × 1</small></div><div class="arrow">→</div>
+    <div class="node"><strong>SGTile</strong><small>BM/SGM × BN/SGN × BK</small></div><div class="arrow">→</div>
+    <div class="node"><strong>DPAS Atom</strong><small>AM × AN × AK</small></div><div class="arrow">→</div>
+    <div class="node"><strong>Repeats</strong><small>RM × RN × RK</small></div>
+  </div>
+
+  <div class="eq">WGTile = SGLayout × MMARepeats × MMAAtom</div>
+  <pre><code>BM = SG_M × Repeat_M × Atom_M
+BN = SG_N × Repeat_N × Atom_N
+BK =        Repeat_K × Atom_K</code></pre>
+</section>
+
+<section>
+  <div class="kicker">2 · Interactive configuration</div>
+  <h2>Change the shapes</h2>
+
+  <div class="grid g3">
+    <div class="card">
+      <h3>Work-group tile</h3>
+      <div class="controls">
+        <div class="control"><label>BM</label><input id="bm" type="number" value="256" min="1"></div>
+        <div class="control"><label>BN</label><input id="bn" type="number" value="256" min="1"></div>
+        <div class="control"><label>BK</label><input id="bk" type="number" value="32" min="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Subgroup layout</h3>
+      <div class="controls">
+        <div class="control"><label>SG_M</label><input id="sgm" type="number" value="8" min="1"></div>
+        <div class="control"><label>SG_N</label><input id="sgn" type="number" value="4" min="1"></div>
+        <div class="control"><label>SG_K</label><input id="sgk" type="number" value="1" min="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>DPAS atom</h3>
+      <div class="controls">
+        <div class="control"><label>Atom M</label><input id="am" type="number" value="8" min="1"></div>
+        <div class="control"><label>Atom N</label><input id="an" type="number" value="16" min="1"></div>
+        <div class="control"><label>Atom K</label><input id="ak" type="number" value="16" min="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status" class="status ok">Valid configuration</div>
+</section>
+
+<section>
+  <div class="kicker">3 · Derived shapes</div>
+  <h2>What CuTe derives from your choices</h2>
+  <div class="grid g3">
+    <div class="card">
+      <div class="muted">Work-group tile</div>
+      <div class="big cyan" id="wgOut">256 × 256 × 32</div>
+      <p>One work-group updates a <b>BM × BN</b> output tile while consuming <b>BK</b> values of K per mainloop step.</p>
+    </div>
+    <div class="card">
+      <div class="muted">Subgroup tile</div>
+      <div class="big green" id="sgOut">32 × 64 × 32</div>
+      <p>Derived as <code>(BM/SG_M, BN/SG_N, BK)</code> when K is not split across subgroups.</p>
+    </div>
+    <div class="card">
+      <div class="muted">MMA repetitions per subgroup</div>
+      <div class="big amber" id="repOut">4 × 4 × 2</div>
+      <p>How many DPAS atom positions each subgroup covers in M, N, and K.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">4 · Subgroup grid</div>
+  <h2>How the work-group C tile is divided</h2>
+  <div class="grid g2">
+    <div class="diagram">
+      <div id="sgMatrix" class="matrix"></div>
+    </div>
+    <div class="card">
+      <h3>Relationship</h3>
+      <table>
+        <tr><th>Quantity</th><th>Formula</th><th>Value</th></tr>
+        <tr><td>Subgroups</td><td>SG_M × SG_N × SG_K</td><td id="numSG">32</td></tr>
+        <tr><td>Work-items / WG</td><td>subgroups × 16</td><td id="numWI">512</td></tr>
+        <tr><td>SG tile M</td><td>BM / SG_M</td><td id="sgmTile">32</td></tr>
+        <tr><td>SG tile N</td><td>BN / SG_N</td><td id="sgnTile">64</td></tr>
+      </table>
+      <div class="callout">For the common <code>8×4×1</code> layout, 32 subgroups collectively cover the work-group's <code>256×256</code> C tile.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">5 · One subgroup → DPAS atoms</div>
+  <h2>Tile the subgroup tile with the hardware atom</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Dimension equations</h3>
+      <pre id="eqOut"><code>M: 32 / 8  = 4 repeats
+N: 64 / 16 = 4 repeats
+K: 32 / 16 = 2 repeats
+
+Total = 4 × 4 × 2 = 32 atom applications</code></pre>
+    </div>
+    <div class="diagram">
+      <div class="muted">M×N atom positions for one K slice</div>
+      <div id="atomGrid" class="repeat-grid"></div>
+      <p class="muted" id="kSlices">There are 2 K slices, so this M×N atom grid is traversed twice.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">6 · Validity rules</div>
+  <h2>The shape constraints to remember</h2>
+  <pre><code>BM % SG_M == 0
+BN % SG_N == 0
+
+(BM / SG_M) % Atom_M == 0
+(BN / SG_N) % Atom_N == 0
+
+BK % Atom_K == 0
+
+SG_K == 1     // normal non-split-K GEMM in this tutorial
+subgroup_size = 16</code></pre>
+  <div class="eq">Equivalent: BM % (SG_M × Atom_M) == 0 &nbsp;&nbsp; and &nbsp;&nbsp; BN % (SG_N × Atom_N) == 0</div>
+</section>
+
+<section>
+  <div class="kicker">7 · Concrete BF16 example</div>
+  <h2>Why 256 × 256 × 32 works</h2>
+  <div class="grid g3">
+    <div class="card">
+      <h3>M dimension</h3>
+      <div class="eq">256 = 8 × 4 × 8</div>
+      <p><code>SG_M=8</code>, each subgroup gets 32 rows, then <code>32/Atom_M(8)=4</code> DPAS positions.</p>
+    </div>
+    <div class="card">
+      <h3>N dimension</h3>
+      <div class="eq">256 = 4 × 4 × 16</div>
+      <p><code>SG_N=4</code>, each subgroup gets 64 columns, then <code>64/Atom_N(16)=4</code> DPAS positions.</p>
+    </div>
+    <div class="card">
+      <h3>K dimension</h3>
+      <div class="eq">32 = 2 × 16</div>
+      <p>BF16 DPAS has <code>Atom_K=16</code>; a work-group K tile of 32 therefore contains 2 DPAS-depth steps.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">8 · Map to CuTe code</div>
+  <h2>The types correspond directly to the visual model</h2>
+  <pre><code>using WGTile =
+    Shape&lt;_256, _256, _32&gt;;
+//          BM    BN    BK
+
+using SGLayout =
+    Layout&lt;
+      Shape&lt;_8, _4, _1&gt;,
+      Stride&lt;_4, _1, _0&gt;
+    &gt;;
+//       SG_M SG_N SG_K
+
+using Tiled = typename TiledMMAHelper&lt;
+    MMA_Atom&lt;XE_DPAS_TT&lt;8, float, bfloat16_t&gt;&gt;,
+    Layout&lt;WGTile&gt;,
+    SGLayout
+&gt;::TiledMMA;</code></pre>
+
+  <div class="flow">
+    <div class="node"><strong>DPAS</strong><small>8×16×16</small></div><div class="arrow">+</div>
+    <div class="node"><strong>SGLayout</strong><small>8×4×1</small></div><div class="arrow">+</div>
+    <div class="node"><strong>WGTile</strong><small>256×256×32</small></div><div class="arrow">→</div>
+    <div class="node"><strong>TiledMMA</strong><small>complete ownership map</small></div>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">9 · Global GEMM</div>
+  <h2>How the work-group tile covers the full problem</h2>
+  <p>If the full problem is <code>M=N=K=4096</code> and <code>WGTile=256×256×32</code>:</p>
+  <div class="grid g3">
+    <div class="card"><div class="muted">WG grid in M</div><div class="big">16</div><code>4096 / 256</code></div>
+    <div class="card"><div class="muted">WG grid in N</div><div class="big">16</div><code>4096 / 256</code></div>
+    <div class="card"><div class="muted">K-loop iterations</div><div class="big">128</div><code>4096 / 32</code></div>
+  </div>
+  <div class="callout">The first two work-group dimensions determine <b>where the output tile lives</b>. The third dimension determines <b>how much reduction work is consumed per mainloop iteration</b>.</div>
+</section>
+
+</main>
+
+<script>
+const ids = ['bm','bn','bk','sgm','sgn','sgk','am','an','ak'];
+ids.forEach(id => document.getElementById(id).addEventListener('input', update));
+
+function n(id){ return Math.max(1, Number(document.getElementById(id).value || 1)); }
+
+function update(){
+  const BM=n('bm'), BN=n('bn'), BK=n('bk');
+  const SGM=n('sgm'), SGN=n('sgn'), SGK=n('sgk');
+  const AM=n('am'), AN=n('an'), AK=n('ak');
+
+  const sgM = BM / SGM, sgN = BN / SGN;
+  const rM = sgM / AM, rN = sgN / AN, rK = BK / AK;
+
+  document.getElementById('wgOut').textContent = `${BM} × ${BN} × ${BK}`;
+  document.getElementById('sgOut').textContent = `${fmt(sgM)} × ${fmt(sgN)} × ${BK}`;
+  document.getElementById('repOut').textContent = `${fmt(rM)} × ${fmt(rN)} × ${fmt(rK)}`;
+  document.getElementById('numSG').textContent = SGM*SGN*SGK;
+  document.getElementById('numWI').textContent = SGM*SGN*SGK*16;
+  document.getElementById('sgmTile').textContent = fmt(sgM);
+  document.getElementById('sgnTile').textContent = fmt(sgN);
+
+  const valid =
+    BM % SGM === 0 &&
+    BN % SGN === 0 &&
+    sgM % AM === 0 &&
+    sgN % AN === 0 &&
+    BK % AK === 0 &&
+    SGK === 1;
+
+  const status=document.getElementById('status');
+  status.className='status '+(valid?'ok':'bad');
+  status.textContent=valid
+    ? 'Valid shape hierarchy: all WG → SG → DPAS divisions are integral.'
+    : 'Invalid hierarchy: one or more dimensions do not divide cleanly (or SG_K ≠ 1).';
+
+  drawSG(SGM,SGN,sgM,sgN);
+  drawAtoms(rM,rN,rK,AM,AN,AK);
+
+  document.getElementById('eqOut').innerHTML =
+`<code>M: ${fmt(sgM)} / ${AM} = ${fmt(rM)} repeats
+N: ${fmt(sgN)} / ${AN} = ${fmt(rN)} repeats
+K: ${BK} / ${AK} = ${fmt(rK)} repeats
+
+Total = ${fmt(rM)} × ${fmt(rN)} × ${fmt(rK)} = ${fmt(rM*rN*rK)} atom applications</code>`;
+}
+
+function fmt(x){ return Number.isInteger(x) ? x : x.toFixed(2); }
+
+function drawSG(SGM,SGN,sgM,sgN){
+  const g=document.getElementById('sgMatrix');
+  g.innerHTML='';
+  g.style.gridTemplateColumns=`repeat(${Math.min(SGN,12)}, minmax(72px,1fr))`;
+  const limit=Math.min(SGM*SGN,96);
+  for(let i=0;i<limit;i++){
+    const m=Math.floor(i/SGN), nn=i%SGN;
+    const d=document.createElement('div');
+    d.className='sg';
+    d.textContent=`SG ${i} · ${fmt(sgM)}×${fmt(sgN)}`;
+    d.title=`subgroup coordinate (${m}, ${nn})`;
+    g.appendChild(d);
+  }
+  if(SGM*SGN>96){
+    const d=document.createElement('div'); d.className='sg'; d.textContent='…'; g.appendChild(d);
+  }
+}
+
+function drawAtoms(rM,rN,rK,AM,AN,AK){
+  const g=document.getElementById('atomGrid');
+  g.innerHTML='';
+  if(!Number.isInteger(rM)||!Number.isInteger(rN)||rM<1||rN<1||rM*rN>120){
+    g.style.gridTemplateColumns='1fr';
+    const d=document.createElement('div'); d.className='atom'; d.textContent='Invalid / too large to draw'; g.appendChild(d);
+  }else{
+    g.style.gridTemplateColumns=`repeat(${rN}, minmax(54px,1fr))`;
+    for(let m=0;m<rM;m++) for(let nn=0;nn<rN;nn++){
+      const d=document.createElement('div'); d.className='atom';
+      d.textContent=`${AM}×${AN}`;
+      d.title=`DPAS output atom position (${m}, ${nn})`;
+      g.appendChild(d);
+    }
+  }
+  document.getElementById('kSlices').textContent =
+    Number.isInteger(rK)
+    ? `There are ${rK} K slice${rK===1?'':'s'} of Atom_K=${AK}; the M×N atom grid is accumulated ${rK} time${rK===1?'':'s'} per WG K tile.`
+    : `BK does not divide Atom_K cleanly.`;
+}
+update();
+</script>
+</body>
+</html>
