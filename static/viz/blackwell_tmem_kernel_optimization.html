@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Blackwell Tensor Memory (TMEM) — Kernel Optimization Visual Guide</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#111821;
+    --panel2:#0e141c;
+    --line:#2a3441;
+    --text:#e8eef5;
+    --muted:#9aacbd;
+    --accent:#73ffa6;
+    --accent2:#66c7ff;
+    --warn:#ffd166;
+    --pink:#ff8bd1;
+    --red:#ff7a7a;
+    --chip:#1a2430;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(102,199,255,.08), transparent 30%),
+      radial-gradient(circle at 90% 10%, rgba(115,255,166,.06), transparent 28%),
+      var(--bg);
+    color:var(--text);
+    line-height:1.5;
+  }
+  a{color:var(--accent2)}
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 22px 80px}
+  .hero{
+    padding:28px 28px 18px;
+    background:linear-gradient(180deg,rgba(17,24,33,.95),rgba(14,20,28,.95));
+    border:1px solid var(--line);
+    border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.28);
+  }
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(34px,5vw,64px);line-height:1.03;margin:8px 0 10px}
+  .subtitle{max-width:980px;color:var(--muted);font-size:18px}
+  .pillbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .pill{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:7px 11px;font-size:13px;color:#cdd8e3}
+  .pill b{color:white}
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media(max-width:920px){.g2,.g3{grid-template-columns:1fr}}
+  section{margin-top:22px}
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:20px;
+    overflow:hidden;
+  }
+  h2{font-size:27px;margin:0 0 12px}
+  h3{font-size:18px;margin:0 0 8px}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:8px 0 14px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+  .flow{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:14px;border:1px solid var(--line);border-radius:14px;background:#0a1118;
+  }
+  .node{
+    border:1px solid #344253;border-radius:12px;padding:10px 12px;background:#111a24;min-width:92px;text-align:center;
+  }
+  .node strong{display:block}
+  .arrow{color:#6d8194;font-weight:700}
+  .node.gmem{box-shadow:inset 0 0 0 1px rgba(102,199,255,.14)}
+  .node.smem{box-shadow:inset 0 0 0 1px rgba(255,209,102,.14)}
+  .node.tmem{box-shadow:inset 0 0 0 1px rgba(115,255,166,.22);border-color:#2b7250}
+  .node.rmem{box-shadow:inset 0 0 0 1px rgba(255,139,209,.14)}
+  .node.tc{border-color:#416f96}
+  .vs{
+    text-align:center;color:#7f91a4;font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:11px;margin:4px 0 10px
+  }
+  .compare-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .badge{font-size:11px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:var(--muted)}
+  .em{color:var(--accent);font-weight:700}
+  .warn{color:var(--warn);font-weight:700}
+  .accent2{color:var(--accent2);font-weight:700}
+  .tmatrix{
+    display:grid;
+    grid-template-columns:82px 1fr;
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0b1219;
+  }
+  .lanes{
+    display:grid;grid-template-rows:repeat(8,1fr);border-right:1px solid var(--line);
+  }
+  .lane{padding:8px 10px;border-bottom:1px solid rgba(42,52,65,.65);font-size:12px;color:#9fb0c0}
+  .lane:last-child{border-bottom:0}
+  .cols{display:grid;grid-template-columns:repeat(16,1fr);min-height:260px}
+  .cell{border-right:1px solid rgba(42,52,65,.48);border-bottom:1px solid rgba(42,52,65,.48);background:#0d1820;transition:.2s}
+  .cell.allocA{background:rgba(115,255,166,.12)}
+  .cell.allocB{background:rgba(102,199,255,.11)}
+  .cell:hover{background:rgba(255,255,255,.08)}
+  .matrixlabels{display:flex;justify-content:space-between;margin:7px 4px 0;color:var(--muted);font-size:12px}
+  .sliderRow{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  input[type=range]{width:260px}
+  button{
+    background:#182431;color:var(--text);border:1px solid #344253;border-radius:10px;padding:8px 12px;cursor:pointer;
+  }
+  button:hover{border-color:#4c6176}
+  .timeline{
+    display:grid;
+    grid-template-columns:140px repeat(8,minmax(56px,1fr));
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0a1118;
+  }
+  .tcell{padding:9px;border-right:1px solid rgba(42,52,65,.6);border-bottom:1px solid rgba(42,52,65,.6);font-size:12px;min-height:40px}
+  .thead{color:#7f92a5;background:#0d151d;text-align:center}
+  .rowhead{font-weight:700;color:#cbd6e0;background:#0d151d}
+  .load{background:rgba(102,199,255,.11)}
+  .mma{background:rgba(115,255,166,.12)}
+  .epi{background:rgba(255,139,209,.10)}
+  .wait{background:rgba(255,122,122,.08);color:#c89090}
+  .bufA{outline:1px solid rgba(115,255,166,.32);outline-offset:-2px}
+  .bufB{outline:1px solid rgba(102,199,255,.32);outline-offset:-2px}
+  .callout{
+    border-left:3px solid var(--accent);padding:10px 12px;background:rgba(115,255,166,.055);border-radius:8px;
+  }
+  .bars{display:grid;gap:10px}
+  .barrow{display:grid;grid-template-columns:190px 1fr 62px;gap:10px;align-items:center}
+  .bar{height:14px;background:#0a1118;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .fill{height:100%;background:linear-gradient(90deg,rgba(102,199,255,.5),rgba(115,255,166,.75))}
+  .kpi{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c8d4df}
+  .code{
+    background:#091016;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;font-size:13px;white-space:pre;
+  }
+  .twocta{display:grid;grid-template-columns:1fr 110px 1fr;gap:10px;align-items:center}
+  .cta{
+    padding:16px;border:1px solid var(--line);border-radius:14px;background:#0d151d;
+  }
+  .shared{
+    padding:16px;border:1px dashed #3c8a62;border-radius:14px;background:rgba(115,255,166,.055);text-align:center
+  }
+  .checklist{display:grid;gap:8px;margin-top:8px}
+  .check{display:flex;gap:8px;align-items:flex-start}
+  .check b{color:#dfe8f1}
+  .sources li{margin:7px 0}
+  .sticky-nav{
+    position:sticky;top:0;z-index:20;margin:-1px -1px 20px;
+    backdrop-filter:blur(12px);background:rgba(11,15,20,.82);border-bottom:1px solid var(--line);
+  }
+  .sticky-nav .inner{max-width:1320px;margin:0 auto;padding:10px 22px;display:flex;gap:8px;overflow:auto}
+  .sticky-nav a{white-space:nowrap;text-decoration:none;color:#aab9c8;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:6px 10px}
+  .sticky-nav a:hover{color:white;border-color:#44566a}
+</style>
+</head>
+<body>
+
+<div class="sticky-nav">
+  <div class="inner">
+    <a href="#mental-model">Mental model</a>
+    <a href="#layout">TMEM layout</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#double-buffer">Double buffering</a>
+    <a href="#quant">MXFP/NVFP</a>
+    <a href="#opt">Optimization knobs</a>
+    <a href="#sources">Sources</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">NVIDIA data-center Blackwell · tcgen05 · Tensor Memory (TMEM)</div>
+    <h1>TMEM as a Kernel-Optimization Primitive</h1>
+    <div class="subtitle">
+      A visual mental model of how data-center Blackwell tcgen05 kernels move large Tensor Core accumulators out of the normal register file,
+      then turns TMEM into a <b>pipeline buffer</b> between <span class="accent2">tcgen05.mma</span> and the epilogue.
+    </div>
+    <div class="pillbar">
+      <div class="pill"><b>Scope</b>: tcgen05-capable data-center Blackwell, not every “Blackwell” GPU</div>
+      <div class="pill"><b>TMEM</b> ≠ TMA</div>
+      <div class="pill"><b>128</b> lanes/datapaths × <b>512</b> columns × <b>32-bit</b> cells</div>
+      <div class="pill"><b>tcgen05.mma</b> accumulates into TMEM</div>
+      <div class="pill"><b>tcgen05.ld</b> moves TMEM → registers</div>
+      <div class="pill"><b>Double buffering</b> overlaps MMA + epilogue</div>
+    </div>
+  </header>
+
+  <section id="mental-model">
+    <div class="grid g2">
+      <div class="card">
+        <div class="compare-title"><h2>Hopper mental model</h2><span class="badge">register-centric</span></div>
+        <div class="flow">
+          <div class="node gmem"><strong>GMEM</strong><span class="small muted">global</span></div>
+          <div class="arrow">→ TMA →</div>
+          <div class="node smem"><strong>SMEM</strong><span class="small muted">A/B tiles</span></div>
+          <div class="arrow">→</div>
+          <div class="node tc"><strong>WGMMA</strong><span class="small muted">Tensor Core</span></div>
+          <div class="arrow">→</div>
+          <div class="node rmem"><strong>RMEM</strong><span class="small muted">accumulator</span></div>
+        </div>
+        <p class="muted">
+          Large output tiles imply many accumulator registers. Register pressure can constrain tile size,
+          occupancy, and how much fused epilogue work fits.
+        </p>
+        <div class="callout">
+          <b>Primary pressure:</b> “Can the participating threads hold the accumulator and still leave enough registers for the rest of the kernel?”
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="compare-title"><h2>Blackwell mental model</h2><span class="badge">TMEM-centric</span></div>
+        <div class="flow">
+          <div class="node gmem"><strong>GMEM</strong></div>
+          <div class="arrow">→ TMA →</div>
+          <div class="node smem"><strong>SMEM</strong><span class="small muted">A/B tiles</span></div>
+          <div class="arrow">→</div>
+          <div class="node tc"><strong>tcgen05.mma</strong></div>
+          <div class="arrow">→</div>
+          <div class="node tmem"><strong>TMEM</strong><span class="small muted">accumulator</span></div>
+          <div class="arrow">→ tcgen05.ld + wait::ld →</div>
+          <div class="node rmem"><strong>RMEM</strong><span class="small muted">epilogue chunk</span></div>
+        </div>
+        <p class="muted">
+          For tcgen05 MMA, the destination/accumulator D lives in TMEM. Registers are brought into play when TMEM data is explicitly loaded for post-processing or storage.
+        </p>
+        <div class="callout">
+          <b>New question:</b> “How do I schedule <span class="mono">mma → TMEM → ld → epilogue</span> so the kernel stays in steady state?”
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="layout" class="card">
+    <h2>1. TMEM is not generic byte-addressed SRAM</h2>
+    <p class="muted">
+      Architecturally, the tcgen05 TMEM view is <b>128 lanes (often called datapaths in CUTLASS) × 512 columns × 32-bit cells</b>. Allocation is by columns;
+      each allocated column spans all 128 datapaths.
+    </p>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--accent)"></span>Accumulator buffer 0</span>
+      <span><span class="dot" style="background:var(--accent2)"></span>Accumulator buffer 1</span>
+      <span><span class="dot" style="background:#344253"></span>unallocated</span>
+    </div>
+
+    <div class="tmatrix">
+      <div class="lanes">
+        <div class="lane">dp 0–15</div>
+        <div class="lane">dp 16–31</div>
+        <div class="lane">dp 32–47</div>
+        <div class="lane">dp 48–63</div>
+        <div class="lane">dp 64–79</div>
+        <div class="lane">dp 80–95</div>
+        <div class="lane">dp 96–111</div>
+        <div class="lane">dp 112–127</div>
+      </div>
+      <div class="cols" id="tmatrix"></div>
+    </div>
+    <div class="matrixlabels"><span>column 0</span><span>… 512 columns …</span><span>column 511</span></div>
+
+    <div class="sliderRow">
+      <label>Allocated columns per buffer: <b id="colLabel">128</b></label>
+      <input id="colSlider" type="range" min="32" max="256" step="32" value="128"/>
+      <button id="toggleBuf">Show buffers 0 + 1</button>
+    </div>
+
+    <p class="small muted">
+      Visual compression: the diagram renders 16 column groups rather than all 512 columns.
+      A 128-column allocation represents 128 × 128 × 4 B = 64 KiB of logical cell capacity. The two colored regions are only an allocation visual. For example, a 128×256 FP32 accumulator occupies 256 columns (128 KiB), so two full such accumulator stages consume all 512 columns.
+    </p>
+  </section>
+
+  <section id="pipeline">
+    <div class="grid g2">
+      <div class="card">
+        <h2>2. TMEM changes the steady-state pipeline</h2>
+        <div class="flow">
+          <div class="node gmem"><strong>GMEM</strong><span class="small muted">next operands</span></div>
+          <div class="arrow">→</div>
+          <div class="node smem"><strong>SMEM</strong><span class="small muted">staged A/B</span></div>
+          <div class="arrow">→</div>
+          <div class="node tc"><strong>MMA</strong></div>
+          <div class="arrow">→</div>
+          <div class="node tmem"><strong>TMEM</strong><span class="small muted">C/D</span></div>
+          <div class="arrow">→</div>
+          <div class="node rmem"><strong>RMEM</strong><span class="small muted">small slice</span></div>
+          <div class="arrow">→</div>
+          <div class="node smem"><strong>SMEM</strong><span class="small muted">store staging</span></div>
+        </div>
+        <p class="muted">
+          The full D accumulator tile no longer needs to stay live in registers. The epilogue can stream subtiles out of TMEM,
+          process them, and hand them to the store path.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>3. Bigger epilogue chunk ≠ always faster</h2>
+        <div class="bars">
+          <div class="barrow"><div>TMEM → RMEM chunk</div><div class="bar"><div class="fill" style="width:78%"></div></div><div class="kpi">larger</div></div>
+          <div class="barrow"><div>Epilogue iterations</div><div class="bar"><div class="fill" style="width:36%"></div></div><div class="kpi">fewer</div></div>
+          <div class="barrow"><div>Register footprint</div><div class="bar"><div class="fill" style="width:75%"></div></div><div class="kpi">higher</div></div>
+          <div class="barrow"><div>SMEM epilogue footprint</div><div class="bar"><div class="fill" style="width:71%"></div></div><div class="kpi">higher</div></div>
+          <div class="barrow"><div>Mainloop SMEM stages</div><div class="bar"><div class="fill" style="width:45%"></div></div><div class="kpi">may fall</div></div>
+        </div>
+        <p class="small muted" style="margin-top:12px">
+          Optimization becomes a balance between fewer TMEM reads and preserving enough SMEM / registers for a deep mainloop pipeline.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="double-buffer" class="card">
+    <h2>4. Double-buffered TMEM accumulators: a common optimization pattern</h2>
+    <p class="muted">
+      When a kernel has independent output tiles/stages, it can reserve separate TMEM accumulator regions so the Tensor Core
+      produces tile <i>i+1</i> into one region while the epilogue consumes the already-completed tile <i>i</i> from the other.
+      <b>The same TMEM region must not be read by the epilogue while MMA is still updating it.</b>
+    </p>
+
+    <div class="timeline" id="timeline">
+      <div class="tcell thead"></div>
+      <div class="tcell thead">t0</div><div class="tcell thead">t1</div><div class="tcell thead">t2</div><div class="tcell thead">t3</div>
+      <div class="tcell thead">t4</div><div class="tcell thead">t5</div><div class="tcell thead">t6</div><div class="tcell thead">t7</div>
+
+      <div class="tcell rowhead">TMA producer role</div>
+      <div class="tcell load">load operands 0</div><div class="tcell load">load operands 1</div><div class="tcell load">load operands 2</div><div class="tcell load">load operands 3</div>
+      <div class="tcell load">load operands 4</div><div class="tcell load">load operands 5</div><div class="tcell load">load operands 6</div><div class="tcell load">load operands 7</div>
+
+      <div class="tcell rowhead">MMA issue role</div>
+      <div class="tcell"></div><div class="tcell mma bufA">tile 0 → buf 0</div><div class="tcell mma bufB">tile 1 → buf 1</div><div class="tcell mma bufA">tile 2 → buf 0</div>
+      <div class="tcell mma bufB">tile 3 → buf 1</div><div class="tcell mma bufA">tile 4 → buf 0</div><div class="tcell mma bufB">tile 5 → buf 1</div><div class="tcell mma bufA">tile 6 → buf 0</div>
+
+      <div class="tcell rowhead">Epilogue role</div>
+      <div class="tcell"></div><div class="tcell"></div><div class="tcell epi bufA">consume buf 0</div><div class="tcell epi bufB">consume buf 1</div>
+      <div class="tcell epi bufA">consume buf 0</div><div class="tcell epi bufB">consume buf 1</div><div class="tcell epi bufA">consume buf 0</div><div class="tcell epi bufB">consume buf 1</div>
+    </div>
+
+    <p class="small muted" style="margin-top:10px">
+      Conceptual tile-level timeline only: each “MMA tile” may itself contain a K-loop / multiple tcgen05.mma instructions.
+      A completion barrier (commonly tcgen05.commit → mbarrier) must make the accumulator region visible to the consumer before
+      <span class="mono">tcgen05.ld</span>; the load itself is asynchronous and must complete before its registers are used.
+      Likewise, the producer cannot reuse a buffer until the epilogue has released it.
+    </p>
+
+    <div class="grid g3" style="margin-top:16px">
+      <div class="callout"><b>TMA producer role</b><br><span class="muted small">Keeps future operand tiles moving GMEM → SMEM. Exact warp count is kernel-specific.</span></div>
+      <div class="callout"><b>MMA issue role</b><br><span class="muted small">An elected single thread issues <span class="mono">tcgen05.mma</span>; kernels often dedicate a warp/role around that instruction stream.</span></div>
+      <div class="callout"><b>Epilogue consumer role</b><br><span class="muted small">A warpgroup/warps load their permitted TMEM lane windows, wait for loads, fuse math, and stage stores.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="grid g2">
+      <div class="card">
+        <h2>5. Why the whole accumulator should not be loaded at once</h2>
+        <div class="code">Example: output tile = 128 × 256, FP32 accumulator
+
+128 × 256 × 4 B = 131,072 B = 128 KiB
+
+If an implementation tried to materialize the whole 128 KiB tile in registers at once:
+  → register pressure comes back
+  → epilogue occupancy/flexibility suffers
+
+Typical epilogue strategy:
+  TMEM full tile
+     ↓ tcgen05.ld
+     ↓ tcgen05.wait::ld
+  small RMEM subtile
+     ↓
+  fuse bias / activation / scale / cast
+     ↓
+  store
+     ↓
+  next TMEM subtile</div>
+      </div>
+
+      <div class="card">
+        <h2>6. Layout becomes part of performance</h2>
+        <div class="flow">
+          <div class="node tc"><strong>MMA layout</strong></div>
+          <div class="arrow">→</div>
+          <div class="node tmem"><strong>TMEM layout</strong></div>
+          <div class="arrow">→</div>
+          <div class="node rmem"><strong>RMEM layout</strong></div>
+          <div class="arrow">→</div>
+          <div class="node smem"><strong>Epilogue layout</strong></div>
+        </div>
+        <p class="muted">
+          Some production kernels choose operand/result swizzles and epilogue layouts so the TMEM readout composes more efficiently with the desired register arrangement; this is kernel-specific, not a universal TMEM requirement.
+        </p>
+        <div class="callout">
+          <b>Optimization goal:</b> minimize rearrangement between <span class="mono">tcgen05.mma</span> output ownership and the next consumer.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quant">
+    <div class="grid g2">
+      <div class="card">
+        <h2>7. Block-scaled MMA: scale factors must be staged in TMEM</h2>
+        <div class="flow">
+          <div class="node smem"><strong>SMEM</strong><span class="small muted">scale blocks</span></div>
+          <div class="arrow">→ tcgen05.cp →</div>
+          <div class="node tmem"><strong>TMEM</strong><span class="small muted">scale factors</span></div>
+          <div class="arrow">→</div>
+          <div class="node tc"><strong>block-scaled MMA</strong></div>
+        </div>
+        <p class="muted">
+          For tcgen05 block-scaled MMA (for example MXFP8/MXFP4/NVFP4), SFA/SFB scale factors are staged GMEM → SMEM → TMEM and consumed by MMA from TMEM. In tuned kernels, scale-factor movement can become a major bottleneck.
+        </p>
+        <div class="callout">
+          <b>Scheduling opportunity:</b> where the instruction ordering and independent buffers permit it, pipeline <span class="mono">tcgen05.cp(scale[i+1])</span> with <span class="mono">tcgen05.mma(tile[i])</span>. Both use the tcgen05 asynchronous machinery, so correctness requires the documented ordering/barrier protocol.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>8. Fused epilogue after TMEM</h2>
+        <div class="flow">
+          <div class="node tmem"><strong>TMEM</strong><span class="small muted">FP32 acc</span></div>
+          <div class="arrow">→ tcgen05.ld + wait::ld →</div>
+          <div class="node rmem"><strong>RMEM</strong><span class="small muted">subtile</span></div>
+          <div class="arrow">→</div>
+          <div class="node tc"><strong>scale+bias<br/>activation/cast</strong></div>
+          <div class="arrow">→</div>
+          <div class="node smem"><strong>SMEM</strong></div>
+          <div class="arrow">→ TMA →</div>
+          <div class="node gmem"><strong>GMEM</strong></div>
+        </div>
+        <p class="muted">
+          Do as much cheap post-processing as possible while the data is already in registers, instead of round-tripping through another kernel.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>9. 1-CTA vs 2-CTA UMMA: operation scope, not “one shared TMEM pool”</h2>
+      <div class="twocta">
+        <div class="cta">
+          <b>CTA 0 TMEM</b>
+          <p class="small muted">Has its own CTA TMEM view. In <span class="mono">cta_group::2</span>, allocation/deallocation are collective across the pair.</p>
+        </div>
+        <div class="shared">
+          <b>one tcgen05.mma issue</b><br/>
+          <span class="small muted">can operate on current + peer CTA TMEM</span>
+        </div>
+        <div class="cta">
+          <b>Peer CTA TMEM</b>
+          <p class="small muted">The peer must be launched and active. The 2-CTA MMA updates TMEM associated with both CTAs.</p>
+        </div>
+      </div>
+      <p class="small muted" style="margin-top:12px">
+        <span class="mono">cta_group::2</span> is a cooperative two-CTA operation. Do not model it as two CTAs blindly sharing one flat 512-column address space.
+        PTX requires a consistent <span class="mono">cta_group</span> choice for tcgen05 operations in the kernel.
+      </p>
+    </div>
+  </section>
+
+  <section id="opt" class="card">
+    <h2>10. What to tune in a real Blackwell kernel</h2>
+    <div class="grid g2">
+      <div class="checklist">
+        <div class="check"><span class="em">①</span><div><b>TMEM columns per accumulator tile</b><br><span class="small muted">Does the chosen tile leave room for double buffering?</span></div></div>
+        <div class="check"><span class="em">②</span><div><b>TMEM acc 0/1 buffer count</b><br><span class="small muted">Can the epilogue consume a completed region while MMA produces into a different region?</span></div></div>
+        <div class="check"><span class="em">③</span><div><b>TMEM → RMEM subtile size</b><br><span class="small muted">Too small = too many iterations; too large = register pressure.</span></div></div>
+        <div class="check"><span class="em">④</span><div><b>Epilogue SMEM footprint</b><br><span class="small muted">Don’t steal so much SMEM that mainloop staging depth collapses.</span></div></div>
+        <div class="check"><span class="em">⑤</span><div><b>Warp specialization</b><br><span class="small muted">Choose role counts for TMA, MMA issue, compute, and epilogue; the exact partition is workload-specific.</span></div></div>
+      </div>
+      <div class="checklist">
+        <div class="check"><span class="accent2">⑥</span><div><b>mbarrier / pipeline timing</b><br><span class="small muted">Async overlap only works if producer/consumer handoff is exact.</span></div></div>
+        <div class="check"><span class="accent2">⑦</span><div><b>Layout composition</b><br><span class="small muted">MMA output → TMEM → register mapping → epilogue should minimize shuffles.</span></div></div>
+        <div class="check"><span class="accent2">⑧</span><div><b>Scale-factor feed for block-scaled formats</b><br><span class="small muted">SFA/SFB need SMEM → TMEM staging; pipeline copies with MMA only under correct ordering and separate-buffer constraints.</span></div></div>
+        <div class="check"><span class="accent2">⑨</span><div><b>1-CTA vs 2-CTA UMMA</b><br><span class="small muted">Choose based on tile shape and cooperative scheduling economics.</span></div></div>
+        <div class="check"><span class="accent2">⑩</span><div><b>Steady-state utilization</b><br><span class="small muted">Optimize the flat middle of the timeline, not only fill/drain overhead.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>One-picture summary</h2>
+    <div class="flow" style="justify-content:center;padding:24px">
+      <div class="node gmem"><strong>GMEM</strong><span class="small muted">future data</span></div>
+      <div class="arrow">TMA →</div>
+      <div class="node smem"><strong>SMEM</strong><span class="small muted">multi-stage operands</span></div>
+      <div class="arrow">→</div>
+      <div class="node tc"><strong>tcgen05.mma</strong><span class="small muted">async compute</span></div>
+      <div class="arrow">→</div>
+      <div class="node tmem"><strong>TMEM acc stages</strong><span class="small muted">one or more regions</span></div>
+      <div class="arrow">tcgen05.ld →</div>
+      <div class="node rmem"><strong>RMEM</strong><span class="small muted">small epilogue slice</span></div>
+      <div class="arrow">→</div>
+      <div class="node smem"><strong>SMEM</strong><span class="small muted">store staging</span></div>
+      <div class="arrow">TMA →</div>
+      <div class="node gmem"><strong>GMEM</strong><span class="small muted">output</span></div>
+    </div>
+    <div class="callout" style="margin-top:14px">
+      <b>Core idea:</b> On tcgen05-capable data-center Blackwell, TMEM removes the need to keep the full Tensor Core accumulator in the ordinary register file,
+      then turns that accumulator storage into a schedulable buffer that can overlap with both the next MMA and the current epilogue.
+    </div>
+  </section>
+
+
+  <section class="card">
+    <h2>Audit notes — corrected in this revision</h2>
+    <div class="checklist">
+      <div class="check"><span class="em">✓</span><div><b>Architecture scope</b><br><span class="small muted">TMEM here refers to the tcgen05 data-center Blackwell path; “Blackwell” broadly also includes products that do not expose TMEM.</span></div></div>
+      <div class="check"><span class="em">✓</span><div><b>128 × 512 terminology</b><br><span class="small muted">PTX calls the 128 dimension “lanes”; current CUTLASS utilities often call them “datapaths.” The page now shows both terms.</span></div></div>
+      <div class="check"><span class="em">✓</span><div><b>Double-buffer race removed</b><br><span class="small muted">The old timeline incorrectly overlapped epilogue reads with ongoing MMA writes to the same TMEM region. Buffers now alternate only after completion/release.</span></div></div>
+      <div class="check"><span class="em">✓</span><div><b>Async completion shown</b><br><span class="small muted"><span class="mono">tcgen05.ld</span> is asynchronous; the page now calls out its completion wait and cross-role synchronization.</span></div></div>
+      <div class="check"><span class="em">✓</span><div><b>2-CTA model corrected</b><br><span class="small muted"><span class="mono">cta_group::2</span> spans current + peer CTA TMEM; it should not be drawn as a single undifferentiated shared pool.</span></div></div>
+      <div class="check"><span class="em">✓</span><div><b>Block-scale path tightened</b><br><span class="small muted">Scale factors SFA/SFB are explicitly shown as SMEM → TMEM via <span class="mono">tcgen05.cp</span> before block-scaled MMA.</span></div></div>
+    </div>
+  </section>
+
+  <section id="sources" class="card">
+    <h2>Sources used for this visual</h2>
+    <ul class="sources muted small">
+      <li><a href="https://research.colfax-intl.com/cutlass-tutorial-writing-gemm-kernels-using-tensor-memory-for-nvidia-blackwell-gpus/">Colfax — CUTLASS Tutorial: Writing GEMM Kernels Using Tensor Memory for NVIDIA Blackwell GPUs</a></li>
+      <li><a href="https://blog.ai.princeton.edu/2026/03/12/flashattention-4-algorithm-and-kernel-pipelining-co-design-for-asymmetric-hardware-scaling/">Princeton — FlashAttention-4: Algorithm and Kernel Pipelining Co-Design</a></li>
+      <li><a href="https://hazyresearch.stanford.edu/blog/2026-02-19-tk-2">Hazy Research — ThunderKittens 2.0</a></li>
+      <li><a href="https://pytorch.org/blog/tlx-block-attention-a-warp-specialized-blackwell-kernel-for-fixed-block-sparse-self-attention/">PyTorch — TLX Block Attention on Blackwell</a></li>
+      <li><a href="https://developer.nvidia.com/blog/blackwell-breaks-the-1000-tps-user-barrier-with-metas-llama-4-maverick/">NVIDIA — Blackwell Llama 4 kernel optimizations</a></li>
+      <li><a href="https://mufeezamjad.com/blog/nvfp4-group-gemm">NVFP4 Grouped GEMM optimization worklog</a></li>
+      <li><a href="https://ultism.github.io/svdquant-kernels/blog/2026-05-13-svdquant-w4a4-blackwell.html">SVDQuant W4A4 Blackwell kernel walkthrough</a></li>
+      <li><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/">NVIDIA PTX ISA — authoritative tcgen05 / TMEM semantics</a></li>
+      <li><a href="https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/mma_docs/tcgen05_programming.html">NVIDIA CUTLASS — tcgen05 MMA Programming Guide</a></li>
+      <li><a href="https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/utils_sm100.html">NVIDIA CUTLASS — SM100 epilogue/TMEM sizing utilities and constraints</a></li>
+    </ul>
+    <p class="small muted">
+      This page is a conceptual visualization. Exact supported MMA shapes, TMEM layouts, synchronization rules, and PTX syntax vary by instruction form and architecture target; consult the PTX ISA and CUTLASS docs for implementation details.
+    </p>
+  </section>
+</div>
+
+<script>
+const matrix = document.getElementById('tmatrix');
+const slider = document.getElementById('colSlider');
+const label = document.getElementById('colLabel');
+const toggle = document.getElementById('toggleBuf');
+let showTwo = true;
+
+function buildMatrix(){
+  matrix.innerHTML = '';
+  for(let r=0;r<8;r++){
+    for(let c=0;c<16;c++){
+      const d=document.createElement('div');
+      d.className='cell';
+      d.dataset.c=c;
+      matrix.appendChild(d);
+    }
+  }
+  paint();
+}
+function paint(){
+  const cols=parseInt(slider.value,10);
+  label.textContent=cols;
+  const groups=Math.round(cols/32); // each visual column group = 32 TMEM columns
+  [...matrix.children].forEach(cell=>{
+    cell.className='cell';
+    const c=parseInt(cell.dataset.c,10);
+    if(c<groups) cell.classList.add('allocA');
+    if(showTwo && c>=groups && c<2*groups) cell.classList.add('allocB');
+  });
+  toggle.textContent = showTwo ? 'Show buffer 0 only' : 'Show buffers 0 + 1';
+}
+slider.addEventListener('input', paint);
+toggle.addEventListener('click', ()=>{showTwo=!showTwo;paint();});
+buildMatrix();
+</script>
+</body>
+</html>
