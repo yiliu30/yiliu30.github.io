@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Intel EU/XVE Stall Counter Visualizer — Audited</title>
+<style>
+:root{--bg:#07111f;--bd:#24435f;--tx:#e8f1fa;--mu:#8fa8bd;--bl:#5bb8ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 8%,rgba(91,184,255,.12),transparent 26rem),var(--bg);color:var(--tx);font-family:Inter,system-ui,sans-serif}
+.wrap{max-width:1480px;margin:auto;padding:26px}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-end}h1{margin:0 0 6px;font-size:32px}.sub{color:var(--mu);font-size:14px}.badge{border:1px solid var(--bd);padding:7px 11px;border-radius:999px;color:#bad0e0;font-size:11px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}button{border:1px solid var(--bd);background:#0d1d31;color:#dcebf8;padding:8px 11px;border-radius:10px;font-weight:800;font-size:11px;cursor:pointer}button:hover,button.active{border-color:var(--bl);background:#123352}
+.layout{display:grid;grid-template-columns:310px 1fr;gap:17px}.card{border:1px solid var(--bd);background:linear-gradient(180deg,rgba(15,34,56,.97),rgba(8,20,34,.97));border-radius:17px;box-shadow:0 18px 45px rgba(0,0,0,.2)}
+.side{padding:15px;position:sticky;top:14px;align-self:start}.ttl{text-transform:uppercase;letter-spacing:.09em;color:#9fc3df;font-size:10px;font-weight:850;margin-bottom:10px}.list{display:flex;flex-direction:column;gap:7px}
+.item{border:1px solid #27465e;background:#0d2033;border-radius:11px;padding:9px;cursor:pointer}.item:hover,.item.active{border-color:var(--bl);background:#12304c}.item strong{font-size:10.5px;display:block}.item span{font-size:9px;color:var(--mu)}
+.main{display:flex;flex-direction:column;gap:15px}.hero,.detail,.ref{padding:17px}.herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.box{border:1px solid var(--bd);border-radius:13px;padding:12px;background:rgba(8,22,37,.62)}.box b{font-size:11px}.box p{margin:5px 0 0;color:var(--mu);font-size:10px;line-height:1.45}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:13px}.counter{font-size:21px;font-weight:900}.meaning{color:#9db5c8;font-size:10.5px;line-height:1.45;margin-top:4px;max-width:850px}.tag{border:1px solid #335a76;background:#102b42;color:#acd8f6;border-radius:999px;padding:4px 8px;font-size:9px;font-weight:800;white-space:nowrap}
+.grid{display:grid;grid-template-columns:minmax(440px,1fr) minmax(350px,1fr);gap:13px}.asm{border:1px solid #29465d;border-radius:13px;background:#071522;padding:13px;font:10.5px/1.75 Consolas,monospace;overflow-x:auto}.asm .i{color:#8dcfff}.asm .c{color:#7597ad}
+.flow{border:1px solid #29465d;border-radius:13px;padding:13px;background:rgba(7,21,34,.72)}.chain{display:flex;flex-direction:column;align-items:center;gap:7px}.node{width:90%;border:1px solid #31536c;border-radius:11px;padding:8px 10px;background:#0f263a;text-align:center;font-size:10px;font-weight:750}.node small{display:block;color:#7f9bb0;font-size:8.7px;margin-top:3px;font-weight:500}.stall{border-color:#80566a;background:#2a1c29;color:#ffd4df}.res{border-color:#6b5936;background:#2b2417;color:#ffe0a3}.mem{border-color:#3a665d;background:#132b28;color:#bff0df}.ctl{border-color:#5d5277;background:#211c31;color:#d9ceff}.arr{color:#5d7a92;font-size:16px}
+.note{margin-top:11px;border:1px dashed #395a72;border-radius:11px;padding:10px 11px;color:#90a9bd;font-size:9.8px;line-height:1.5;background:rgba(8,24,39,.62)}.hidden{display:none}
+table{width:100%;border-collapse:collapse;min-width:1000px}th,td{padding:9px 11px;border-bottom:1px solid #203b53;text-align:left;vertical-align:top}th{background:#10263e;color:#cde1f0;font-size:9.5px;text-transform:uppercase}td{font-size:9.8px;color:#99b0c3;line-height:1.4}td:first-child{font-weight:850;color:#ecf4fa;white-space:nowrap}.tbl{overflow:auto;border:1px solid var(--bd);border-radius:13px}
+.sources a{color:#8dcfff;text-decoration:none}.sources a:hover{text-decoration:underline}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}.side{position:static}.grid,.herogrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>Intel EU / XVE Stall Counter Visualizer</h1><div class="sub">Audited tiny examples: documented counter semantics separated from performance interpretation</div></div><div class="badge">Pseudo ASM · source-scoped semantics</div></header>
+
+<div class="controls">
+<button class="active" onclick="showAll(this)">Show all</button>
+<button onclick="filterType('compute',this)">Compute</button>
+<button onclick="filterType('memory',this)">Memory / SEND</button>
+<button onclick="filterType('control',this)">Control / sync</button>
+</div>
+
+<div class="layout">
+<aside class="card side">
+  <div class="ttl">Counters</div><div id="list" class="list"></div>
+  <div class="note"><b>Important:</b> these names span multiple Intel metric generations. Arc/ACM, VTune/Ponte Vecchio, and Lunar Lake/Xe2 do not always use identical semantics. If your counters come from Cobalt/XeSim, its target-specific definition wins.</div>
+  <div class="note">Modern XVE metric documentation explicitly notes that <b>multiple stall reasons may qualify in the same cycle</b>; do not automatically sum percentages as mutually exclusive slices.</div>
+</aside>
+
+<main class="main">
+<section class="card hero"><div class="ttl">Fast mental model · audited</div><div class="herogrid">
+<div class="box"><b>ALUWR / SBID</b><p>Both are dependency-side waits, but different dependencies: ALUWR is waiting for an ALU write/result; SBID is scoreboard token/dependency state. Neither alone proves DRAM latency or physical write-port contention.</p></div>
+<div class="box"><b>PIPESTALL</b><p>The instruction can be ready yet unable to enter the target pipe. Intel VTune gives a GRF bank conflict as a concrete example.</p></div>
+<div class="box"><b>SENDWR</b><p>This one must be source-scoped: Arc/ACM = waiting for SEND to write GRF; Lunar Lake-style metric = waiting for SEND dispatch from XVE.</p></div>
+</div></section>
+
+<div id="details"></div>
+
+<section class="card ref"><div class="ttl">Compact audited reference</div><div class="tbl"><table>
+<thead><tr><th>Counter</th><th>Documented core meaning</th><th>Source scope</th><th>Good tiny mental model</th></tr></thead>
+<tbody>
+<tr><td>EU_STALL_ALUWR</td><td>Waiting for ALU to write GRF/ACC</td><td>Arc/ACM PRM</td><td>producer → destination not written → dependent consumer waits</td></tr>
+<tr><td>EU_STALL_SENDWR</td><td>Arc: SEND writes GRF; newer Xe: SEND dispatch wait</td><td>Generation-sensitive</td><td>do not use one universal flow</td></tr>
+<tr><td>EU_STALL_SBID</td><td>Scoreboard token/dependency unavailable</td><td>Arc/ACM + VTune + LNL</td><td>async tracked work holds scoreboard state → later work waits</td></tr>
+<tr><td>EU_STALL_PIPESTALL</td><td>Ready instruction cannot dispatch to target pipe</td><td>VTune XVE / LNL</td><td>won arbitration → GRF/resource conflict → pipe cannot accept</td></tr>
+<tr><td>EU_STALL_PS_DEPENDENCY</td><td>Pixel Shader dependency</td><td>Lunar Lake metric</td><td>graphics dependency remains unresolved</td></tr>
+<tr><td>EU_STALL_INSTFETCH</td><td>Waiting for Instruction Fetch</td><td>Arc/ACM + VTune</td><td>new PC → target instruction not available</td></tr>
+<tr><td>EU_STALL_CONTROL</td><td>Waiting for Branch unit / branch completion</td><td>VTune XVE / LNL</td><td>conditional branch → control unit unavailable</td></tr>
+<tr><td>EU_STALL_BARRIER</td><td>Waiting for synchronization dependency; Arc mentions Gateway Notify</td><td>Arc/ACM + VTune</td><td>some work-items arrive → others late → barrier wait</td></tr>
+<tr><td>EU_STALL_OTHER</td><td>Other dependency; Flag/EoT are explicit examples</td><td>Arc/ACM + LNL</td><td>flag/predicate dependency not covered elsewhere</td></tr>
+</tbody></table></div></section>
+
+<section class="card ref sources"><div class="ttl">Audit sources</div>
+<div class="note" style="margin-top:0">
+<b>Primary:</b>
+<a href="https://www.x.org/docs/intel/ACM/intel-gfx-prm-osrc-acm-vol13-swhwsysteminterface.pdf">Intel Arc A-Series / ACM PRM Vol. 13 event definitions</a>;
+<a href="https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide/2024-2/gpu-compute-media-hotspots-view.html">Intel VTune — Reasons for XVE Stalls</a>;
+<a href="https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide/2026-1/xve-pipe-stall.html">Intel VTune — XVE Pipe Stall</a>;
+<a href="https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide/2026-0/xve-sbid-stall.html">Intel VTune — XVE SBID Stall</a>.
+<br><b>Cross-check for newer Xe/Lunar Lake metric wording:</b> Mesa Intel performance-metric XML (including PS_DEPENDENCY and newer SENDWR wording).
+</div></section>
+</main>
+</div>
+</div>
+
+<script>
+const D=[{"id": "aluwr", "type": "compute", "counter": "EU_STALL_ALUWR", "short": "ALU → GRF/ACC result not written yet", "source": "Arc/ACM PRM exact", "meaning": "Intel Arc/ACM defines this as an EU stall with at least one thread waiting for an ALU to write a GRF or ACC register. It establishes a pending ALU write/result dependency; it does not by itself prove physical write-port or GRF-bank contention.", "asm": [["math.inv  g20, g10", "pseudo: compute reciprocal into g20; potentially longer-latency producer"], ["mul       g30, g20, g5", "consumer needs g20; may wait until the ALU has written g20"]], "flow": [["ALU producer executes", "math.inv is producing g20", "normal"], ["GRF/ACC write not complete", "required destination result is not available yet", "resource"], ["consumer wants result", "mul reaches the dependency", "normal"], ["ALUWR", "thread waits for the ALU write/result", "stall"]], "note": "Good hypothesis: inspect tight producer→consumer chains such as math.inv → mul. Bad conclusion: “ALUWR proves writeback-port collision.” The counter definition does not establish that."}, {"id": "sendwr", "type": "memory", "counter": "EU_STALL_SENDWR", "short": "SEND write or SEND dispatch wait", "source": "Generation-sensitive", "meaning": "Published semantics differ by generation. Arc/ACM EU_STALL_SENDWR means waiting for SEND to write a GRF register. Lunar Lake-style XVE_STALL_SENDWR means waiting for a SEND message to be dispatched from the XVE. Use the Cobalt/XeSim target definition as final authority.", "asm": [["send.load   g20, [g10]", "Arc/ACM view: response targets g20; SENDWR can cover waiting for SEND to write that GRF"], ["send.store  [g11], g21", "newer-Xe view: a SEND can stall before dispatch if the SEND path cannot accept it"]], "flow": [["Arc/ACM interpretation", "SEND is in flight and a GRF result is expected", "memory"], ["OR newer-Xe interpretation", "SEND is ready but cannot dispatch from XVE", "resource"], ["SENDWR", "interpret according to target metric generation", "stall"]], "note": "Do not merge the two semantics. In particular, SENDWR is not universally “store completion,” and on newer Xe it can be an issue/dispatch-side stall rather than a return-data stall."}, {"id": "sbid", "type": "memory", "counter": "EU_STALL_SBID", "short": "Scoreboard token/dependency unavailable", "source": "Arc/ACM + VTune + LNL", "meaning": "Arc/ACM and Lunar Lake metric definitions say a thread is waiting for a Scoreboard token to become available; VTune summarizes the user-facing condition as waiting for a Software Scoreboard dependency to resolve. This is a scoreboard-state dependency, not synonymous with DRAM latency.", "asm": [["send.load  g20, [g10]   {SBID=S0}", "conceptual notation: async work is tracked by scoreboard token S0"], ["send.load  g21, [g11]   {needs SBID}", "later scoreboard-managed work waits if the required token/state is still unavailable"]], "flow": [["asynchronous work issued", "scoreboard tracks outstanding operation", "normal"], ["SBID/token still unavailable", "scoreboard state has not been released/resolved", "control"], ["later work needs scoreboard state", "issue is blocked", "resource"], ["SBID", "thread waits for scoreboard token/dependency", "stall"]], "note": "The {SBID=...} notation is explanatory, not literal Intel assembler syntax. A load can cause SBID pressure, but “SBID = memory data has not reached GRF” is too narrow."}, {"id": "pipestall", "type": "compute", "counter": "EU_STALL_PIPESTALL", "short": "Ready instruction cannot enter target pipe", "source": "VTune XVE + LNL", "meaning": "VTune describes Pipe stall as an instruction that won arbitration but could not dispatch into a Floating-Point or Extended Math unit; a GRF bank conflict is a documented example. Newer Xe metrics describe ready work held by GRF conflicts, SEND holds, and similar issue-side conditions.", "asm": [["add  g20, gSrcA, gSrcB", "illustrative pseudo-ASM: operands are ready; assume target-specific GRF placement creates a dispatch/resource conflict"]], "flow": [["instruction is ready", "operands/dependencies are satisfied", "normal"], ["wins arbitration", "scheduler selects the instruction", "normal"], ["cannot dispatch to FP/EM", "e.g. target-specific GRF bank/resource conflict", "resource"], ["PIPESTALL", "ready work cannot enter the pipe this cycle", "stall"]], "note": "This differs from ALUWR: ALUWR says a required ALU write has not completed; PIPESTALL says the instruction is ready but cannot be dispatched into the execution path."}, {"id": "psdep", "type": "control", "counter": "EU_STALL_PS_DEPENDENCY", "short": "Pixel Shader dependency", "source": "Lunar Lake metric definition", "meaning": "This explicitly means a Pixel Shader dependency. PS here is Pixel Shader, not Payload Scoreboard and not a generic compute-result dependency.", "asm": [["pixel_op   g20, g10", "pseudo graphics operation creates/participates in a Pixel Shader dependency"], ["pixel_use  g30, g20", "dependent Pixel Shader work cannot proceed until the PS dependency clears"]], "flow": [["Pixel Shader work", "graphics pipeline establishes a PS dependency", "control"], ["PS dependency remains", "required graphics dependency has not cleared", "resource"], ["PS_DEPENDENCY", "Pixel Shader thread waits", "stall"]], "note": "For a compute kernel, PS_DEPENDENCY = 0 does not imply that math.inv/exp chains have no dependency stalls."}, {"id": "instfetch", "type": "control", "counter": "EU_STALL_INSTFETCH", "short": "Waiting for instruction fetch", "source": "Arc/ACM PRM + VTune", "meaning": "At least one thread is waiting for Instruction Fetch. A jump to a not-yet-resident target is a useful tiny example, but not the only possible cause.", "asm": [["add   g10, g2, g3", "current instruction is available"], ["jmpi  LABEL", "control flow jumps to a different instruction region"], ["LABEL: sel g20, g5, g6", "target cannot execute until instruction fetch supplies it"]], "flow": [["jmpi changes PC", "execution moves to target instruction region", "control"], ["target instruction unavailable", "instruction-fetch path has not supplied it", "resource"], ["INSTFETCH", "thread waits for instruction fetch", "stall"]], "note": "Large code footprints and branchy control flow can increase instruction-fetch pressure, but the counter itself only says the thread is waiting for Instruction Fetch."}, {"id": "control", "type": "control", "counter": "EU_STALL_CONTROL", "short": "Waiting for branch/control unit", "source": "VTune XVE + LNL", "meaning": "VTune defines this as waiting for a Branch unit to become available. Lunar Lake metric XML describes waiting for JEU to complete a branch instruction.", "asm": [["cmp        f0, g10, g11", "produce predicate/flag f0"], ["(+f0) jmpi LABEL", "conditional branch uses branch/control execution machinery"]], "flow": [["predicate available", "cmp determines the control condition", "normal"], ["branch instruction issued", "jmpi needs branch/control machinery", "control"], ["Branch unit unavailable / branch completing", "control path cannot accept or finish branch immediately", "resource"], ["CONTROL", "thread waits on branch/control execution", "stall"]], "note": "A large jmpi count makes CONTROL worth investigating. It should not automatically be counted as evidence for ALUWR."}, {"id": "barrier", "type": "control", "counter": "EU_STALL_BARRIER", "short": "Thread synchronization dependency", "source": "Arc/ACM PRM + VTune", "meaning": "VTune describes this as waiting for a thread synchronization dependency to resolve. Arc/ACM defines the event more specifically as waiting for the Gateway to write the Notify register.", "asm": [["send.gateway  barrier_payload", "pseudo: issue a barrier/synchronization message through gateway machinery"], ["add           g20, g10, g11", "subsequent work cannot proceed until synchronization releases"]], "flow": [["some work-items arrive", "early participants reach synchronization", "normal"], ["other participants still running", "required synchronization state is incomplete", "resource"], ["BARRIER", "thread waits for synchronization / Notify", "stall"], ["barrier releases", "execution can continue", "normal"]], "note": "Typical pattern: write SLM → barrier → read SLM. The pseudo mnemonic is explanatory; the exact ISA/message sequence is generation-specific."}, {"id": "other", "type": "compute", "counter": "EU_STALL_OTHER", "short": "Other dependency class", "source": "Arc/ACM PRM + LNL", "meaning": "Catch-all for stall dependencies outside the named classes. Arc/ACM explicitly gives Flag and EoT (End of Thread) as examples.", "asm": [["cmp       f0, g10, g11", "produce predicate flag f0"], ["(+f0) sel g20, g2, g3", "predicated select consumes f0; a flag dependency can fall into OTHER"]], "flow": [["cmp produces flag", "predicate state is created", "normal"], ["consumer needs flag", "predicated instruction depends on that state", "control"], ["dependency not covered elsewhere", "falls into miscellaneous dependency class", "resource"], ["OTHER", "thread waits on other dependency", "stall"]], "note": "OTHER is not necessarily noise. If it is large, inspect flag/predicate chains, EoT, and target-specific dependencies."}];
+
+function cls(k){return k==='stall'?'node stall':k==='resource'?'node res':k==='memory'?'node mem':k==='control'?'node ctl':'node'}
+function esc(x){return x.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
+const list=document.getElementById('list'), details=document.getElementById('details');
+
+for(const d of D){
+  const item=document.createElement('div'); item.className='item'; item.dataset.type=d.type;
+  item.innerHTML=`<strong>${d.counter}</strong><span>${d.short}</span>`;
+  item.onclick=()=>{document.querySelectorAll('.item').forEach(x=>x.classList.remove('active'));item.classList.add('active');document.getElementById('sec-'+d.id).scrollIntoView({behavior:'smooth',block:'start'})};
+  list.appendChild(item);
+
+  const sec=document.createElement('section'); sec.className='card detail'; sec.id='sec-'+d.id; sec.dataset.type=d.type;
+  sec.innerHTML=`<div class="top"><div><div class="counter">${d.counter}</div><div class="meaning">${d.meaning}</div></div><div class="tag">${d.source}</div></div>
+  <div class="grid"><div><div class="ttl">Tiny commented pseudo-ASM</div><div class="asm">${d.asm.map(x=>`<div><span class="i">${esc(x[0])}</span> <span class="c">// ${esc(x[1])}</span></div>`).join('')}</div><div class="note">${d.note}</div></div>
+  <div class="flow"><div class="ttl">What the example means</div><div class="chain">${d.flow.map((x,i)=>`<div class="${cls(x[2])}">${x[0]}<small>${x[1]}</small></div>${i<d.flow.length-1?'<div class="arr">↓</div>':''}`).join('')}</div></div></div>`;
+  details.appendChild(sec);
+}
+function resetBtns(){document.querySelectorAll('.controls button').forEach(b=>b.classList.remove('active'))}
+function showAll(b){resetBtns();b.classList.add('active');document.querySelectorAll('.detail,.item').forEach(x=>x.classList.remove('hidden'))}
+function filterType(t,b){resetBtns();b.classList.add('active');document.querySelectorAll('.detail,.item').forEach(x=>x.classList.toggle('hidden',x.dataset.type!==t))}
+</script>
+</body>
+</html>
