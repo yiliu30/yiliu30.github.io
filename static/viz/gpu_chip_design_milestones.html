@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GPU Chip Design Milestones</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#121a2d;
+    --panel2:#0f1628;
+    --text:#eef3ff;
+    --muted:#aeb9d6;
+    --line:#31405f;
+    --accent:#69a7ff;
+    --accent2:#79e0c3;
+    --warn:#ffcc66;
+    --danger:#ff7b8a;
+    --chip:#1b2742;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(105,167,255,.15), transparent 28rem),
+      radial-gradient(circle at 90% 10%, rgba(121,224,195,.08), transparent 26rem),
+      var(--bg);
+    color:var(--text);
+  }
+  .wrap{max-width:1200px;margin:auto;padding:36px 22px 70px}
+  h1{font-size:clamp(30px,5vw,54px);margin:0 0 10px;line-height:1.04}
+  .subtitle{color:var(--muted);font-size:18px;max-width:900px;line-height:1.55;margin-bottom:26px}
+  .note{
+    background:linear-gradient(135deg,rgba(105,167,255,.13),rgba(121,224,195,.08));
+    border:1px solid #31496c;border-radius:16px;padding:15px 18px;color:#dbe6ff;margin-bottom:28px
+  }
+  .overview{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:34px
+  }
+  .stat{background:var(--panel);border:1px solid #25324c;border-radius:16px;padding:16px}
+  .stat b{display:block;font-size:24px;margin-bottom:4px}
+  .stat span{color:var(--muted);font-size:13px}
+  .phase-title{
+    margin:32px 0 14px;font-size:20px;display:flex;align-items:center;gap:10px
+  }
+  .phase-title:after{content:"";height:1px;background:var(--line);flex:1}
+  .timeline{position:relative;margin-left:18px}
+  .timeline:before{
+    content:"";position:absolute;left:16px;top:0;bottom:0;width:2px;background:linear-gradient(var(--accent),var(--accent2),var(--warn))
+  }
+  .item{
+    position:relative;margin:0 0 14px 54px;background:var(--panel);
+    border:1px solid #25324c;border-radius:16px;overflow:hidden;
+    transition:.18s ease;
+  }
+  .item:hover{transform:translateY(-2px);border-color:#456187}
+  .dot{
+    position:absolute;left:-46px;top:21px;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);border:4px solid var(--bg);box-shadow:0 0 0 2px var(--accent)
+  }
+  .item.manufacturing .dot{background:var(--accent2);box-shadow:0 0 0 2px var(--accent2)}
+  .item.validation .dot{background:var(--warn);box-shadow:0 0 0 2px var(--warn)}
+  .head{
+    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;padding:17px 18px 12px;cursor:pointer
+  }
+  .name{font-size:18px;font-weight:750}
+  .abbr{color:var(--accent);font-weight:700}
+  .duration{
+    font-size:13px;font-weight:700;color:#dfe9ff;background:var(--chip);
+    border:1px solid #334667;border-radius:999px;padding:6px 10px;white-space:nowrap
+  }
+  .plain{color:var(--muted);line-height:1.5;padding:0 18px 16px}
+  .details{
+    display:none;border-top:1px solid #25324c;padding:15px 18px 18px;background:var(--panel2)
+  }
+  .item.open .details{display:block}
+  .details-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8391b4;margin-bottom:6px}
+  .details p{margin:0;line-height:1.55;color:#d5def4}
+  .milestone{
+    margin:24px 0 24px 54px;border-radius:18px;padding:20px 22px;
+    border:1px solid #5b4765;background:linear-gradient(135deg,rgba(255,123,138,.14),rgba(105,167,255,.09))
+  }
+  .milestone.green{border-color:#3d675e;background:linear-gradient(135deg,rgba(121,224,195,.14),rgba(105,167,255,.07))}
+  .milestone h3{margin:0 0 6px;font-size:24px}
+  .milestone p{margin:0;color:#d8e2f7;line-height:1.5}
+  .mini-flow{
+    margin-top:38px;background:var(--panel);border:1px solid #25324c;border-radius:20px;padding:22px;overflow:auto
+  }
+  .flow-row{display:flex;align-items:center;gap:8px;min-width:920px}
+  .box{
+    padding:12px 14px;border-radius:12px;background:var(--chip);border:1px solid #334667;
+    font-size:13px;text-align:center;min-width:110px
+  }
+  .arrow{color:#6f80a7;font-size:20px}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;color:var(--muted);font-size:13px}
+  .legend span:before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+  .l1:before{background:var(--accent)} .l2:before{background:var(--accent2)} .l3:before{background:var(--warn)}
+  .footer{color:#8391b4;font-size:13px;margin-top:26px;line-height:1.5}
+  @media(max-width:760px){
+    .overview{grid-template-columns:1fr 1fr}
+    .head{grid-template-columns:1fr}
+    .duration{width:max-content}
+    .details-grid{grid-template-columns:1fr}
+    .timeline{margin-left:4px}
+    .item{margin-left:46px}
+    .milestone{margin-left:46px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>How a New GPU Chip Is Designed</h1>
+  <div class="subtitle">
+    A practical end-to-end view from the first product idea to mass production.
+    Click any stage to expand the GPU example and expected output.
+  </div>
+
+  <div class="note">
+    <b>Important:</b> these durations are rough industry-style estimates for a modern high-end GPU.
+    Many stages run in parallel, so you should not simply add every duration together.
+  </div>
+
+  <div class="overview">
+    <div class="stat"><b>~3–5 years</b><span>Typical overall development window</span></div>
+    <div class="stat"><b>~12–24 mo</b><span>RTL + verification work</span></div>
+    <div class="stat"><b>~9–18 mo</b><span>Physical design window</span></div>
+    <div class="stat"><b>~4–6+ mo</b><span>Tapeout to first silicon</span></div>
+  </div>
+
+  <div class="phase-title">1. Decide what to build</div>
+  <div class="timeline">
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Product Definition</div>
+        <div class="duration">3–9 months</div>
+      </div>
+      <div class="plain">Decide what kind of GPU the company wants, its customers, performance target, power limit, process node, memory, package, and cost target.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Target AI + graphics GPU with very high matrix throughput, HBM memory, PCIe/CXL connectivity, and a defined board-power envelope.</p></div>
+        <div><div class="label">Main output</div><p>A product requirements document that says what the finished GPU must achieve.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Architecture Definition</div>
+        <div class="duration">6–12 months</div>
+      </div>
+      <div class="plain">Choose the GPU's major blocks and how much hardware each one gets.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Choose core count, L2 size, memory-controller count, matrix units, raster/RT units, NoC topology, and HBM channels.</p></div>
+        <div><div class="label">Main output</div><p>A top-level architecture specification and early performance/power targets.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Microarchitecture Definition</div>
+        <div class="duration">6–12 months</div>
+      </div>
+      <div class="plain">Work out exactly how each block operates internally: pipelines, queues, schedulers, registers, ports, and control logic.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Define warp/subgroup scheduling, issue width, register-file ports, matrix-unit tile sizes, cache pipelines, and load/store queues.</p></div>
+        <div><div class="label">Main output</div><p>A cycle-level hardware plan detailed enough for RTL engineers to implement.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Performance Modeling</div>
+        <div class="duration">~1–2 years, overlapping</div>
+      </div>
+      <div class="plain">Build software models that estimate whether the proposed GPU will meet throughput, latency, bandwidth, occupancy, and power goals.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Run GEMM, attention, graphics, cache-stress, and memory-bandwidth simulations before the chip exists.</p></div>
+        <div><div class="label">Main output</div><p>Performance projections and feedback that continuously changes architecture choices.</p></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="phase-title">2. Describe the actual digital hardware</div>
+  <div class="timeline">
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">RTL</span> — Register-Transfer Level Development</div>
+        <div class="duration">12–24 months</div>
+      </div>
+      <div class="plain">Write the hardware design in code. RTL specifies registers, signals, state machines, and what moves where on every clock cycle.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Implement the instruction decoder, scheduler, ALUs, register file, matrix engine, caches, memory pipeline, barriers, and atomics.</p></div>
+        <div><div class="label">Main output</div><p>Synthesizable SystemVerilog/Verilog or equivalent hardware source.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Functional Verification</div>
+        <div class="duration">12–24+ months</div>
+      </div>
+      <div class="plain">Try very hard to break the RTL before manufacturing. Verify every instruction, corner case, protocol, reset path, cache state, and error condition.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Check matrix instructions, barriers, atomics, page faults, cache coherence, race conditions, and interactions among thousands of concurrent threads.</p></div>
+        <div><div class="label">Main output</div><p>Coverage reports, passing regressions, formal proofs, bug closures, and verification sign-off.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">DFT</span> — Design for Test</div>
+        <div class="duration">6–12 months, overlapping</div>
+      </div>
+      <div class="plain">Add special hardware so that factories can test whether manufactured chips are electrically healthy.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Add scan chains, MBIST for SRAMs, built-in self-test, JTAG hooks, and production-test modes.</p></div>
+        <div><div class="label">Main output</div><p>A GPU design that can be tested quickly and reliably after fabrication.</p></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="phase-title">3. Turn RTL into a manufacturable physical chip</div>
+  <div class="timeline">
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Logic Synthesis</div>
+        <div class="duration">Weeks–months, iterative</div>
+      </div>
+      <div class="plain">Convert RTL into real logic gates from the target semiconductor process library.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>An RTL expression such as a+b becomes flip-flops, adders, multiplexers, buffers, and other standard cells.</p></div>
+        <div><div class="label">Main output</div><p>A gate-level netlist plus timing, area, and power estimates.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Physical Design</div>
+        <div class="duration">9–18 months</div>
+      </div>
+      <div class="plain">Decide exactly where the hardware goes on the die and how billions of physical wires connect it.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Floorplan compute cores, L2 slices, HBM controllers, SerDes, clock networks, power grids, and large SRAM arrays.</p></div>
+        <div><div class="label">Main output</div><p>A complete physical layout suitable for manufacturing.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">P&amp;R</span> — Place and Route</div>
+        <div class="duration">Part of physical design</div>
+      </div>
+      <div class="plain">Place standard cells in physical locations, build clock trees, and route the wires between everything.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Fit enormous compute blocks together while still closing a multi-GHz clock target.</p></div>
+        <div><div class="label">Main output</div><p>Placed and routed geometry with clocks and interconnect.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">STA</span> — Static Timing Analysis</div>
+        <div class="duration">Months, iterative</div>
+      </div>
+      <div class="plain">Check whether every critical electrical path can finish before its clock deadline.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Verify that register → datapath → register paths really sustain the target GPU frequency across process, voltage, and temperature corners.</p></div>
+        <div><div class="label">Main output</div><p>Timing closure with acceptable setup/hold margins.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">IR / EM</span> — Voltage Drop / Electromigration Sign-off</div>
+        <div class="duration">Several months, overlapping</div>
+      </div>
+      <div class="plain">Make sure the power network can feed the chip without too much voltage loss or long-term wire damage.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Stress the case where many matrix units switch at once and check that local voltage does not collapse.</p></div>
+        <div><div class="label">Main output</div><p>Power-integrity and reliability sign-off.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">DRC</span> — Design Rule Check</div>
+        <div class="duration">Weeks–months</div>
+      </div>
+      <div class="plain">Check that the physical layout obeys the semiconductor foundry's manufacturing rules.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Check wire spacing, widths, via structures, density, transistor geometry, and many process-specific constraints.</p></div>
+        <div><div class="label">Main output</div><p>A layout with no unacceptable manufacturing-rule violations.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name"><span class="abbr">LVS</span> — Layout Versus Schematic</div>
+        <div class="duration">Weeks–months</div>
+      </div>
+      <div class="plain">Check that the physical transistors and wires correspond to the circuit that engineers intended to build.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Confirm that the placed/routed physical GPU is electrically equivalent to the intended design.</p></div>
+        <div><div class="label">Main output</div><p>Electrical equivalence sign-off between layout and source design.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Design Sign-off</div>
+        <div class="duration">~1–3 months</div>
+      </div>
+      <div class="plain">Final approval that the GPU is ready to be manufactured.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Verification, timing, power, DFT, DRC, LVS, reliability, and release criteria all reach acceptable status.</p></div>
+        <div><div class="label">Main output</div><p>Final release candidate for manufacturing.</p></div>
+      </div></div>
+    </div>
+
+    <div class="milestone">
+      <h3>🚀 TAPEOUT</h3>
+      <p>The final <b>GDSII / OASIS</b> physical-design database is frozen and released from the chip company into the manufacturing flow. After this point, a hardware bug may require a new stepping and another fabrication cycle.</p>
+    </div>
+  </div>
+
+  <div class="phase-title">4. Manufacture the GPU</div>
+  <div class="timeline">
+    <div class="item manufacturing" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Mask Generation</div>
+        <div class="duration">~2–6 weeks</div>
+      </div>
+      <div class="plain">Prepare the pattern data and photomasks used to manufacture the chip layers.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>The released GPU layout is converted into manufacturing mask data for the chosen process.</p></div>
+        <div><div class="label">Main output</div><p>A production-ready mask set / manufacturing data package.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item manufacturing" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Wafer Fabrication</div>
+        <div class="duration">~3–5+ months</div>
+      </div>
+      <div class="plain">The foundry physically builds transistors and metal layers on silicon wafers through many repeated process steps.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>The actual compute cores, SRAMs, interconnect, I/O, and power network are fabricated.</p></div>
+        <div><div class="label">Main output</div><p>Finished wafers containing many GPU dies.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item manufacturing" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Wafer Probe / Die Sort</div>
+        <div class="duration">Days–weeks</div>
+      </div>
+      <div class="plain">Test dies while they are still on the wafer and reject clearly defective ones.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Check basic logic, memories, clocks, leakage, and test structures before spending money on advanced packaging.</p></div>
+        <div><div class="label">Main output</div><p>A map of known-good and bad dies.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item manufacturing" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Packaging</div>
+        <div class="duration">Weeks–2+ months</div>
+      </div>
+      <div class="plain">Put good dies into the package and connect them to memory, substrate, power, and external I/O.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Integrate compute dies or chiplets with HBM stacks and an interposer or advanced substrate.</p></div>
+        <div><div class="label">Main output</div><p>Packaged GPU samples ready for boards and lab bring-up.</p></div>
+      </div></div>
+    </div>
+
+    <div class="milestone green">
+      <h3>🧪 FIRST SILICON</h3>
+      <p>The design team receives the first real manufactured GPU samples, often called an early stepping such as <b>A0</b>. This is where simulation becomes reality.</p>
+    </div>
+  </div>
+
+  <div class="phase-title">5. Make the real silicon work</div>
+  <div class="timeline">
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">First Power-On</div>
+        <div class="duration">Hours–days</div>
+      </div>
+      <div class="plain">Apply power to the physical chip and check that the basic electrical behavior is healthy.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Check power rails, leakage/current, reset, clocks, JTAG/debug access, and whether the GPU responds safely.</p></div>
+        <div><div class="label">Main output</div><p>A living chip that can proceed to deeper initialization.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Silicon Bring-up</div>
+        <div class="duration">Days–3 months</div>
+      </div>
+      <div class="plain">Enable the chip block by block until useful software and workloads can run.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Clocks → reset → firmware → PCIe → HBM/GDDR → GPU cores → driver → first compute kernel.</p></div>
+        <div><div class="label">Main output</div><p>Stable enough hardware/software stack for systematic validation.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">First Boot</div>
+        <div class="duration">Days–weeks</div>
+      </div>
+      <div class="plain">Reach the point where firmware, operating system, and driver can recognize and initialize the GPU.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>The host enumerates the GPU over PCIe, firmware runs, memory initializes, and the driver loads.</p></div>
+        <div><div class="label">Main output</div><p>A software-visible GPU device.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Silicon Validation</div>
+        <div class="duration">6–12+ months</div>
+      </div>
+      <div class="plain">Test the real chip across workloads, voltage, temperature, frequency, memory conditions, and corner cases.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Run GEMM, attention, graphics, cache tests, memory stress, fault handling, clocks, thermal limits, and long-running regressions.</p></div>
+        <div><div class="label">Main output</div><p>A list of silicon errata, validated limits, and confidence that the chip matches its specification.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Characterization</div>
+        <div class="duration">3–9 months</div>
+      </div>
+      <div class="plain">Measure the real operating limits of the silicon instead of relying on pre-silicon estimates.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Find safe voltage/frequency curves, thermal behavior, HBM margins, power limits, and process variation.</p></div>
+        <div><div class="label">Main output</div><p>Production voltage, frequency, power, and binning tables.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Performance Tuning</div>
+        <div class="duration">6–18+ months</div>
+      </div>
+      <div class="plain">Tune firmware, compiler, drivers, libraries, and kernels for what the real GPU actually does best.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Tune GEMM and attention tile sizes, register usage, cache policy, compiler scheduling, occupancy, clocks, and firmware controls.</p></div>
+        <div><div class="label">Main output</div><p>A software stack that gets close to the hardware's real performance potential.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Stepping / Respin</div>
+        <div class="duration">Adds ~4–8+ months</div>
+      </div>
+      <div class="plain">If important hardware problems are found, modify the design and manufacture a revised silicon version.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>A0 → A1 → B0 may fix logic bugs, timing problems, analog issues, reliability problems, or manufacturability issues.</p></div>
+        <div><div class="label">Main output</div><p>A corrected hardware revision.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Qualification</div>
+        <div class="duration">3–6+ months</div>
+      </div>
+      <div class="plain">Prove that the GPU and package can survive the reliability requirements needed for shipping products.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Temperature cycling, voltage stress, aging tests, package reliability, memory stress, and long-duration operation.</p></div>
+        <div><div class="label">Main output</div><p>Approval that the part is suitable for production shipment.</p></div>
+      </div></div>
+    </div>
+
+    <div class="item validation" onclick="toggle(this)">
+      <div class="dot"></div>
+      <div class="head">
+        <div class="name">Yield Ramp</div>
+        <div class="duration">3–12+ months</div>
+      </div>
+      <div class="plain">Improve how many manufactured GPU dies are usable and how efficiently they can be sold in different performance bins.</div>
+      <div class="details"><div class="details-grid">
+        <div><div class="label">GPU example</div><p>Improve process yield, repair/fuse strategies, binning, voltage targets, and usable SKU coverage for a very large die.</p></div>
+        <div><div class="label">Main output</div><p>Economically viable high-volume production.</p></div>
+      </div></div>
+    </div>
+
+    <div class="milestone green">
+      <h3>🏭 MP — Mass Production</h3>
+      <p>The GPU is manufactured in volume and shipped to customers, OEMs, board partners, or data-center systems. For a large modern GPU, this may be roughly <b>9–18 months after tapeout</b>, depending on complexity and respins.</p>
+    </div>
+  </div>
+
+  <div class="mini-flow">
+    <h2 style="margin-top:0">One-line mental model</h2>
+    <div class="flow-row">
+      <div class="box">Product<br>requirements</div><div class="arrow">→</div>
+      <div class="box">Architecture</div><div class="arrow">→</div>
+      <div class="box">Microarchitecture</div><div class="arrow">→</div>
+      <div class="box">RTL</div><div class="arrow">→</div>
+      <div class="box">Verification</div><div class="arrow">→</div>
+      <div class="box">Physical design</div><div class="arrow">→</div>
+      <div class="box">Tapeout</div><div class="arrow">→</div>
+      <div class="box">Fabrication</div><div class="arrow">→</div>
+      <div class="box">First silicon</div><div class="arrow">→</div>
+      <div class="box">Bring-up</div><div class="arrow">→</div>
+      <div class="box">Production</div>
+    </div>
+    <div class="legend">
+      <span class="l1">Design / pre-silicon</span>
+      <span class="l2">Manufacturing</span>
+      <span class="l3">Post-silicon validation</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    Estimates are illustrative rather than tied to one vendor or GPU generation. Large chip programs overlap architecture, RTL, verification, physical design, software enablement, and validation aggressively.
+  </div>
+</div>
+
+<script>
+function toggle(el){
+  el.classList.toggle('open');
+}
+</script>
+</body>
+</html>
