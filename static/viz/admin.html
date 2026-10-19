@@ -3,182 +3,274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Viz - Add New Page</title>
+<title>Viz - Create or Update Page</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
-h1 { margin-bottom: 20px; color: #64ffda; }
-.container { display: grid; grid-template-columns: 1fr 4fr; gap: 20px; height: calc(100vh - 160px); }
-.editor-panel, .preview-panel { display: flex; flex-direction: column; }
-.editor-panel textarea { flex: 1; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: 'Fira Code', monospace; font-size: 13px; resize: none; }
-.preview-panel iframe { flex: 1; border: 1px solid #30363d; border-radius: 6px; background: white; }
-.controls { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-.controls input { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px 12px; color: #c9d1d9; font-size: 14px; }
-.controls input[name="filename"] { width: 250px; }
-.controls input[name="token"] { width: 300px; }
-button { background: #238636; color: white; border: none; border-radius: 6px; padding: 10px 20px; font-size: 14px; cursor: pointer; font-weight: 600; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
+h1 { margin: 0 0 16px; color: #64ffda; font-size: 26px; }
+.controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 14px 0; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+label { font-size: 12px; color: #aab4c3; }
+input, select { background: #0d1117; border: 1px solid #4d5969; border-radius: 5px; color: #e0e0e0; padding: 9px 11px; font: inherit; font-size: 14px; }
+input:read-only { opacity: .75; }
+#filenameInput { width: 260px; max-width: 100%; }
+#existingPage { width: min(420px, 100%); }
+#tokenInput { width: min(500px, 100%); }
+button, .file-label { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid transparent; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+button { background: #238636; color: #fff; }
 button:hover { background: #2ea043; }
 button:disabled { background: #555; cursor: not-allowed; }
-button.preview-btn { background: #1f6feb; }
-button.preview-btn:hover { background: #388bfd; }
-.file-label { background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; padding: 10px 20px; font-size: 14px; cursor: pointer; font-weight: 600; }
+.preview-btn, .secondary-btn { background: #1f6feb; color: #fff; }
+.preview-btn:hover, .secondary-btn:hover { background: #388bfd; }
+.file-label { background: #30363d; border-color: #484f58; color: #e0e0e0; }
 .file-label:hover { background: #3c444d; }
 .file-label input { display: none; }
-.status { margin-top: 12px; padding: 10px; border-radius: 4px; display: none; }
-.status.success { display: block; background: #0d2818; border: 1px solid #238636; color: #3fb950; }
-.status.error { display: block; background: #2d1b1b; border: 1px solid #da3633; color: #f85149; }
-.status.info { display: block; background: #0d1b2e; border: 1px solid #1f6feb; color: #58a6ff; }
-label { font-size: 12px; color: #8b949e; margin-bottom: 4px; display: block; }
-.field { display: flex; flex-direction: column; }
-.token-section { margin-bottom: 16px; padding: 12px; background: #0d1117; border-radius: 6px; border: 1px solid #30363d; }
-.token-section summary { cursor: pointer; color: #8b949e; font-size: 13px; }
+.token-section { padding: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; }
+.token-section summary { cursor: pointer; color: #ccd6e3; }
+.hint, #modeNote { color: #aab4c3; font-size: 13px; line-height: 1.5; }
+.hint { margin: 8px 0 0; }
+#modeNote { margin: 2px 0 8px; }
+.container { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 4fr); gap: 16px; min-height: 580px; height: min(68vh, 900px); }
+.editor-panel, .preview-panel { display: flex; flex-direction: column; min-height: 0; }
+.panel-heading { font-size: 13px; color: #aab4c3; margin-bottom: 7px; }
+.editor-panel textarea { width: 100%; flex: 1; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 13px; resize: vertical; }
+.preview-panel iframe { width: 100%; flex: 1; border: 1px solid #30363d; border-radius: 6px; background: #fff; }
+.status { display: none; margin: 14px 0; padding: 12px; border-radius: 5px; overflow-wrap: anywhere; }
+.status.success { display: block; background: #0d2818; border: 1px solid #238636; color: #71e49a; }
+.status.error { display: block; background: #2d1b1b; border: 1px solid #da3633; color: #ff9290; }
+.status.info { display: block; background: #0d1b2e; border: 1px solid #1f6feb; color: #7ab5ff; }
+@media (max-width: 850px) {
+  .container { grid-template-columns: 1fr; height: auto; }
+  .editor-panel { min-height: 280px; }
+  .preview-panel { min-height: 420px; }
+  #filenameInput, #existingPage { width: 100%; }
+}
 </style>
 </head>
 <body>
-<h1>Viz - Add New Page</h1>
+<h1>Viz - Create or Update Page</h1>
 
 <details class="token-section" id="tokenSection">
-<summary>GitHub Token Settings</summary>
-<div style="margin-top:10px">
-<div class="field">
-<label>Personal Access Token (stored in localStorage only)</label>
-<input type="password" name="token" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx">
-</div>
-<button onclick="saveToken()" style="margin-top:8px; background:#1f6feb;">Save Token</button>
-</div>
+  <summary>GitHub Token Settings</summary>
+  <div class="field" style="margin-top:10px">
+    <label for="tokenInput">Fine-grained Personal Access Token (not saved in browser storage)</label>
+    <input type="password" name="token" id="tokenInput" placeholder="github_pat_..." autocomplete="off">
+  </div>
+  <p class="hint">Use a token restricted to this repository with Contents: Read and write.
+  It stays only in this page's input until the tab is closed or refreshed.</p>
 </details>
 
 <div class="controls">
-<label class="file-label">Choose File<input type="file" id="fileInput" accept=".html,text/html"></label>
-<div class="field">
-<label>Filename (without .html)</label>
-<input name="filename" id="filenameInput" placeholder="e.g. attention_flow">
+  <div class="field">
+    <label for="existingPage">Existing visualization (optional)</label>
+    <select id="existingPage" aria-describedby="modeNote">
+      <option value="">New page</option>
+    </select>
+  </div>
+  <button type="button" class="secondary-btn" onclick="loadPages()">Refresh pages</button>
 </div>
-<button class="preview-btn" onclick="updatePreview()">Preview</button>
-<button onclick="pushToGitHub()">Push to GitHub</button>
+<p id="modeNote">Create a new visualization, or select an existing one to replace its HTML.</p>
+
+<div class="controls">
+  <label class="file-label" for="fileInput">Choose HTML File<input type="file" id="fileInput" accept=".html,text/html"></label>
+  <div class="field">
+    <label for="filenameInput">Published filename (without .html)</label>
+    <input name="filename" id="filenameInput" placeholder="e.g. attention_flow" autocomplete="off">
+  </div>
+  <button type="button" class="preview-btn" onclick="updatePreview()">Preview</button>
+  <button type="button" id="publishButton" onclick="pushToGitHub()">Publish to GitHub</button>
 </div>
 
 <div class="container">
-<div class="editor-panel">
-<textarea id="htmlEditor" placeholder="Choose a file or paste your HTML here..."></textarea>
+  <div class="editor-panel">
+    <label class="panel-heading" for="htmlEditor">HTML code</label>
+    <textarea id="htmlEditor" spellcheck="false" placeholder="Choose a replacement HTML file or paste your HTML here..."></textarea>
+  </div>
+  <div class="preview-panel">
+    <label class="panel-heading" for="previewFrame">Preview (isolated from publisher permissions)</label>
+    <iframe id="previewFrame" title="Visualization preview" sandbox="allow-scripts"></iframe>
+  </div>
 </div>
-<div class="preview-panel">
-<iframe id="previewFrame"></iframe>
-</div>
-</div>
-
-<div class="status" id="status"></div>
+<div id="status" class="status" role="status" aria-live="polite"></div>
 
 <script>
+'use strict';
 const REPO = 'yiliu30/yiliu30.github.io';
 const PATH_PREFIX = 'static/viz/';
+let previewUrl = null;
+
+const byId = id => document.getElementById(id);
 
 window.addEventListener('load', () => {
-  const saved = localStorage.getItem('github_pat');
-  if (saved) {
-    document.getElementById('tokenInput').value = saved;
-    document.getElementById('tokenSection').removeAttribute('open');
-  } else {
-    document.getElementById('tokenSection').setAttribute('open', '');
-  }
+  // The old publisher stored the token in localStorage; clear that copy.
+  // Any other HTML on this same site could otherwise access the stored token.
+  try {
+    if (localStorage.getItem('github_pat')) {
+      localStorage.removeItem('github_pat');
+      showStatus('For security, the token saved by the old publisher has been cleared. Enter a restricted token to publish.', 'info');
+    }
+  } catch (_) { /* Storage may be disabled; publishing still works. */ }
+  loadPages();
 });
 
-function saveToken() {
-  const token = document.getElementById('tokenInput').value.trim();
-  if (token) {
-    localStorage.setItem('github_pat', token);
-    showStatus('Token saved to localStorage.', 'success');
-  }
+function showStatus(message, kind) {
+  const status = byId('status');
+  status.textContent = message;
+  status.className = 'status ' + kind;
 }
 
 function getToken() {
-  return localStorage.getItem('github_pat') || document.getElementById('tokenInput').value.trim();
+  return byId('tokenInput').value.trim();
 }
 
 function updatePreview() {
-  const html = document.getElementById('htmlEditor').value;
-  const iframe = document.getElementById('previewFrame');
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  iframe.src = url;
+  const html = byId('htmlEditor').value;
+  const frame = byId('previewFrame');
+  const oldUrl = previewUrl;
+  previewUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  frame.addEventListener('load', function cleanOldUrl() {
+    frame.removeEventListener('load', cleanOldUrl);
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+  });
+  frame.src = previewUrl;
 }
 
-document.getElementById('fileInput').addEventListener('change', (e) => {
-  const file = e.target.files[0];
+function updateMode() {
+  const selected = byId('existingPage').value;
+  const filename = byId('filenameInput');
+  filename.readOnly = Boolean(selected);
+  if (selected) {
+    filename.value = selected.replace(/\.html$/i, '');
+    byId('modeNote').textContent = 'Update mode: choose a replacement HTML file or paste new code. The selected filename and URL stay the same.';
+    byId('publishButton').textContent = 'Update Existing Page';
+  } else {
+    filename.value = '';
+    byId('modeNote').textContent = 'New page mode: choose an HTML file or paste code, then enter its filename.';
+    byId('publishButton').textContent = 'Publish New Page';
+  }
+}
+
+byId('existingPage').addEventListener('change', updateMode);
+
+byId('fileInput').addEventListener('change', async event => {
+  const file = event.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    document.getElementById('htmlEditor').value = reader.result;
-    const filenameInput = document.getElementById('filenameInput');
-    if (!filenameInput.value.trim()) {
-      filenameInput.value = file.name.replace(/\.html?$/i, '');
+  try {
+    byId('htmlEditor').value = await file.text();
+    if (!byId('existingPage').value) {
+      byId('filenameInput').value = file.name.replace(/\.html?$/i, '');
     }
     updatePreview();
-  };
-  reader.readAsText(file);
+    showStatus('Loaded ' + file.name + '. Review the preview before publishing.', 'info');
+  } catch (error) {
+    showStatus('Could not read file: ' + error.message, 'error');
+  }
 });
 
-function showStatus(msg, type) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = 'status ' + type;
+async function githubAPI(path, method = 'GET', body) {
+  const token = getToken();
+  if (method !== 'GET' && !token) throw new Error('Enter a GitHub token in Token Settings.');
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const response = await fetch('https://api.github.com/repos/' + REPO + '/contents/' + path, {
+    method, headers, body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || ('HTTP ' + response.status));
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
 }
 
-async function githubAPI(path, method, body) {
-  const token = getToken();
-  if (!token) throw new Error('No GitHub token set');
-  const resp = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.message || resp.statusText);
+async function loadPages(preferredFilename) {
+  const select = byId('existingPage');
+  const previous = preferredFilename || select.value;
+  try {
+    const entries = await githubAPI('static/viz');
+    if (!Array.isArray(entries)) throw new Error('Unexpected repository response');
+    const htmlPages = entries
+      .filter(page => page.type === 'file' && /\.html$/i.test(page.name) && page.name !== 'admin.html')
+      .sort((a, b) => a.name.localeCompare(b.name));
+    select.replaceChildren(new Option('New page', ''));
+    for (const page of htmlPages) select.add(new Option(page.name, page.name));
+    if (htmlPages.some(page => page.name === previous)) select.value = previous;
+    updateMode();
+  } catch (error) {
+    showStatus('Could not refresh existing pages: ' + error.message + '. You may still enter a new filename.', 'error');
   }
-  return resp.json();
+}
+
+function getPublishFilename() {
+  const selected = byId('existingPage').value;
+  const typed = byId('filenameInput').value.trim();
+  const filename = selected || (/\.html$/i.test(typed) ? typed : typed + '.html');
+  // Forbid path traversal / API URL injection, and prevent overwriting this publisher.
+  if (!typed && !selected) throw new Error('Enter a filename.');
+  if (!filename || filename === '.' || filename === '..' ||
+      /[/\\?#%\u0000-\u001f\u007f]/.test(filename) ||
+      filename.toLowerCase() === 'admin.html') {
+    throw new Error('Invalid or protected filename.');
+  }
+  return filename;
 }
 
 async function pushToGitHub() {
+  const button = byId('publishButton');
+  if (button.disabled) return;
+  button.disabled = true;
   try {
-    const html = document.getElementById('htmlEditor').value;
-    const filename = document.getElementById('filenameInput').value.trim();
+    const html = byId('htmlEditor').value;
+    if (!html.trim()) throw new Error('Choose or paste an HTML file first.');
+    if (!getToken()) throw new Error('Enter a GitHub token in Token Settings.');
 
-    if (!html || !filename) {
-      showStatus('Please provide HTML content and a filename.', 'error');
+    const filename = getPublishFilename();
+    const selected = byId('existingPage').value;
+    const path = PATH_PREFIX + encodeURIComponent(filename);
+    showStatus('Checking the current version of ' + filename + '...', 'info');
+
+    let current = null;
+    try {
+      current = await githubAPI(path);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      if (selected) throw new Error('Selected page no longer exists. Refresh the page list before updating.');
+    }
+
+    if (current && (current.type !== 'file' || !current.sha)) {
+      throw new Error('Expected an existing file with a GitHub SHA.');
+    }
+    if (current && !confirm('Replace "' + filename + '" with the HTML in the editor?\n\nThe current version will remain recoverable from Git history.')) {
+      showStatus('Update cancelled. No files changed.', 'info');
       return;
     }
 
-    const token = getToken();
-    if (!token) {
-      showStatus('No GitHub token set. Open token settings and save one.', 'error');
-      return;
-    }
+    showStatus((current ? 'Updating ' : 'Creating ') + filename + ' in GitHub...', 'info');
+    const payload = {
+      message: (current ? 'Update ' : 'Add ') + filename + ' in viz',
+      content: btoa(unescape(encodeURIComponent(html)))
+    };
+    if (current) payload.sha = current.sha; // Required by GitHub to replace a file safely.
+    await githubAPI(path, 'PUT', payload);
 
-    const fullFilename = filename.endsWith('.html') ? filename : filename + '.html';
-    const filePath = PATH_PREFIX + fullFilename;
-
-    showStatus('Pushing HTML file...', 'info');
-
-    await githubAPI(filePath, 'PUT', {
-      message: `Add ${fullFilename} to viz`,
-      content: btoa(unescape(encodeURIComponent(html))),
-    });
-
-    showStatus(`Done! Published at: /viz/${fullFilename}`, 'success');
-  } catch (e) {
-    showStatus('Error: ' + e.message, 'error');
-    console.error(e);
+    // Updating the same HTML URL triggers a new Git commit, which also moves
+    // this visualization to the top of the timestamp-sorted index.
+    await loadPages(filename);
+    showStatus((current ? 'Updated ' : 'Created ') + filename +
+      ' in GitHub. The page is at /viz/' + encodeURIComponent(filename) +
+      ' after GitHub Pages finishes deploying.', 'success');
+  } catch (error) {
+    showStatus('Publish failed: ' + error.message +
+      (error.status === 409 ? '. The page changed in GitHub; reload before retrying.' : ''), 'error');
+  } finally {
+    button.disabled = false;
   }
 }
 
-// Live preview on ctrl+enter
-document.getElementById('htmlEditor').addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.key === 'Enter') updatePreview();
+byId('htmlEditor').addEventListener('keydown', event => {
+  if (event.ctrlKey && event.key === 'Enter') updatePreview();
 });
 </script>
 </body>
