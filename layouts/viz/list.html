@@ -4,7 +4,7 @@
   {{ with .Content }}<div class="post-content">{{ . }}</div>{{ end }}
 </header>
 
-{{- /* The deployment workflow generates these dates from each HTML file's latest Git commit. */ }}
+{{/* The deployment workflow generates dates from the latest Git commit for each HTML file. */}}
 {{- $dates := site.Data.viz_dates | default (dict) }}
 {{- $entries := slice }}
 {{- $dir := "static/viz" }}
