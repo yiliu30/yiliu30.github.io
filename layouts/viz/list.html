@@ -25,7 +25,7 @@
       {{- $updated = .timestamp }}
       {{- $date = .date }}
     {{- end }}
-    {{- $entries = append $entries (dict "name" $name "title" $title "timestamp" $updated "date" $date) }}
+    {{- $entries = $entries | append (dict "name" $name "title" $title "timestamp" $updated "date" $date) }}
   {{- end }}
 {{- end }}
 
