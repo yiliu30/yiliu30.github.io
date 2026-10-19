@@ -33,13 +33,21 @@ git submodule add --depth=1 https://github.com/adityatelange/hugo-PaperMod.git t
 git submodule update --init --recursive
 ```
 
-3. **Start the development server**
+3. **Generate visualization dates (newest first)**
+
+```bash
+python3 scripts/generate_viz_dates.py
+```
+
+Re-run this after adding or editing pages under `static/viz/`. GitHub Actions runs it automatically on every deployment. Dates are based on each HTML file's latest Git commit (UTC).
+
+4. **Start the development server**
 
 ```bash
 hugo server -D
 ```
 
-4. **View your site**
+5. **View your site**
 
 Open your browser and navigate to `http://localhost:1313`
 

@@ -20,3 +20,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Generated visualization index metadata
+data/viz_dates.json

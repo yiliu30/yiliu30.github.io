@@ -4,31 +4,81 @@
   {{ with .Content }}<div class="post-content">{{ . }}</div>{{ end }}
 </header>
 
-<ul class="viz-list">
-  {{- $dir := "static/viz" }}
-  {{- range (readDir $dir) }}
-    {{- $name := .Name }}
-    {{- if and (strings.HasSuffix $name ".html") (ne $name "admin.html") }}
-      {{- $path := printf "%s/%s" $dir $name }}
-      {{- $raw := os.ReadFile $path }}
-      {{- $title := $name }}
-      {{- $m := findRE "(?is)<title[^>]*>(.*?)</title>" $raw 1 }}
-      {{- with $m }}
-        {{- $inner := index . 0 }}
-        {{- $title = $inner | replaceRE "(?is)<title[^>]*>" "" | replaceRE "(?is)</title>" "" | htmlUnescape | strings.TrimSpace }}
-      {{- end }}
-      <li class="viz-entry">
-        <a href="{{ printf "/viz/%s" $name | relURL }}">{{ $title }}</a>
-        <span class="viz-file">{{ $name }}</span>
-      </li>
+{{- /* The deployment workflow generates these dates from each HTML file's latest Git commit. */ }}
+{{- $dates := site.Data.viz_dates | default (dict) }}
+{{- $entries := slice }}
+{{- $dir := "static/viz" }}
+{{- range (readDir $dir) }}
+  {{- $name := .Name }}
+  {{- if and (strings.HasSuffix $name ".html") (ne $name "admin.html") }}
+    {{- $path := printf "%s/%s" $dir $name }}
+    {{- $raw := os.ReadFile $path }}
+    {{- $title := $name }}
+    {{- $matches := findRE "(?is)<title[^>]*>(.*?)</title>" $raw 1 }}
+    {{- with $matches }}
+      {{- $inner := index . 0 }}
+      {{- $title = $inner | replaceRE "(?is)<title[^>]*>" "" | replaceRE "(?is)</title>" "" | htmlUnescape | strings.TrimSpace }}
     {{- end }}
+    {{- $updated := 0 }}
+    {{- $date := "" }}
+    {{- with (index $dates $name) }}
+      {{- $updated = .timestamp }}
+      {{- $date = .date }}
+    {{- end }}
+    {{- $entries = append $entries (dict "name" $name "title" $title "timestamp" $updated "date" $date) }}
   {{- end }}
-</ul>
+{{- end }}
+
+<p class="viz-sort-note">{{ len $entries }} visualizations &middot; Most recently updated first</p>
+<div class="viz-grid">
+  {{- range sort $entries "timestamp" "desc" }}
+    <article class="viz-card">
+      <a class="viz-card-link" href="{{ printf "/viz/%s" .name | relURL }}">{{ .title }}</a>
+      <div class="viz-card-meta">
+        {{- if .date }}
+          <time datetime="{{ .date }}">Updated {{ .date }}</time>
+        {{- else }}
+          <span>Date unavailable</span>
+        {{- end }}
+        <span class="viz-card-file" title="{{ .name }}">{{ .name }}</span>
+      </div>
+    </article>
+  {{- end }}
+</div>
 
 <style>
-  .viz-list { list-style: none; padding: 0; }
-  .viz-entry { padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .viz-entry a { font-size: 18px; font-weight: 600; }
-  .viz-file { display: block; font-size: 13px; opacity: 0.6; margin-top: 2px; }
+  .viz-sort-note { margin: 0 0 20px; color: var(--secondary); font-size: 14px; }
+  .viz-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+  .viz-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 154px;
+    padding: 20px;
+    background: var(--entry);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 150ms ease, transform 150ms ease;
+  }
+  .viz-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .viz-card:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .viz-card-link {
+    display: block;
+    color: var(--primary);
+    font-size: 17px;
+    font-weight: 650;
+    line-height: 1.4;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .viz-card-link:focus-visible { outline: none; }
+  .viz-card-meta { display: flex; flex-direction: column; gap: 5px; margin-top: 20px; color: var(--secondary); font-size: 12px; }
+  .viz-card-file { overflow-wrap: anywhere; opacity: 0.75; }
+  @media (prefers-reduced-motion: reduce) { .viz-card { transition: none; } .viz-card:hover { transform: none; } }
 </style>
 {{- end }}
