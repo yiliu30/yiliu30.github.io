@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tiny-GPU · Execution Trace Explorer</title>
+<style>
+:root{--bg:#0b1020;--panel:#141d31;--panel2:#19243a;--line:#2b3852;--text:#eaf1ff;--muted:#a0afc8;--blue:#6b9cff;--green:#56d5a2;--amber:#f3bf67;--red:#ff797b;--violet:#bd9bff;--cyan:#68d8ed;--radius:15px;--shadow:0 14px 50px #02081759}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px}body{background-image:radial-gradient(ellipse 900px 400px at 70% -5%,#24355450,transparent)}button,select,input,textarea{font:inherit}button{cursor:pointer}a{color:#a7c6ff;text-decoration:none}a:hover{text-decoration:underline}
+.layout{max-width:1680px;margin:0 auto;padding:25px clamp(14px,2.5vw,34px) 50px}header{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;margin-bottom:23px}.eyebrow{color:var(--cyan);font-weight:750;text-transform:uppercase;letter-spacing:.15em;font-size:10px}.brand h1{font-size:clamp(22px,3vw,33px);letter-spacing:-.035em;line-height:1.12;margin:6px 0}.brand p{color:var(--muted);font-size:12px;margin:3px 0}.header-right{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+button,.btn,select,input[type=number],input[type=text]{background:#1f2b44;color:var(--text);border:1px solid #3a4a67;border-radius:9px;padding:9px 12px}button:hover,.btn:hover{background:#2b3c60;border-color:#6c89bb}button.primary{background:#4579e7;border-color:#618bf0;color:white;font-weight:700}button.primary:hover{background:#5a8bf7}button:disabled{opacity:.35;cursor:not-allowed}button.slim{padding:6px 9px}button.icon{font-weight:700;font-size:15px;min-width:37px}.panel{background:linear-gradient(160deg,#172138,#111a2b);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px;border-bottom:1px solid var(--line);flex-wrap:wrap}.panel-head h2{font-size:14px;margin:0;font-weight:750}.panel-head small,.muted{color:var(--muted)}.panel-body{padding:17px}.source-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:13px;margin-bottom:14px}.source-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.source-sub{color:var(--muted);font-size:11px;margin-top:9px;line-height:1.5}.drop{border:1px dashed #60769a;border-radius:9px;padding:9px 12px;cursor:pointer;background:#1d2d46}.drop:hover,.drop.drag{background:#304768}.status{border-radius:9px;padding:9px 11px;color:#bdcce2;background:#182c40;border:1px solid #284966;font-size:12px;margin-top:9px;line-height:1.4}.status.good{background:#173b32;color:#b6efda;border-color:#2a735b}.status.bad{background:#48292c;color:#ffd9d9;border-color:#855050}.source-paste{width:100%;height:76px;border:1px solid #34435d;border-radius:9px;background:#111a2c;color:var(--text);padding:9px;font:11px ui-monospace,monospace;resize:vertical}.paste-actions{display:flex;gap:8px;margin-top:7px;justify-content:flex-end}.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin-bottom:13px}.stat{padding:14px 16px}.stat .value{font-size:25px;font-weight:780;letter-spacing:-.04em}.stat .label{color:var(--muted);font-size:11px;margin-top:4px}.stat .accent{color:var(--cyan)}.main-grid{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(330px,1fr);gap:14px;align-items:start}.section-stack{display:flex;flex-direction:column;gap:14px;min-width:0}.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.pill{font-size:10px;border:1px solid var(--line);padding:4px 7px;border-radius:99px;color:var(--muted);white-space:nowrap}.timebar{display:flex;align-items:center;gap:9px;padding:15px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}.timebar input[type=range]{flex:1;min-width:120px;accent-color:#78a3ff}.cycle-number{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;min-width:92px}.timeline-controls{display:flex;gap:6px;align-items:center}.chart-scroll{display:flex;overflow:hidden}.tracks{width:134px;flex-shrink:0;background:#101a2b;border-right:1px solid #394660;z-index:1}.track-row{height:29px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid #25334b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.track-row.core{height:39px;font-weight:750;color:#e7f2ff;background:#1b2a42}.track-row.mem{color:#a6dcf8}.track-row small{color:var(--muted);font-size:10px;margin-left:5px}.canvas-scroll{overflow-x:auto;overflow-y:hidden;flex:1;min-width:0;scrollbar-color:#536786 #101a2b;cursor:crosshair;position:relative}.canvas-scroll canvas{display:block;image-rendering:pixelated}.legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line)}.legend-item{font-size:10px;color:#b8c8df;display:flex;align-items:center;gap:5px}.dot{width:9px;height:9px;border-radius:2px;display:inline-block}.no-data{padding:20px;text-align:center;color:var(--muted)}.info-strip{padding:9px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.inspect-head{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.inspect-hero{padding:16px 18px 13px}.instruction{font:700 16px ui-monospace,SFMono-Regular,Consolas,monospace;color:#fff;white-space:normal;word-break:break-word;margin:6px 0}.meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.meta b{font-weight:700}.state-tag{border:1px solid #344969;padding:5px 8px;border-radius:7px;font:700 10px ui-monospace,monospace;letter-spacing:.02em}.mini-s{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 16px 15px}.mini-s div{background:#0c1829;border:1px solid #2a3851;border-radius:9px;padding:9px}.mini-s span{display:block;font-size:10px;color:var(--muted)}.mini-s strong{display:block;font-family:ui-monospace,monospace;margin-top:5px;font-size:13px}.subhead{font-size:11px;text-transform:uppercase;letter-spacing:.10em;color:#aabbd2;font-weight:800;margin:16px 0 8px}.reg-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.reg{background:#0e192b;border:1px solid #253751;border-radius:8px;padding:9px}.reg.changed{border-color:#71c6a4;background:#16352f}.reg.special{background:#252b44}.reg-name{color:#a9bbd1;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reg-num{font:700 15px ui-monospace,Consolas,monospace;margin-top:4px}.reg.changed .reg-num{color:#83f1ba}.reg small{color:#8a9bb2;font-size:9px}.tip{font-size:11px;color:#abbcd2;padding:11px 13px;background:#0c1a2e;border-left:3px solid var(--blue);border-radius:6px;line-height:1.55}.program-list{max-height:225px;overflow:auto}.prog-row{display:flex;gap:7px;align-items:center;padding:6px 8px;border-bottom:1px solid #2a354b;font:11px ui-monospace,monospace;cursor:pointer}.prog-row:hover{background:#293851}.prog-row.active{background:#254369}.prog-row .count{margin-left:auto;color:#8497b6}.memory-table{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.memgroup{border:1px solid #2b3a52;border-radius:10px;overflow:hidden}.memgroup h4{padding:9px 10px;margin:0;background:#1c2940;font-size:11px}.meminner{max-height:200px;overflow-y:auto}.memrow{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #27334a;font:11px ui-monospace,monospace}.memrow.changed{color:#95ebc5;background:#1c3b35}.explain{font-size:12px;color:#c4d2e7;line-height:1.7;padding:13px;background:#0e1b2e;border:1px solid #253550;border-radius:10px}.explain strong{color:#f0f5ff}.guide{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.guide .g{background:#0f1a2a;border:1px solid #26364e;border-radius:9px;padding:10px}.guide b{display:block;margin-bottom:6px}.guide p{color:var(--muted);font-size:11px;line-height:1.55;margin:0}.keycap{font:10px monospace;background:#26344b;border:1px solid #4a5b79;border-radius:4px;padding:2px 5px}.empty{color:#a9bad2;background:#0c182a;border:1px dashed #354864;padding:27px 14px;text-align:center;line-height:1.8}.footer{color:#8497ae;font-size:11px;padding-top:16px;line-height:1.7}.filter-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.filter-line select{max-width:150px}.progress{font:11px ui-monospace,monospace;color:#8dcfff}.chip{padding:4px 7px;border-radius:6px;background:#263650;color:#bfd0ec;font:10px ui-monospace,monospace}.guide-meta{font-size:11px;color:#a3b4cd}
+@media(max-width:1080px){.main-grid{grid-template-columns:1fr}.source-wrap{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:600px){.layout{padding:15px 10px 30px}.stats{grid-template-columns:repeat(2,1fr)}.reg-grid{grid-template-columns:repeat(4,1fr)}.guide{grid-template-columns:1fr}.tracks{width:112px}.track-row{font-size:10px}.panel-head{padding:12px}.panel-body{padding:12px}.memory-table{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* Embedded RTL learning guide: core FSM + lane-local LSU FSM + ALU datapath */
+.concept-panel{margin-bottom:14px;overflow:hidden}
+.concept-intro{font-size:12px;color:#b8c8dc;line-height:1.6;margin:0 0 14px}
+.concept-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.concept-card{background:#0e1b30;border:1px solid #2e4364;border-radius:12px;padding:15px;min-width:0}
+.concept-card h3{font-size:14px;margin:0 0 6px;font-weight:780}
+.concept-card p{font-size:11px;line-height:1.62;color:#afc1dc;margin:0 0 10px}
+.concept-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid #435473;border-radius:7px;background:#17263e;font:700 10px ui-monospace,monospace;color:#e4f0ff;white-space:nowrap}
+.concept-pill .dot{width:8px;height:8px;border-radius:2px}
+.concept-line{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:9px 0 10px}
+.concept-arrow{font-size:12px;color:#7991b6}
+.concept-note{font-size:11px;line-height:1.55;color:#a6b9d5;border-left:2px solid #77aaff;padding-left:10px;margin-top:9px}
+.concept-bridge{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;padding:12px 13px;border:1px dashed #405a7b;border-radius:10px;margin:12px 0 16px;background:#0c1b2b}
+.concept-bridge span{border-radius:6px;background:#233653;color:#d5e4fb;padding:6px 9px;font-size:10px;font-weight:700}
+.concept-bridge .arrow{color:#83d1e6;font-size:15px}
+.concept-lab{border:1px solid #344b68;border-radius:12px;background:linear-gradient(140deg,#12233b,#101b2e);padding:14px}
+.concept-lab-head{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+.concept-lab-title{font-size:13px;font-weight:800}
+.concept-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.concept-mode[aria-pressed=true]{background:#375e9a;border-color:#70a9fc;color:#fff;font-weight:750}
+.concept-flow{display:grid;grid-template-columns:minmax(0,1fr) 1.2fr;gap:12px}
+.concept-step-list{display:grid;gap:5px;max-height:324px;overflow-y:auto;padding-right:3px}
+.concept-step{display:flex;align-items:center;gap:9px;text-align:left;color:#bfd1e9;background:#13233b;border:1px solid #2e4260;border-radius:8px;padding:8px 10px;width:100%;font-size:11px}
+.concept-step:hover{border-color:#6998dc;background:#203653}
+.concept-step[aria-current=step]{border-color:#78b5ff;background:#213e63;color:#fff;box-shadow:inset 3px 0 #8bc3ff}
+.concept-step .index{min-width:22px;text-align:center;color:#93acd0;font:700 10px ui-monospace,monospace}
+.concept-step .core{font-weight:800;min-width:62px}
+.concept-step .lane{color:#a6d7cf;margin-left:auto;white-space:nowrap;font-size:10px}
+.concept-detail{display:flex;flex-direction:column;gap:11px}
+.concept-detail h4{margin:0;font-size:16px}
+.concept-detail p{font-size:12px;line-height:1.7;color:#c4d1e6;margin:5px 0}
+.concept-pair{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.concept-statebox{padding:12px;border-radius:9px;background:#0b182a;border:1px solid #294160}
+.concept-statebox small{font-size:10px;color:#9fb1cc;display:block;margin-bottom:6px}
+.concept-statebox strong{font:800 17px ui-monospace,monospace}
+.concept-foot{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;margin-top:auto}
+.concept-meter{font:11px ui-monospace,monospace;color:#91b0da}
+.concept-live{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 13px;border:1px solid #2e5062;background:#112735;border-radius:9px}
+.concept-live p{margin:0;color:#c6e1e7;font-size:11px;line-height:1.6;flex:1}
+.concept-live button{white-space:nowrap}
+.concept-inline-source{display:flex;gap:13px;flex-wrap:wrap;margin-top:11px;color:#8fa6c6;font-size:11px}
+.concept-detail .example-value{display:inline-block;background:#264b58;border-radius:4px;padding:1px 4px;color:#b5f0f0;font-family:ui-monospace,monospace}
+/* ALU execution is a derived clocked-enable condition, not a dedicated FSM. */
+.alu-legend{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px}
+.alu-guide-state{font:750 10px ui-monospace,monospace;padding:5px 8px;border-radius:6px;border:1px solid #49607d;background:#14283b;white-space:nowrap}
+.alu-check{display:inline-flex;align-items:center;gap:6px;color:#c4d4e8;font-size:11px;cursor:pointer;user-select:none;white-space:nowrap}
+.alu-check input{accent-color:#67deb0;cursor:pointer}
+.track-row.alu{color:#9edbcc;background:#112333;font-size:11px}
+.alu-status{margin:0 16px 14px;padding:11px 12px;background:#0c1929;border:1px solid #354d68;border-radius:9px;display:flex;gap:11px;align-items:flex-start}
+.alu-status-dot{width:11px;height:11px;border-radius:3px;flex:none;margin-top:4px}
+.alu-status-content{flex:1;min-width:0}
+.alu-status-top{font-size:12px;font-weight:800;line-height:1.4;margin-bottom:3px}
+.alu-status-desc{font-size:11px;color:#afc4dd;line-height:1.62}
+.alu-status-desc code{color:#d7f3ff}
+@media(max-width:900px){.concept-grid,.concept-flow{grid-template-columns:1fr}.concept-step-list{max-height:210px}}
+@media(max-width:600px){.concept-pair{grid-template-columns:1fr}.concept-lab{padding:10px}.concept-step .lane{margin-left:0}}
+
+</style>
+</head><body><main class="layout">
+<header><div class="brand"><div class="eyebrow">RTL learning lab / Execution trace</div><h1>Tiny-GPU <span style="color:#79a3ff">Trace Explorer</span></h1><p>From cycle logs to a mental model of core scheduling, thread lanes, instructions, and register updates.</p></div><div class="header-right"><span class="pill">Standalone HTML</span><a href="https://github.com/yiliu30/tiny-gpu" target="_blank" rel="noopener">RTL ↗</a><a href="https://gist.github.com/yiliu30/a435860be3e06c874f9fa6c98be69724" target="_blank" rel="noopener">Source Gist ↗</a></div></header>
+<section class="source-wrap">
+<div class="panel"><div class="panel-head"><h2>① Load the execution log</h2><span class="pill" id="sourcePill">NO TRACE LOADED</span></div><div class="panel-body"><div class="source-actions"><button class="primary" id="gistBtn">↻ Load linked Gist</button><label class="drop" id="dropLabel" tabindex="0">↑ Import .txt / .log / .json<input type="file" id="upload" accept=".log,.txt,.json,text/plain,application/json" hidden></label><button id="demoBtn">Load labeled demo</button><button id="exportBtn" disabled>↓ Normalized JSON</button></div><div class="source-sub">The linked Gist may load directly when you open this HTML online. If your browser blocks remote requests, download the Gist's raw log and import it here. The demo is <b>synthetic</b> and never presented as the Gist.</div><div class="status" id="status" role="status">No log has been loaded yet. Choose <b>Load linked Gist</b>, import a file, or paste the original log.</div></div></div>
+<div class="panel"><div class="panel-head"><h2>Paste a log</h2><span class="pill">Parsed locally · No upload</span></div><div class="panel-body"><textarea class="source-paste" id="paste" placeholder="Paste a Tiny-GPU text trace, or normalized JSON records here…"></textarea><div class="paste-actions"><button class="slim" id="parseBtn">Parse pasted log →</button></div></div></div>
+</section>
+<section class="stats" aria-label="Trace summary"><div class="panel stat"><div class="value accent" id="stCycles">—</div><div class="label">Observed cycles</div></div><div class="panel stat"><div class="value" id="stCores">—</div><div class="label">Cores logged</div></div><div class="panel stat"><div class="value" id="stLanes">—</div><div class="label">Distinct core / lanes</div></div><div class="panel stat"><div class="value" id="stInstructions">—</div><div class="label">Instruction PCs seen</div></div><div class="panel stat"><div class="value" id="stDone">—</div><div class="label">Completion cycles reported</div></div></section>
+
+<section class="panel concept-panel" id="lsuFsmGuide" aria-label="Core FSM, LSU FSM and ALU learning guide">
+  <div class="panel-head"><h2>Learn the hardware: Core FSM + LSU + ALU</h2><span class="pill">Interactive · grounded in Tiny-GPU RTL</span></div>
+  <div class="panel-body">
+    <p class="concept-intro"><b>FSM = Finite-State Machine:</b> a hardware controller that remembers its current state and changes state on clock edges. <b>LSU = Load/Store Unit:</b> the hardware in <em>each thread lane</em> that sends <b>LDR</b> (load) and <b>STR</b> (store) requests to data memory. <strong>The LSU itself also contains an FSM.</strong> <b>ALU = Arithmetic Logic Unit:</b> each active lane has a registered arithmetic datapath, <b>but the ALU has no separate FSM</b>; the Core Scheduler triggers it during EXECUTE.</p>
+    <div class="concept-grid">
+      <article class="concept-card">
+        <h3>1 · Core Scheduler FSM <span class="pill">One per core</span></h3>
+        <p>One scheduler controls the <b>instruction being executed</b> by all enabled lanes. The timeline row <b>“Core 0 · FSM”</b> is this state machine. These are <b>sequential control states, not overlapping pipeline stages.</b></p>
+        <div class="concept-line" aria-label="Core FSM states">
+          <span class="concept-pill">IDLE</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#668ef4"></span>FETCH</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#a28cff"></span>DECODE</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#50c7b2"></span>REQUEST</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#f6b35b"></span>WAIT</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#60bfff"></span>EXECUTE</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#5cda9c"></span>UPDATE</span>
+        </div>
+        <div class="concept-note">After UPDATE: return to FETCH for the next instruction, or go to DONE on RET. FETCH can last many cycles; WAIT can also repeat until the relevant LSUs finish.</div>
+      </article>
+      <article class="concept-card">
+        <h3>2 · Load/Store Unit FSM <span class="pill">One per active lane</span></h3>
+        <p>The row <b>“Lane 2 · LSU”</b> shows this lane’s <b>memory transaction progress</b>, not an instruction pipeline. Non-memory instructions normally leave it IDLE.</p>
+        <div class="concept-line" aria-label="Load Store Unit FSM states">
+          <span class="concept-pill"><span class="dot" style="background:#42536d"></span>IDLE</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#8d96f8"></span>REQUESTING</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#ffad65"></span>WAITING</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#5cd4a1"></span>DONE</span><span class="concept-arrow">→</span>
+          <span class="concept-pill">IDLE</span>
+        </div>
+        <div class="concept-note"><b>REQUESTING</b>: preparing/issuing the memory request; <b>WAITING</b>: request is outstanding; <b>DONE</b>: received ready/acknowledgment; <b>IDLE</b>: returns after the core’s UPDATE edge.</div>
+      </article>
+      <article class="concept-card">
+        <h3>3 · Arithmetic Logic Unit (ALU) <span class="pill">One per lane · no FSM</span></h3>
+        <p>Each lane has an <b>8-bit ALU</b> with a registered <code>alu_out</code>. The shared decoder selects <b>ADD, SUB, MUL, DIV</b> or <b>CMP</b>. The ALU calculates on the rising edge while the Core FSM is in <b>EXECUTE</b>.</p>
+        <div class="concept-line" aria-label="ALU datapath, not another FSM">
+          <span class="concept-pill">rs + rt</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#60bfff"></span>EXECUTE edge</span><span class="concept-arrow">→</span>
+          <span class="concept-pill">alu_out</span><span class="concept-arrow">→</span>
+          <span class="concept-pill"><span class="dot" style="background:#5cda9c"></span>UPDATE edge</span>
+        </div>
+        <div class="concept-note"><b>No IDLE/WAIT/DONE state machine here.</b> Arithmetic results are truncated to 8 bits. During UPDATE, the register file copies <code>alu_out</code> into the destination for arithmetic instructions. CMP instead uses the ALU output to update NZP condition flags. For LDR/STR, ALU output is not selected for data writeback.<div class="alu-legend"><span class="alu-guide-state" style="color:#67deb0">● ACTIVE · USEFUL</span><span class="alu-guide-state" style="color:#eab86c">● ACTIVE · UNUSED</span><span class="alu-guide-state" style="color:#96a8be">● IDLE</span><span class="alu-guide-state" style="color:#7b8da8">● UNOBSERVED</span></div><div style="margin-top:8px"><b>How it is derived:</b> enabled lane + <code>core_state == EXECUTE</code> means the ALU computes/updates its output on the <em>next rising edge</em>. Arithmetic/CMP opcodes make the result useful; memory/control opcodes do not. The displayed <code>alu_out</code> is sampled <em>before</em> that edge and can still be the previous result. Unchanged output does not imply idle.</div></div>
+      </article>
+    </div>
+    <div class="concept-bridge" aria-label="How core scheduler and load store units communicate">
+      <span>Shared Core FSM: REQUEST</span><strong class="arrow">→</strong><span>Lane LSU: REQUESTING</span><strong class="arrow">→</strong><span>Memory controller + memory</span><strong class="arrow">→</strong><span>ready / data</span><strong class="arrow">→</strong><span>LSU: DONE</span><strong class="arrow">→</strong><span>Core can leave WAIT</span>
+    </div>
+    <div class="concept-bridge" aria-label="How core scheduler activates arithmetic datapath">
+      <span>Shared Core FSM: REQUEST</span><strong class="arrow">→</strong><span>Read lane operands rs / rt</span><strong class="arrow">→</strong><span>EXECUTE edge</span><strong class="arrow">→</strong><span>ALU registered result</span><strong class="arrow">→</strong><span>UPDATE edge: register writeback</span>
+    </div>
+    <div class="concept-lab" aria-label="Instruction, ALU, and LSU walkthrough">
+      <div class="concept-lab-head"><div><div class="concept-lab-title">4 · Walk through one instruction</div><span class="guide-meta">Conceptual states for one lane; repeated WAIT cycles depend on the memory handshake</span></div><div class="concept-actions" role="group" aria-label="Instruction walkthrough"><button type="button" class="slim concept-mode" data-concept-mode="LDR" aria-pressed="true">LDR · Load</button><button type="button" class="slim concept-mode" data-concept-mode="STR" aria-pressed="false">STR · Store</button><button type="button" class="slim concept-mode" data-concept-mode="ADD" aria-pressed="false">ADD · ALU</button><button type="button" class="slim concept-mode" data-concept-mode="MUL" aria-pressed="false">MUL · ALU</button></div></div>
+      <div class="concept-flow">
+        <div class="concept-step-list" id="conceptStepList" aria-label="Instruction execution steps"></div>
+        <div class="concept-detail" id="conceptDetail" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="concept-live"><p id="conceptLive">Load a log and select a cycle to see the <b>actual observed Core FSM + LSU FSM + ALU output</b> together. Until then, the walkthrough above is a conceptual teaching example.</p><button type="button" class="slim" id="firstMemoryBtn" disabled>Jump to first LDR / STR ↗</button></div>
+    <div class="concept-inline-source">Read the RTL: <a href="https://github.com/yiliu30/tiny-gpu/blob/master/src/scheduler.sv" target="_blank" rel="noopener">scheduler.sv ↗</a><a href="https://github.com/yiliu30/tiny-gpu/blob/master/src/lsu.sv" target="_blank" rel="noopener">lsu.sv ↗</a><a href="https://github.com/yiliu30/tiny-gpu/blob/master/src/controller.sv" target="_blank" rel="noopener">controller.sv ↗</a><a href="https://github.com/yiliu30/tiny-gpu/blob/master/src/alu.sv" target="_blank" rel="noopener">alu.sv ↗</a><a href="https://github.com/yiliu30/tiny-gpu/blob/master/src/registers.sv" target="_blank" rel="noopener">registers.sv ↗</a></div>
+  </div>
+</section>
+
+<div class="main-grid">
+<div class="section-stack">
+<section class="panel"><div class="panel-head"><h2>② Cycle timeline</h2><div class="filter-line"><label class="alu-check" title="Show derived per-lane ALU activity beneath LSU state"><input id="showAlu" type="checkbox" checked>ALU lanes</label><label class="guide-meta" for="zoom">Zoom</label><select id="zoom"><option value="3">Compact</option><option value="7" selected>Normal</option><option value="13">Detailed</option><option value="22">Expanded</option></select><span class="pill" id="timelineInfo">Select a cycle</span></div></div>
+<div class="timebar"><div class="cycle-number" id="cycleLabel">Cycle —</div><div class="timeline-controls"><button class="icon slim" id="prevBtn" title="Previous cycle" disabled>‹</button><button class="icon slim" id="playBtn" title="Play / pause" disabled>▶</button><button class="icon slim" id="nextBtn" title="Next cycle" disabled>›</button></div><input type="range" id="scrubber" min="0" max="0" value="0" disabled aria-label="Selected cycle"><input type="number" id="jump" min="0" value="0" disabled style="width:77px" title="Jump to cycle"></div>
+<div class="chart-scroll"><div id="labels" class="tracks"></div><div id="timelineScroll" class="canvas-scroll"><canvas id="timeline" height="200"></canvas></div></div><div class="legend" id="legend"></div><div class="info-strip"><span id="timelineHelp">Click a timeline cell to inspect that cycle. Arrow keys step between cycles.</span><span id="hoverInfo" class="progress"></span></div></section>
+<section class="panel"><div class="panel-head"><h2>③ Instruction execution map</h2><div class="filter-line"><label class="guide-meta">Core</label><select id="programCore"></select></div></div><div class="panel-body"><div class="program-list" id="program"><div class="empty">Load a trace to reconstruct the observed instruction stream.</div></div></div></section>
+<section class="panel"><div class="panel-head"><h2>④ Data-memory snapshots</h2><span class="pill">When present in original text log</span></div><div class="panel-body" id="memoryBox"><div class="empty">Load a text log containing the initial and final DATA MEMORY tables.</div></div></section>
+<section class="panel"><div class="panel-head"><h2>How to read the timeline</h2><span class="pill">Hardware mental model</span></div><div class="panel-body"><div class="guide"><div class="g"><b>Core is the instruction owner</b><p>Each core fetches one instruction and moves through FETCH → DECODE → REQUEST → WAIT → EXECUTE → UPDATE. Stages are FSM states, not overlapped pipeline slots.</p></div><div class="g"><b>Threads carry different data</b><p>Each lane has a register file, ALU (Arithmetic Logic Unit), LSU (Load/Store Unit), and PC (Program Counter) calculation. The core shares the decoded instruction.</p></div><div class="g"><b>Memory can stall everything</b><p>LDR/STR uses valid/ready handshakes. While LSUs wait, the core remains in WAIT; multiple lanes can have different LSU states even with a shared instruction.</p></div></div><p class="guide-meta" style="margin-bottom:0;margin-top:11px">Tip: Start at an <b>LDR</b> or <b>STR</b> instruction. Watch the LSU states change while the core waits, then inspect register updates after <b>UPDATE</b>.</p></div></section>
+</div>
+<aside class="section-stack"><section class="panel"><div class="panel-head"><h2>Cycle inspector</h2><div class="inspect-head"><label class="guide-meta">Core</label><select id="coreSel"></select><label class="guide-meta">Lane</label><select id="laneSel"></select></div></div>
+<div id="inspector"><div class="empty" style="margin:14px">Load a log and select any cycle in the timeline to inspect decoded instructions, execution states, ALU/LSU outputs and register changes.</div></div></section>
+<section class="panel"><div class="panel-head"><h2>Execution-state meaning</h2><span class="pill">Source: scheduler.sv</span></div><div class="panel-body" id="stateMeaning"><div class="explain">Select a cycle to explain what the hardware is doing.</div></div></section>
+<section class="panel"><div class="panel-head"><h2>Visible trace limitations</h2></div><div class="panel-body"><p class="guide-meta" style="line-height:1.7;margin:0">A missing lane in a log is <strong>unobserved</strong>, not necessarily inactive. Core/LSU states are sampled after the cocotb testbench drives memory responses and before the next rising edge. The ALU activity track is <strong>derived</strong> from Core FSM + opcode + presence of the logged lane, not a logged alu_busy wire. In a pre-edge snapshot, the ALU result of the current EXECUTE edge is not visible until the subsequent cycle. The viewer does not invent missing lanes or hardware signals.</p><p class="guide-meta" style="margin:10px 0 0">The PC and decoded instruction are core-level quantities; registers and LSU values are per-lane. The tooltip reflects the currently selected row.</p></div></section></aside>
+</div><div class="footer">Tiny-GPU Trace Explorer · Local, dependency-free rendering. Works with the textual trace format emitted by <a href="https://github.com/yiliu30/tiny-gpu/blob/master/test/helpers/format.py" target="_blank" rel="noopener">test/helpers/format.py</a> and with normalized JSON records. Gist retrieval requires browser network access; imported files and pasted logs stay on your machine.</div></main>
+<script>
+'use strict';
+const GIST_ID='a435860be3e06c874f9fa6c98be69724', GIST_OWNER='yiliu30';
+const $=id=>document.getElementById(id);
+const STAGES={IDLE:'#54627b',FETCH:'#668ef4',DECODE:'#a28cff',REQUEST:'#50c7b2',WAIT:'#f6b35b',EXECUTE:'#60bfff',UPDATE:'#5cda9c',DONE:'#3f8e64'};
+const ALU_COLORS={USEFUL:'#55dba4',UNUSED:'#f0bc6e',IDLE:'#394d64',UNKNOWN:'#8fa5ce',UNOBSERVED:'#27374c'};
+const ARITHMETIC=new Set(['ADD','SUB','MUL','DIV','CMP']);
+const NON_ARITHMETIC=new Set(['NOP','BRNZP','LDR','STR','CONST','RET']);
+const LSUS={IDLE:'#42536d',REQUESTING:'#8d96f8',WAITING:'#ffad65',DONE:'#5cd4a1'};
+const STAGE_INFO={IDLE:['Idle','The scheduler is waiting for a launch/start.'],FETCH:['Instruction fetch','The fetcher retrieves an instruction from program memory for the current PC. The instruction-memory controller may add waiting cycles.'],DECODE:['Instruction decode','The shared decoder interprets opcode, source/destination registers and control bits.'],REQUEST:['Register and memory request','Each active thread lane reads source operands. LDR/STR starts the lane-local LSU request sequence.'],WAIT:['Wait for LSUs','The scheduler checks the load/store units. A memory instruction can keep this core stalled here across multiple cycles.'],EXECUTE:['Arithmetic and PC','ALUs compute arithmetic or comparison results; lane-local PC units compute the next instruction address.'],UPDATE:['Register writeback and PC update','The destination register or NZP flags are updated, and the core adopts its next PC (unless RET completes the block).'],DONE:['Block complete','This core finished the current block and waits for dispatch/reset.']};
+let trace=null,current=0,coreId=null,laneId=null,pixels=7,rows=[],timer=null,hover=null;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function status(msg,type=''){let el=$('status');el.innerHTML=msg;el.className='status '+type;}
+function intOr(v,fall=null){let n=Number(v);return Number.isFinite(n)?n:fall;}
+function parseText(raw){
+ let cycles=[],byCycle=new Map(),core=null,thread=null,cy=null,mode='',memCurrent=null,memshots=[],completion=null;
+ function ensureCycle(n){if(!byCycle.has(n)){let ob={cycle:n,cores:{}};byCycle.set(n,ob);cycles.push(ob);}return byCycle.get(n)}
+ function ensureCore(n){let ob=cy.cores[n];if(!ob){ob={id:n,pc:null,instruction:null,state:null,fetcher:null,done:null,threads:{}};cy.cores[n]=ob;}return ob}
+ const lines=raw.split(/\r?\n/);
+ for(let i=0;i<lines.length;i++){
+   const line=lines[i].trim();if(!line)continue;
+   let m;
+   if((m=line.match(/^=+\s*Cycle\s+(\d+)\s*=+$/i))){cy=ensureCycle(+m[1]);core=null;thread=null;mode='trace';continue}
+   if((m=line.match(/Completed\s+in\s+(\d+)\s+cycles/i))){completion=+m[1];continue}
+   if((m=line.match(/^(DATA|PROGRAM)\s+MEMORY\s*$/i))){mode='memory';memCurrent={kind:m[1].toUpperCase(),entries:{},line:i};memshots.push(memCurrent);continue}
+   if(cy && (m=line.match(/^\+[-\s]*Core\s+(\d+)\s*[-\s]*\+$/i))){mode='trace';core=ensureCore(+m[1]);thread=null;continue}
+   if(cy && core && (m=line.match(/^\+[-\s]*Thread\s+(\d+)\s*[-\s]*\+$/i))){let key=+m[1];thread=core.threads[key]??{globalThread:key,lane:null,registers:{},rs:null,rt:null,alu:null,lsu:null,constant:null,lsuState:null};core.threads[key]=thread;continue}
+   if(mode==='memory' && memCurrent && (m=line.match(/^\|\s*(\d+)\s*\|\s*(\d+|[01]{8,16})\s*\|?\s*$/))){const addr=+m[1];let value=+m[2];if(/^0[01]+$/.test(m[2]))value=parseInt(m[2],2);memCurrent.entries[addr]=value;continue}
+   if(!cy||!core)continue;
+   if((m=line.match(/^PC:\s*(\d+)/i))){core.pc=+m[1];continue}
+   if((m=line.match(/^Instruction:\s*(.*)$/i))){core.instruction=m[1];continue}
+   if((m=line.match(/^Core State:\s*(\w+)/i))){core.state=m[1].toUpperCase();continue}
+   if((m=line.match(/^Fetcher State:\s*(\w+)/i))){core.fetcher=m[1].toUpperCase();continue}
+   if((m=line.match(/^Core Done:\s*([01])/i))){core.done=+m[1];thread=null;continue}
+   if(!thread)continue;
+   if((m=line.match(/^LSU State:\s*(\w+)/i))){thread.lsuState=m[1].toUpperCase();continue}
+   if((m=line.match(/^Registers:\s*(.+)$/i))){for(const part of m[1].split(/,\s*/)){let a=part.match(/^([^=]+?)\s*=\s*(-?\d+)$/);if(a)thread.registers[a[1].trim()]=+a[2]};if(thread.registers['%threadIdx']!==undefined)thread.lane=thread.registers['%threadIdx'];continue}
+   if((m=line.match(/^RS\s*=\s*(-?\d+)\s*,\s*RT\s*=\s*(-?\d+)/i))){thread.rs=+m[1];thread.rt=+m[2];continue}
+   if((m=line.match(/^ALU Out:\s*(-?\d+)/i))){thread.alu=+m[1];continue}
+   if((m=line.match(/^LSU Out:\s*(-?\d+)/i))){thread.lsu=+m[1];continue}
+   if((m=line.match(/^Constant:\s*(-?\d+)/i))){thread.constant=+m[1];continue}
+ }
+ cycles.sort((a,b)=>a.cycle-b.cycle);
+ if(!cycles.length)throw Error('No Tiny-GPU cycle headers found. Expected a line such as "========== Cycle 0 ==========".');
+ let memories=memshots.filter(x=>x.kind==='DATA'&&Object.keys(x.entries).length>0);
+ return normalize({cycles,completion,memories,format:'Tiny-GPU text log'});
+}
+function parseJSON(raw){let j=JSON.parse(raw);if(j.cycles&&Array.isArray(j.cycles)){return normalize({cycles:j.cycles,completion:j.completion??null,memories:j.memories??[],format:'JSON cycles'})}
+ let records=Array.isArray(j)?j:Array.isArray(j.records)?j.records:Array.isArray(j.trace)?j.trace:null;
+ if(!records)throw Error('JSON does not contain recognized cycle records. Expect an array with {cycle, core, lane, ...}, or {cycles:[...]}');
+ const cmap=new Map();for(const rec of records){let cy=+rec.cycle,ci=+rec.core;if(!Number.isFinite(cy)||!Number.isFinite(ci))continue;
+ if(!cmap.has(cy))cmap.set(cy,{cycle:cy,cores:{}});let obj=cmap.get(cy);let co=obj.cores[ci];if(!co){co={id:ci,pc:rec.pc??null,instruction:rec.instruction??null,state:rec.core_state??rec.state??null,fetcher:rec.fetcher_state??rec.fetcher??null,done:rec.core_done??rec.done??null,threads:{}};obj.cores[ci]=co}
+ const l=rec.lane??rec.thread??rec.thread_id;if(l!==undefined&&l!==null){co.threads[l]={globalThread:rec.global_thread??rec.thread_id??+l,lane:+l,registers:rec.registers??{},lsuState:rec.lsu_state??null,rs:rec.rs??null,rt:rec.rt??null,alu:rec.alu_out??null,lsu:rec.lsu_out??null,constant:rec.constant??null}}
+ }
+ return normalize({cycles:[...cmap.values()].sort((a,b)=>a.cycle-b.cycle),completion:j.completion??null,memories:[],format:'Normalized JSON records'});
+}
+function normalize(obj){const coresSet=new Set(),lanesSet=new Set(),instrSet=new Set();let max=-1,min=Infinity,nrec=0;
+ for(const cy of obj.cycles){max=Math.max(max,cy.cycle);min=Math.min(min,cy.cycle);
+ for(const [id,co] of Object.entries(cy.cores)){coresSet.add(+id);co.id=+id;co.state=co.state?co.state.toUpperCase():null;co.fetcher=co.fetcher?co.fetcher.toUpperCase():null;
+ if(co.pc!==null&&co.instruction)instrSet.add(`${id}:${co.pc}`);
+ for(const [tid,t] of Object.entries(co.threads??{})){t.lane=Number.isFinite(+t.lane)?+t.lane:+tid;lanesSet.add(`${id}:${t.lane}`);nrec++}}
+ }
+ if(max<0)throw Error('No valid cycle records.');obj.min=min;obj.max=max;obj.cores=[...coresSet].sort((a,b)=>a-b);obj.lanes=[...lanesSet];obj.instrs=instrSet.size;obj.index=new Map(obj.cycles.map(x=>[x.cycle,x]));obj.nrecords=nrec;return obj}
+function parseAny(s){const v=s.trim();if(!v)throw Error('Empty input.');if(v[0]!=='{'&&v[0]!=='[')return parseText(v);try{return parseJSON(v)}catch(original){const lines=v.split(/\r?\n/).filter(x=>x.trim());if(lines.length>1){try{const records=lines.map(line=>JSON.parse(line));if(records.every(r=>r&&typeof r==='object'&&Number.isFinite(+r.cycle)&&Number.isFinite(+r.core))){const obj=parseJSON(JSON.stringify(records));obj.format='Canonical JSONL records';return obj}}catch(_){} }throw original}}
+function loadData(data,source){try{stopPlay();const t=parseAny(data);trace=t;trace.source=source;current=t.min;coreId=t.cores[0];laneId=null;initUI();status(`Loaded <b>${esc(source)}</b> · ${t.cycles.length} observed cycles, ${t.cores.length} cores, ${t.nrecords.toLocaleString()} logged lane snapshots.`, 'good');$('sourcePill').textContent=t.format.toUpperCase();}catch(e){status('Could not parse log: '+esc(e.message),'bad');}}
+async function loadGist(){status('Loading linked Gist via the browser. This requires internet access and CORS permission.');$('gistBtn').disabled=true;try{
+ const api=`https://api.github.com/gists/${GIST_ID}`;let response=await fetch(api,{headers:{Accept:'application/vnd.github+json'}});
+ if(!response.ok)throw Error(`GitHub Gist API HTTP ${response.status}`);
+ const gist=await response.json();const files=Object.values(gist.files||{});if(!files.length)throw Error('Gist contains no files');
+ const ordered=files.sort((a,b)=>((/\.log$|\.txt$|trace|log/i.test(b.filename)?10000000:0)+(b.size||0))-((/\.log$|\.txt$|trace|log/i.test(a.filename)?10000000:0)+(a.size||0)));
+ let errs=[];for(const f of ordered){try{let content=f.content;if(!content||f.truncated){const rr=await fetch(f.raw_url);if(!rr.ok)throw Error(`Raw file HTTP ${rr.status}`);content=await rr.text()}
+ const t=parseAny(content);stopPlay();trace=t;trace.source=`Gist · ${f.filename}`;current=t.min;coreId=t.cores[0];laneId=null;initUI();status(`Loaded <b>${esc(f.filename)}</b> directly from the linked Gist · ${t.cycles.length} cycles.`, 'good');$('sourcePill').textContent='LIVE GIST';return}catch(e){errs.push(`${f.filename}: ${e.message}`)}}throw Error(errs.join('; '));
+ }catch(e){
+    // Direct raw content is a useful fallback if anonymous GitHub API requests are rate limited.
+    try {const raw=await fetch(`https://gist.githubusercontent.com/${GIST_OWNER}/${GIST_ID}/raw`);if(!raw.ok)throw Error(`Raw Gist HTTP ${raw.status}`);
+      const data=await raw.text(),t=parseAny(data);stopPlay();trace=t;trace.source='Gist raw text';current=t.min;coreId=t.cores[0];laneId=null;initUI();status(`Loaded <b>raw Gist</b> · ${t.cycles.length} cycles.`, 'good');$('sourcePill').textContent='RAW GIST';return;
+    }catch(rawError){status(`Automatic Gist loading was unavailable: ${esc(e.message)}; fallback: ${esc(rawError.message)}. Open the <a target="_blank" rel="noopener" href="https://gist.github.com/${GIST_OWNER}/${GIST_ID}">Gist</a>, click <b>Raw</b>, save the text, and use <b>Import</b> or paste it here.`, 'bad')}
+  }finally{$('gistBtn').disabled=false}}
+function buildSynthetic(){const stages=['IDLE','FETCH','FETCH','FETCH','DECODE','REQUEST','WAIT','EXECUTE','UPDATE','FETCH','FETCH','DECODE','REQUEST','WAIT','EXECUTE','UPDATE','FETCH','FETCH','DECODE','REQUEST','WAIT','WAIT','WAIT','WAIT','EXECUTE','UPDATE','FETCH','DECODE','REQUEST','WAIT','EXECUTE','UPDATE','DONE'];let v=[];
+ for(let c=0;c<stages.length;c++){const co={id:0,pc:c<9?0:c<16?1:c<26?2:3,instruction:c<9?'ADD R2, R0, R1':c<16?'CONST R3, #8':c<26?'LDR R4, R3':'RET',state:stages[c],fetcher:['FETCH','DECODE'].includes(stages[c])?'FETCHING':'IDLE',done:c===stages.length-1?1:0,threads:{}};
+ for(let lane=0;lane<4;lane++){const r={R0:lane,R1:2,R2:c>=9?lane+2:0,R3:c>=16?8:0,R4:c>=26?10+lane:0,'%blockIdx':0,'%blockDim':4,'%threadIdx':lane};co.threads[lane]={globalThread:lane,lane,registers:r,lsuState:c<20?'IDLE':c<21?'REQUESTING':c<23?'WAITING':c<26?'DONE':'IDLE',rs:lane,rt:2,alu:lane+2,lsu:c>=23?10+lane:0,constant:null}}
+ v.push({cycle:c,cores:{0:co}})}return JSON.stringify({cycles:v,completion:v.length})}
+function coreAt(c,co){return trace?.index.get(c)?.cores[co]??null}
+function lanesFor(core){let lanes=new Set();for(const cy of trace.cycles){const co=cy.cores[core];if(co)for(const t of Object.values(co.threads||{}))lanes.add(t.lane)}return [...lanes].sort((a,b)=>a-b)}
+function threadAt(c,co,lane){let x=coreAt(c,co);return x?Object.values(x.threads).find(t=>t.lane===lane)||null:null}
+// Derived from the pinned alu.sv: an enabled lane clocks its registered ALU
+// whenever the shared scheduler samples EXECUTE. It does so even for LDR/STR.
+// Do not infer idle from unchanged alu_out, and do not label unlogged lanes idle.
+function aluActivity(co, th){
+ if(!co||!th) return {key:'UNOBSERVED',label:'UNOBSERVED',reason:'This core/lane is missing from the imported snapshot; missing data is not proof of an idle ALU.'};
+ if(!co.state) return {key:'UNKNOWN',label:'UNKNOWN STATE',reason:'Core FSM state was not recorded, so ALU activity cannot be inferred.'};
+ if(co.state!=='EXECUTE') return {key:'IDLE',label:'IDLE',reason:`Core FSM is ${co.state}. The ALU output register holds its previous value (except reset).`};
+ const op=String(co.instruction||'').trim().toUpperCase().split(/[\s,]+/)[0];
+ if(ARITHMETIC.has(op))return {key:'USEFUL',label:'ACTIVE · USEFUL',reason:`${op} executes on the rising edge following this pre-edge snapshot; its result is registered into alu_out. During UPDATE, the register file or NZP flags consume the result.`};
+ if(NON_ARITHMETIC.has(op))return {key:'UNUSED',label:'ACTIVE · UNUSED',reason:`The RTL clocks the ALU on EXECUTE even for ${op}, but the instruction does not consume its arithmetic result. alu_out may change despite no useful ALU work.`};
+ return {key:'UNKNOWN',label:'ACTIVE · OPCODE UNKNOWN',reason:'Core is in EXECUTE and this lane is logged, so its ALU is clock-enabled; the opcode is unavailable or unrecognized, so usefulness cannot be classified.'};
+}
+function initUI(){const yes=!!trace;$('firstMemoryBtn').disabled=!yes;for(const x of ['prevBtn','nextBtn','playBtn','scrubber','jump','exportBtn'])$(x).disabled=!yes;const v=trace;for(const [id,val] of [['stCycles',v.cycles.length],['stCores',v.cores.length],['stLanes',v.lanes.length],['stInstructions',v.instrs],['stDone',v.completion===null?'not reported':v.completion]])$(id).textContent=val;
+ $('scrubber').min=v.min;$('scrubber').max=v.max;$('jump').min=v.min;$('jump').max=v.max;
+ let opts=v.cores.map(i=>`<option value="${i}">Core ${i}</option>`).join('');$('coreSel').innerHTML=opts;$('programCore').innerHTML=opts;$('coreSel').value=String(coreId);$('programCore').value=String(coreId);setLanes();buildRows();buildLegend();renderTimeline();updateSelected(false);renderMemory();}
+function setLanes(){let lanes=lanesFor(coreId),keep=laneId;if(keep===null||!lanes.includes(keep))laneId=lanes[0]??null;$('laneSel').innerHTML=lanes.map(i=>`<option value="${i}">Lane ${i}</option>`).join('');if(laneId!==null)$('laneSel').value=String(laneId)}
+function buildRows(){rows=[];const includeAlu=$('showAlu').checked;for(const c of trace.cores){rows.push({core:c,kind:'core',name:`Core ${c} · FSM`,height:39});for(const l of lanesFor(c)){rows.push({core:c,lane:l,kind:'lsu',name:`Lane ${l} · LSU`,height:29});if(includeAlu)rows.push({core:c,lane:l,kind:'alu',name:`Lane ${l} · ALU`,height:25})}}let label=$('labels');label.innerHTML=rows.map(r=>`<div class="track-row ${r.kind==='core'?'core':r.kind==='alu'?'alu':'mem'}" style="height:${r.height}px" title="${esc(r.name)}">${esc(r.name)}</div>`).join('');$('timelineInfo').textContent=trace.cycles.length+' cycles · '+rows.length+' rows';}
+function buildLegend(){$('legend').innerHTML=Object.entries(STAGES).map(([k,v])=>`<span class="legend-item"><span class="dot" style="background:${v}"></span>${k}</span>`).join('')+'<span class="legend-item"><span class="dot" style="background:'+LSUS.WAITING+'"></span>LSU waiting</span>' + ($('showAlu').checked ? Object.entries(ALU_COLORS).filter(([k])=>k!=='UNKNOWN').map(([k,col])=>`<span class="legend-item"><span class="dot" style="background:${col}"></span>ALU ${k==='USEFUL'?'active · useful':k==='UNUSED'?'active · unused':k.toLowerCase()}</span>`).join('') : '');}
+function canvasCoord(ev){const el=$('timeline'),rect=el.getBoundingClientRect();return{x:(ev.clientX-rect.left)*(el.width/rect.width),y:(ev.clientY-rect.top)*(el.height/rect.height)}}
+function draw(){if(!trace)return;const canvas=$('timeline'),ctx=canvas.getContext('2d');const totalW=70+(trace.max-trace.min+1)*pixels, totalH=24+rows.reduce((s,r)=>s+r.height,0);canvas.width=Math.min(110000,totalW);canvas.height=totalH;const w=canvas.width,h=canvas.height;
+ ctx.fillStyle='#0b1729';ctx.fillRect(0,0,w,h);ctx.fillStyle='#93a7c6';ctx.font='10px ui-monospace,monospace';ctx.textBaseline='middle';const tick=pixels<=3?25:pixels<=7?10:pixels<=13?5:2;
+ for(let cy=trace.min;cy<=trace.max;cy++){const x=33+(cy-trace.min)*pixels;if(x>w)break;if(cy%tick===0){ctx.fillStyle='#93a7c6';ctx.fillText(''+cy,x+1,11);ctx.strokeStyle='#34445b';ctx.beginPath();ctx.moveTo(x,23);ctx.lineTo(x,h);ctx.stroke()} }
+ let y=24;for(const r of rows){ctx.fillStyle=r.kind==='core'?'#172941':'#102034';ctx.fillRect(0,y,w,r.height-1);
+ for(const snap of trace.cycles){const co=snap.cores[r.core];if(!co)continue;const th=r.kind==='core'?null:threadAt(snap.cycle,r.core,r.lane);const state=r.kind==='core'?co.state:r.kind==='alu'?aluActivity(co,th).key:th?.lsuState;
+ const col=(r.kind==='core'?STAGES:r.kind==='alu'?ALU_COLORS:LSUS)[state]||'#324057',x=33+(snap.cycle-trace.min)*pixels;if(x>w)continue;
+ ctx.fillStyle=col;ctx.fillRect(x,y+2,Math.max(1,pixels-1),r.height-5);
+ if(r.kind==='core'&&pixels>=7 && snap.cycle>trace.min){const prev=coreAt(snap.cycle-1,r.core);if(!prev||prev.pc!==co.pc){ctx.fillStyle='#f5fbff';ctx.font='bold 9px ui-monospace,monospace';let ins=co.instruction||'';ctx.fillText(`PC${co.pc} ${ins.slice(0,18)}`,x+3,y+12,Math.min(150,pixels*12));}}
+ }
+ ctx.strokeStyle='#2c3f59';ctx.beginPath();ctx.moveTo(0,y+r.height);ctx.lineTo(w,y+r.height);ctx.stroke();y+=r.height}
+ const x=33+(current-trace.min)*pixels;ctx.fillStyle='#ffffff12';ctx.fillRect(x,23,pixels,h-23);ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x+pixels/2,20);ctx.lineTo(x+pixels/2,h);ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x+pixels/2,18);ctx.lineTo(x+pixels/2-5,23);ctx.lineTo(x+pixels/2+5,23);ctx.fill();}
+function renderTimeline(){draw()}
+function chooseCycle(n,scroll=true){if(!trace)return;current=Math.max(trace.min,Math.min(trace.max,Number(n)||0));updateSelected(scroll)}
+function updateSelected(scroll=true){$('cycleLabel').textContent='Cycle '+current;$('scrubber').value=current;$('jump').value=current;draw();if(scroll){const box=$('timelineScroll');const x=33+(current-trace.min)*pixels;if(x<box.scrollLeft+20||x>box.scrollLeft+box.clientWidth-35)box.scrollLeft=Math.max(0,x-box.clientWidth*.35)}renderInspect();renderProgram();}
+function previousThread(){for(let c=current-1;c>=trace.min;c--){let t=threadAt(c,coreId,laneId);if(t)return t}return null}
+function selected(){return {co:coreAt(current,coreId),th:threadAt(current,coreId,laneId)}}
+function fmt(x){return x===null||x===undefined?'—':esc(x)}
+function renderInspect(){if(!trace)return;const {co,th}=selected();if(!co){$('inspector').innerHTML='<div class="empty" style="margin:14px">This core was not logged at the selected cycle.</div>';renderExplanation();return}
+ let state=co.state||'UNKNOWN',opcode=(co.instruction||'').trim().split(/\s+/)[0];let rhtml='';if(th){const p=previousThread();const regs=th.registers||{};const keys=Object.keys(regs).sort((a,b)=>{let ix=s=>{let m=s.match(/^R(\d+)$/);return m?+m[1]:100+['%blockIdx','%blockDim','%threadIdx'].indexOf(s)};return ix(a)-ix(b)});rhtml=keys.map(k=>{let diff=p&&p.registers&&p.registers[k]!==regs[k];return `<div class="reg ${diff?'changed':''} ${k[0]==='%'?'special':''}" title="${esc(k)}"><div class="reg-name">${esc(k)}</div><div class="reg-num">${regs[k]}</div>${diff?'<small>↑ changed</small>':'<small>&nbsp;</small>'}</div>`}).join('')}
+ const lsu=th?.lsuState||'—';const activity=aluActivity(co,th);const aluColor=ALU_COLORS[activity.key]||ALU_COLORS.UNKNOWN;let col=STAGES[state]||'#7689aa';$('inspector').innerHTML=`<div class="inspect-hero"><div class="meta"><span class="state-tag" style="border-color:${col};color:${col}">${esc(state)}</span><span class="state-tag">PC ${fmt(co.pc)}</span><span class="state-tag">${esc(opcode)}</span>${co.done?'<span class="state-tag" style="color:#78e8ad">DONE</span>':''}</div><div class="instruction">${fmt(co.instruction)}</div><div class="muted" style="font-size:11px">Core ${coreId} · ${th?'Lane '+laneId:'No logged lane'} · Fetcher ${fmt(co.fetcher)}</div></div><div class="mini-s"><div><span>LSU state</span><strong>${esc(lsu)}</strong></div><div><span>RS / RT</span><strong>${th?fmt(th.rs)+' / '+fmt(th.rt):'—'}</strong></div><div><span>ALU / LSU output</span><strong>${th?fmt(th.alu)+' / '+fmt(th.lsu):'—'}</strong></div></div><div class="alu-status" title="Derived from Core FSM + enabled lane + instruction; not a hardware alu_busy signal"><span class="alu-status-dot" style="background:${aluColor}"></span><div class="alu-status-content"><div class="alu-status-top" style="color:${aluColor}">ALU: ${esc(activity.label)} <span class="pill" style="margin-left:5px">derived status</span></div><div class="alu-status-desc">${esc(activity.reason)} <b>Clock boundary:</b> trace values are pre-edge; <code>alu_out</code> is the currently registered (possibly previous) value, not necessarily the operation result of this EXECUTE cycle.</div></div></div><div class="panel-body" style="padding-top:0"><div class="subhead">Lane registers <span class="pill" style="font-weight:normal;letter-spacing:0;text-transform:none">Green = changed from last logged lane snapshot</span></div>${th?`<div class="reg-grid">${rhtml}</div>`:'<div class="empty">No thread snapshots for this core at this cycle.</div>'}${th&&th.constant!==null?`<div class="subhead">Constant value: ${th.constant}</div>`:''}</div>`;
+ renderExplanation()}
+function renderExplanation(){renderLiveGuide();const co=coreAt(current,coreId);if(!co){$('stateMeaning').innerHTML='<div class="explain">No state recorded for this core on this cycle.</div>';return}let [heading,body]=STAGE_INFO[co.state]||['Unknown state','This state is not in the standard Tiny-GPU scheduler.'];let th=threadAt(current,coreId,laneId);let info=co.state==='WAIT' && th?.lsuState==='WAITING'?' This lane is waiting for its memory response.':co.state==='UPDATE'?' Compare the highlighted registers with the previous logged cycle to see completed writeback.':'';
+ $('stateMeaning').innerHTML=`<div class="explain"><strong>${esc(heading)}</strong><p style="margin:7px 0 0">${esc(body+info)}</p></div><p class="guide-meta" style="margin:10px 0 0">Core state is shared across all lanes of the block. Lane-local LSU states can differ within that shared core state.</p>`;}
+function renderProgram(){if(!trace)return;let program=new Map();for(const cy of trace.cycles){const co=cy.cores[coreId];if(!co||co.pc===null)continue;const key=co.pc;const p=program.get(key)||{pc:key,ins:new Map(),seen:0,first:cy.cycle};p.ins.set(co.instruction,(p.ins.get(co.instruction)||0)+1);p.seen++;program.set(key,p)}let all=[...program.values()].sort((a,b)=>a.pc-b.pc);
+ $('program').innerHTML=all.map(p=>{const ins=[...p.ins.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';return `<div class="prog-row ${coreAt(current,coreId)?.pc===p.pc?'active':''}" tabindex="0" role="button" data-pc="${p.pc}"><span class="chip">PC ${p.pc}</span><span>${esc(ins)}</span><span class="count" title="Logged cycles at this PC">${p.seen} cycles</span></div>`}).join('')||'<div class="empty">No program counter data.</div>';}
+function renderMemory(){let ms=trace.memories||[],before=ms[0],after=ms.length>1?ms[ms.length-1]:null;if(!before){$('memoryBox').innerHTML='<div class="empty">No DATA MEMORY table was found. This is common in normalized JSON traces.</div>';return}
+ let show=(snap,title)=>`<div class="memgroup"><h4>${title}</h4><div class="meminner">${Object.entries(snap?.entries||{}).map(([k,v])=>`<div class="memrow ${after&&before&&title==='Final memory'&&before.entries[k]!==v?'changed':''}"><span>addr ${esc(k)}</span><b>${v}</b></div>`).join('')}</div></div>`;
+ $('memoryBox').innerHTML=`<div class="memory-table">${show(before,'Initial memory')}${after?show(after,'Final memory'):'<div class="empty">Only one memory snapshot was logged.</div>'}</div>`;}
+function stopPlay(){if(timer)clearInterval(timer);timer=null;$('playBtn').textContent='▶'}
+function play(){if(timer){stopPlay();return}if(!trace)return;$('playBtn').textContent='Ⅱ';timer=setInterval(()=>{if(current>=trace.max){stopPlay();return}chooseCycle(current+1)},240)}
+function downloadJSON(){if(!trace)return;const out={source:trace.source,format:trace.format,completion:trace.completion,cycles:trace.cycles,memories:trace.memories};const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='tiny_gpu_normalized_trace.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+$('gistBtn').addEventListener('click',loadGist);$('parseBtn').addEventListener('click',()=>loadData($('paste').value,'Pasted trace'));
+$('upload').addEventListener('change',async e=>{const f=e.target.files[0];if(f)loadData(await f.text(),f.name);e.target.value=''});
+$('demoBtn').addEventListener('click',()=>loadData(buildSynthetic(),'Synthetic demo (NOT the Gist)'));
+$('exportBtn').addEventListener('click',downloadJSON);
+$('prevBtn').addEventListener('click',()=>chooseCycle(current-1));$('nextBtn').addEventListener('click',()=>chooseCycle(current+1));$('playBtn').addEventListener('click',play);
+$('scrubber').addEventListener('input',e=>chooseCycle(+e.target.value));$('jump').addEventListener('change',e=>chooseCycle(+e.target.value));
+$('zoom').addEventListener('change',e=>{pixels=+e.target.value;if(trace){draw();chooseCycle(current,true)}});
+$('coreSel').addEventListener('change',e=>{coreId=+e.target.value;$('programCore').value=String(coreId);setLanes();updateSelected(false)});
+$('programCore').addEventListener('change',e=>{coreId=+e.target.value;$('coreSel').value=String(coreId);setLanes();updateSelected(false)});
+$('laneSel').addEventListener('change',e=>{laneId=+e.target.value;renderInspect()});
+$('showAlu').addEventListener('change',()=>{if(trace){buildRows();buildLegend();draw()}});
+$('timeline').addEventListener('click',e=>{if(!trace)return;const p=canvasCoord(e),c=Math.floor((p.x-33)/pixels)+trace.min;if(c<trace.min||c>trace.max)return;let y=24;for(let r of rows){if(p.y>=y&&p.y<y+r.height){coreId=r.core;$('coreSel').value=String(coreId);$('programCore').value=String(coreId);setLanes();if(r.kind==='lsu'||r.kind==='alu'){laneId=r.lane;$('laneSel').value=String(laneId)}break}y+=r.height}chooseCycle(c,false)});
+$('timeline').addEventListener('mousemove',e=>{if(!trace)return;let p=canvasCoord(e),c=Math.floor((p.x-33)/pixels)+trace.min;if(c<trace.min||c>trace.max){$('hoverInfo').textContent='';return}let y=24,r=rows.find(row=>{let yes=p.y>=y&&p.y<y+row.height;y+=row.height;return yes});let s=r?(r.kind==='core'?coreAt(c,r.core)?.state:r.kind==='alu'?aluActivity(coreAt(c,r.core),threadAt(c,r.core,r.lane)).label:threadAt(c,r.core,r.lane)?.lsuState):'';$('hoverInfo').textContent=`Cycle ${c} · ${r?.name||''} · ${s||'unobserved'}`});
+$('timeline').addEventListener('mouseleave',()=>{$('hoverInfo').textContent=''});
+$('program').addEventListener('click',e=>{if(!trace)return;let p=e.target.closest('[data-pc]');if(!p)return;const target=+p.dataset.pc;const c=trace.cycles.find(x=>x.cycle>=current&&x.cores[coreId]?.pc===target)||trace.cycles.find(x=>x.cores[coreId]?.pc===target);if(c)chooseCycle(c.cycle)});
+$('program').addEventListener('keydown',e=>{if(e.key==='Enter'){let p=e.target.closest('[data-pc]');if(p)p.click()}});
+document.addEventListener('keydown',e=>{if(!trace||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();chooseCycle(current+1)}if(e.key==='ArrowLeft'){e.preventDefault();chooseCycle(current-1)}if(e.code==='Space'){e.preventDefault();play()}});
+const dz=$('dropLabel');dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));dz.addEventListener('drop',async e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files.length){let f=e.dataTransfer.files[0];loadData(await f.text(),f.name)}});
+$('legend').innerHTML=Object.entries(STAGES).map(([k,v])=>`<span class="legend-item"><span class="dot" style="background:${v}"></span>${k}</span>`).join('');
+
+// Educational, conceptual walkthrough independent from imported trace data.
+// Core and LSU state transitions mirror scheduler.sv / lsu.sv; ALU is a registered datapath (alu.sv), not an FSM.
+const CONCEPT_STEPS = {
+  LDR: [
+    ['FETCH','IDLE','Fetch the LDR instruction','The core fetcher retrieves an LDR instruction using the shared program counter (PC). Memory-controller latency can make FETCH last several cycles.','program memory → fetcher'],
+    ['DECODE','IDLE','Decode LDR','The shared decoder identifies LDR. It enables register writeback from the memory result and enables the per-lane memory-read path.','mem_read_enable = 1'],
+    ['REQUEST','IDLE','Latch the source register','The register file reads rs (the data-memory address). At the REQUEST rising edge, the enabled LSU changes from IDLE to REQUESTING.','rs = address'],
+    ['WAIT','REQUESTING','Issue a read request','On its next clock edge, the LSU asserts mem_read_valid = 1, sets mem_read_address = rs, and enters WAITING.','read_valid = 1; read_address = rs'],
+    ['WAIT','WAITING','Wait for controller and memory','The request passes through the data-memory controller, its available channels and registered relays. WAITING can persist for multiple cycles until read_ready is observed.','read_valid stays 1; waiting for read_ready'],
+    ['WAIT','DONE','Consume the memory response','On the response clock edge, LSU latches mem_read_data into lsu_out, clears read_valid, and enters DONE. The scheduler may leave WAIT once no enabled LSU is REQUESTING/WAITING.','read_ready = 1; lsu_out = read_data'],
+    ['EXECUTE','DONE','Advance to the execution state','For LDR, the data was already obtained by the LSU. The core still passes through EXECUTE and clocks an unused ALU operation before preparing its next program counter.','LSU output is held'],
+    ['UPDATE','DONE','Write back the loaded value','The register file writes lsu_out to the destination register. On the UPDATE edge, the LSU returns to IDLE and the core advances to its next instruction.','Rdest ← lsu_out']
+  ],
+  STR: [
+    ['FETCH','IDLE','Fetch STR','The core fetcher retrieves the STR instruction.','program memory → fetcher'],
+    ['DECODE','IDLE','Decode STR','The decoder enables the per-lane write path. STR does not write a destination register.','mem_write_enable = 1'],
+    ['REQUEST','IDLE','Latch address and value','The register file reads rs (memory address) and rt (value to store). At the rising edge, LSU enters REQUESTING.','rs = address; rt = stored data'],
+    ['WAIT','REQUESTING','Issue a store','At its next rising edge LSU asserts write_valid, copies rs to write_address and rt to write_data, and enters WAITING.','write_valid = 1; write_data = rt'],
+    ['WAIT','WAITING','Wait for write acknowledgement','The memory controller relays the store through an available channel. WAIT persists until write_ready is observed.','write_valid stays 1; waiting for write_ready'],
+    ['WAIT','DONE','Acknowledge store completion','On a ready edge the LSU drops write_valid and enters DONE; there is no loaded value to write back.','write_ready = 1'],
+    ['EXECUTE','DONE','Advance core control','The core passes EXECUTE and clocks an unused ALU operation, even though STR has no ALU result to commit.','No destination register'],
+    ['UPDATE','DONE','Finish the store instruction','The LSU returns to IDLE on the UPDATE edge; the core advances the shared PC to the next instruction.','No register writeback']
+  ],
+  ADD: [
+    ['FETCH','IDLE','Fetch ADD','The fetcher retrieves the ADD instruction from program memory.','program memory → fetcher'],
+    ['DECODE','IDLE','Decode ADD','The decoder selects the addition ALU operation and destination-register writeback.','ALU operation = ADD'],
+    ['REQUEST','IDLE','Read operands','Each enabled lane reads rs and rt from its private register file. The LSU stays IDLE because ADD does not request data memory.','rs, rt → ALU inputs'],
+    ['WAIT','IDLE','No outstanding LSU transaction','The scheduler always visits WAIT, even for ADD. Since no LSU is REQUESTING or WAITING, the core advances on the next edge.','No memory request'],
+    ['EXECUTE','IDLE','Compute the sum','The lane-local Arithmetic Logic Unit calculates its 8-bit result (truncated to 8 bits) at the EXECUTE rising edge.','alu_out ← (rs + rt) & 0xff'],
+    ['UPDATE','IDLE','Write back ALU result','The destination register receives the registered ALU output and the core updates the shared PC.','Rdest ← alu_out']
+  ],
+  MUL: [
+    ['FETCH','IDLE','Fetch MUL','The core fetcher retrieves a MUL instruction using the shared PC.','program memory → fetcher'],
+    ['DECODE','IDLE','Decode MUL','The shared decoder selects the multiply operation and enables arithmetic register writeback.','ALU operation = MUL'],
+    ['REQUEST','IDLE','Read operands','Every enabled lane captures rs and rt from its private register file; the LSU remains IDLE.','rs, rt → ALU inputs'],
+    ['WAIT','IDLE','No outstanding memory request','The Core FSM still visits WAIT; it can advance because the LSUs have no memory operations pending.','No LSU stall'],
+    ['EXECUTE','IDLE','Multiply on the EXECUTE edge','The ALU registers the product, discarding bits above bit 7. This is a single-cycle RTL ALU operation, not a multi-cycle multiply FSM.','alu_out ← (rs × rt) & 0xff'],
+    ['UPDATE','IDLE','Write the product back','The destination register receives the registered alu_out at the UPDATE rising edge.','Rdest ← alu_out']
+  ]
+};
+let conceptMode='LDR', conceptStep=0;
+function renderConcept(){
+  document.querySelectorAll('[data-concept-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.conceptMode===conceptMode)));
+  const steps=CONCEPT_STEPS[conceptMode], record=steps[conceptStep];
+  $('conceptStepList').innerHTML=steps.map((r,i)=>`<button type="button" class="concept-step" data-concept-step="${i}" aria-current="${i===conceptStep?'step':'false'}"><span class="index">${String(i+1).padStart(2,'0')}</span><span class="core">${esc(r[0])}</span><span>${esc(r[2])}</span><span class="lane">${conceptMode==='ADD'||conceptMode==='MUL'?'ALU':'LSU'} ${conceptMode==='ADD'||conceptMode==='MUL'?(r[0]==='EXECUTE'?'COMPUTE':r[0]==='UPDATE'?'WRITEBACK':'READY'):esc(r[1])}</span></button>`).join('');
+  $('conceptDetail').innerHTML=`<div class="concept-pair"><div class="concept-statebox"><small>Core Scheduler FSM · shared per core</small><strong style="color:${STAGES[record[0]]||'#fff'}">${esc(record[0])}</strong></div><div class="concept-statebox"><small>Load/Store Unit FSM · one per lane</small><strong style="color:${LSUS[record[1]]||'#fff'}">${esc(record[1])}</strong></div><div class="concept-statebox"><small>ALU datapath · NO FSM</small><strong style="font-size:13px;color:#87c8ff">${record[0]==='EXECUTE'?(conceptMode==='ADD'||conceptMode==='MUL'?'ACTIVE · USEFUL':'ACTIVE · UNUSED'):'IDLE / HOLD'}</strong></div></div><div><h4>${esc(record[2])}</h4><p>${esc(record[3])}</p></div><div class="concept-note"><b>Signal / effect:</b> <span class="example-value">${esc(record[4])}</span></div><div class="concept-foot"><span class="concept-meter">Step ${conceptStep+1} / ${steps.length} · ${conceptMode} example</span><div class="concept-actions"><button type="button" id="conceptPrev" class="slim" ${conceptStep===0?'disabled':''}>← Previous</button><button type="button" id="conceptNext" class="slim">${conceptStep===steps.length-1?'↻ Replay':'Next →'}</button></div></div>`;
+  $('conceptPrev').addEventListener('click',()=>{conceptStep=Math.max(0,conceptStep-1);renderConcept()});
+  $('conceptNext').addEventListener('click',()=>{conceptStep=(conceptStep+1)%steps.length;renderConcept()});
+}
+function renderLiveGuide(){
+  if(!trace){$('conceptLive').innerHTML='Load a log and select a cycle to see the <b>actual observed Core FSM + LSU FSM + ALU output</b> together. Until then, the walkthrough above is a conceptual teaching example.';return;}
+  const co=coreAt(current,coreId), th=threadAt(current,coreId,laneId);
+  if(!co){$('conceptLive').textContent=`Cycle ${current}: Core ${coreId} has no observed record. Missing data is not evidence of an idle core.`;return;}
+  const core=co.state||'UNOBSERVED',lsu=th?.lsuState||'UNOBSERVED',instruction=co.instruction||'—';
+  const aluLogged=th?.alu!==null&&th?.alu!==undefined;
+  const aluInfo=aluLogged?String(th.alu):'not logged';
+  const isArithmetic=/^(ADD|SUB|MUL|DIV|CMP)\b/i.test(instruction);
+  const activity=aluActivity(co,th);const detail=core==='WAIT'&&lsu==='WAITING'?'The selected lane has a pending memory transaction; the core cannot advance until its relevant LSUs finish.':core==='WAIT'&&lsu==='DONE'?'This LSU has completed. Other lanes may still be waiting; inspect them before concluding the whole core can advance.':core==='WAIT'&&lsu==='IDLE'?'This lane has no outstanding LSU transaction. The scheduler still visits WAIT for every instruction.':lsu==='REQUESTING'?'This lane is preparing to assert a memory request.':lsu==='DONE'?'The lane has received an acknowledgment; see UPDATE for writeback or cleanup.':'The core FSM shows instruction progress; the LSU FSM shows independent memory-transaction progress.';
+  $('conceptLive').innerHTML=`<b>REAL TRACE</b> · Cycle <b>${current}</b> · Core <b>${coreId}</b> <b>${esc(core)}</b> · Lane <b>${laneId===null?'—':laneId}</b> LSU <b>${esc(lsu)}</b> · <code>${esc(instruction)}</code> · <span style="color:${ALU_COLORS[activity.key]}">ALU <b>${esc(activity.label)}</b></span> · registered ALU out: <b>${esc(aluInfo)}</b><br>${esc(detail)} ${isArithmetic && core==='EXECUTE'?'ALU will register its result at this EXECUTE rising edge; in a pre-edge snapshot, alu_out can still contain its previous value.':isArithmetic && core==='UPDATE'?'The ALU result is now registered and the destination RF write occurs on this UPDATE edge.':'No ALU data writeback is selected for this instruction.'} <span style="color:#90abbc">ALU status is derived; output is sampled before the next rising edge. Unlogged lanes are unobserved.</span>`;
+}
+function jumpToMemory(){
+  if(!trace)return;
+  const snap=trace.cycles.find(c=>Object.values(c.cores).some(co=>/^(LDR|STR)\b/i.test(co.instruction||'')));
+  if(!snap){$('conceptLive').textContent='No LDR or STR instruction was found in the imported trace.';return;}
+  let found=Object.entries(snap.cores).find(([,co])=>/^(LDR|STR)\b/i.test(co.instruction||''));
+  coreId=+found[0];$('coreSel').value=String(coreId);$('programCore').value=String(coreId);setLanes();
+  conceptMode=/^STR\b/i.test(found[1].instruction)?'STR':'LDR';conceptStep=0;renderConcept();chooseCycle(snap.cycle);
+}
+document.querySelectorAll('[data-concept-mode]').forEach(b=>b.addEventListener('click',()=>{conceptMode=b.dataset.conceptMode;conceptStep=0;renderConcept()}));
+$('conceptStepList').addEventListener('click',e=>{const el=e.target.closest('[data-concept-step]');if(!el)return;conceptStep=+el.dataset.conceptStep;renderConcept()});
+$('firstMemoryBtn').addEventListener('click',jumpToMemory);
+renderConcept();
+
+// Try the linked Gist on opening. If the browser cannot access it, retain explicit import controls; never substitute demo data.
+if (location.protocol !== "about:") setTimeout(loadGist, 300);
+</script></body></html>
