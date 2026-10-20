@@ -1,0 +1,146 @@
+{
+  "B60.html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "Sparse-Attn-Video.html": [
+    "Attention",
+    "Sparse Attention"
+  ],
+  "attention_matrix_frame0_dense_detail.html": [
+    "Attention",
+    "Sparse Attention"
+  ],
+  "auto-round-v1.html": [
+    "Quantization"
+  ],
+  "b200_key_specs_node_gpu_die.html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "b60_vs_b70_comparison.html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "bit_packing_all_viz.html": [
+    "Quantization",
+    "GPU Kernels"
+  ],
+  "blackwell_tmem_kernel_optimization.html": [
+    "GPU Kernels",
+    "Memory",
+    "Performance"
+  ],
+  "cache_dit_workflow_visual.html": [
+    "AI Models",
+    "Performance"
+  ],
+  "cosmos3_architecture_visual.html": [
+    "AI Models"
+  ],
+  "cosmos3_reasoner_generator_context_visual (2).html": [
+    "AI Models"
+  ],
+  "deepseek_v4_csa_4_to_1_visual.html": [
+    "AI Models",
+    "Attention"
+  ],
+  "dense_vs_blocksparse_kv_prefetch.html": [
+    "Attention",
+    "Sparse Attention",
+    "Memory"
+  ],
+  "dlo_ping_pong_streaming_visual.html": [
+    "GPU Kernels",
+    "Performance"
+  ],
+  "e.html": [
+    "Quantization"
+  ],
+  "fast_topk_clusters_exact_b200_highlight.html": [
+    "Algorithms",
+    "GPU Kernels"
+  ],
+  "glm-5.2-sharedindexer.html": [
+    "AI Models",
+    "Attention"
+  ],
+  "gpu_chip_design_milestones.html": [
+    "GPU Architecture"
+  ],
+  "int4-vs-fp4-encoding.html": [
+    "Quantization"
+  ],
+  "intel-gpu-kernel-lifecycle.html": [
+    "GPU Architecture",
+    "GPU Kernels"
+  ],
+  "intel_gpu_execution_model (5).html": [
+    "GPU Architecture"
+  ],
+  "intel_gpu_stack_clean.html": [
+    "GPU Architecture"
+  ],
+  "intel_xe_cute_beginner_tutorial_audited.html": [
+    "GPU Kernels"
+  ],
+  "intel_xe_cute_gemm_shape_visualizer.html": [
+    "GPU Kernels"
+  ],
+  "intel_xe_stall_counter_visualizer (3).html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "joint_matrix_debug.html": [
+    "GPU Kernels"
+  ],
+  "mxattention_core_idea_with_glossary.html": [
+    "Attention",
+    "Quantization"
+  ],
+  "mxfp4.html": [
+    "Quantization"
+  ],
+  "nvidia_cp_async_vs_intel_xe_prefetch_v2.html": [
+    "GPU Kernels",
+    "Memory"
+  ],
+  "quant-error.html": [
+    "Quantization"
+  ],
+  "quant-granularity.html": [
+    "Quantization"
+  ],
+  "sparse_attention_layout_memory_access (2).html": [
+    "Attention",
+    "Sparse Attention",
+    "Memory"
+  ],
+  "ssa_gist_tokens_unified_visual.html": [
+    "Attention",
+    "AI Models"
+  ],
+  "step1_thread_ownership.html": [
+    "GPU Kernels"
+  ],
+  "tf32_vs_fp32_explainer.html": [
+    "Quantization"
+  ],
+  "tiny_gpu_mental_model (3).html": [
+    "GPU Architecture"
+  ],
+  "tiny_gpu_trace_explorer (2).html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "topk_methods_comparison.html": [
+    "Algorithms"
+  ],
+  "topk_methods_comparison_real_exact.html": [
+    "Algorithms"
+  ],
+  "xe_sdpa_sagev1_concrete_instance (1).html": [
+    "Attention",
+    "GPU Kernels"
+  ]
+}

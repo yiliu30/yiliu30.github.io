@@ -4,9 +4,11 @@
   {{ with .Content }}<div class="post-content">{{ . }}</div>{{ end }}
 </header>
 
-{{/* The deployment workflow generates dates from the latest Git commit for each HTML file. */}}
+{{/* Git dates are generated during deployment; tags are kept in data/viz_tags.json. */}}
 {{- $dates := site.Data.viz_dates | default (dict) }}
+{{- $tagsData := site.Data.viz_tags | default (dict) }}
 {{- $entries := slice }}
+{{- $allTags := slice }}
 {{- $dir := "static/viz" }}
 {{- range (readDir $dir) }}
   {{- $name := .Name }}
@@ -25,15 +27,39 @@
       {{- $updated = .timestamp }}
       {{- $date = .date }}
     {{- end }}
-    {{- $entries = $entries | append (dict "name" $name "title" $title "timestamp" $updated "date" $date) }}
+    {{- $tags := index $tagsData $name | default (slice) }}
+    {{- if eq (len $tags) 0 }}{{- $tags = slice "Untagged" }}{{- end }}
+    {{- range $tags }}
+      {{- if not (in $allTags .) }}
+        {{- $allTags = $allTags | append . }}
+      {{- end }}
+    {{- end }}
+    {{- $entries = $entries | append (dict "name" $name "title" $title "timestamp" $updated "date" $date "tags" $tags) }}
   {{- end }}
 {{- end }}
 
-<p class="viz-sort-note">{{ len $entries }} visualizations &middot; Most recently updated first</p>
-<div class="viz-grid">
+<div class="viz-toolbar">
+  <div class="viz-toolbar-head">
+    <p class="viz-sort-note"><span id="viz-count">{{ len $entries }}</span> of {{ len $entries }} visualizations &middot; Newest first</p>
+    <a class="viz-admin-link" href="{{ "/viz/admin.html" | relURL }}">Manage pages and tags &rarr;</a>
+  </div>
+  <div id="viz-tag-filters" class="viz-tag-filters" role="group" aria-label="Filter visualizations by tag">
+    <button class="viz-filter is-active" type="button" data-tag="*" aria-pressed="true">All</button>
+    {{- range sort $allTags }}
+      <button class="viz-filter" type="button" data-tag="{{ . }}" aria-pressed="false">{{ . }}</button>
+    {{- end }}
+  </div>
+</div>
+
+<div class="viz-grid" id="viz-grid">
   {{- range sort $entries "timestamp" "desc" }}
-    <article class="viz-card">
+    <article class="viz-card" data-tags="{{ delimit .tags "|" }}">
       <a class="viz-card-link" href="{{ printf "/viz/%s" .name | relURL }}">{{ .title }}</a>
+      <div class="viz-card-tags" aria-label="Tags">
+        {{- range .tags }}
+          <button type="button" class="viz-chip" data-tag="{{ . }}" title="Filter by {{ . }}">{{ . }}</button>
+        {{- end }}
+      </div>
       <div class="viz-card-meta">
         {{- if .date }}
           <time datetime="{{ .date }}">Updated {{ .date }}</time>
@@ -45,40 +71,84 @@
     </article>
   {{- end }}
 </div>
+<p id="viz-no-results" hidden>No visualizations match this tag. <button type="button" class="viz-reset">Show all</button></p>
+
+<script>
+(() => {
+  const filters = document.getElementById('viz-tag-filters');
+  const grid = document.getElementById('viz-grid');
+  const cards = Array.from(grid.querySelectorAll('.viz-card'));
+  const count = document.getElementById('viz-count');
+  const empty = document.getElementById('viz-no-results');
+  let selected = '*';
+
+  function applyFilter(tag) {
+    selected = tag;
+    let visible = 0;
+    for (const card of cards) {
+      const matches = tag === '*' || card.dataset.tags.split('|').includes(tag);
+      card.hidden = !matches;
+      if (matches) visible++;
+    }
+    count.textContent = visible;
+    empty.hidden = visible !== 0;
+    for (const button of filters.querySelectorAll('button[data-tag]')) {
+      const active = button.dataset.tag === selected;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  filters.addEventListener('click', event => {
+    const button = event.target.closest('button[data-tag]');
+    if (button) applyFilter(button.dataset.tag);
+  });
+  grid.addEventListener('click', event => {
+    const button = event.target.closest('button.viz-chip[data-tag]');
+    if (button) applyFilter(button.dataset.tag);
+  });
+  empty.querySelector('.viz-reset').addEventListener('click', () => applyFilter('*'));
+})();
+</script>
 
 <style>
-  .viz-sort-note { margin: 0 0 20px; color: var(--secondary); font-size: 14px; }
+  .viz-toolbar { margin: 18px 0 22px; }
+  .viz-toolbar-head { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .viz-sort-note { margin: 0; color: var(--secondary); font-size: 14px; }
+  .viz-admin-link { color: var(--secondary); font-size: 13px; text-decoration: underline; }
+  .viz-tag-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .viz-filter, .viz-chip, .viz-reset {
+    border: 1px solid var(--border); background: var(--entry); color: var(--secondary);
+    border-radius: 999px; cursor: pointer; font-size: 13px; line-height: 1.4;
+    padding: 6px 12px; transition: background 150ms ease, border-color 150ms ease;
+  }
+  .viz-filter:hover, .viz-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .viz-filter.is-active { background: var(--primary); color: var(--theme); border-color: var(--primary); }
+  .viz-filter:focus-visible, .viz-chip:focus-visible, .viz-reset:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .viz-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-    gap: 16px;
-    margin-bottom: 30px;
+    gap: 16px; margin-bottom: 30px;
   }
   .viz-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 154px;
-    padding: 20px;
-    background: var(--entry);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    display: flex; flex-direction: column; min-height: 174px; padding: 20px;
+    background: var(--entry); border: 1px solid var(--border); border-radius: 12px;
     transition: border-color 150ms ease, transform 150ms ease;
   }
+  .viz-card[hidden] { display: none !important; }
   .viz-card:hover { border-color: var(--primary); transform: translateY(-2px); }
   .viz-card:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
   .viz-card-link {
-    display: block;
-    color: var(--primary);
-    font-size: 17px;
-    font-weight: 650;
-    line-height: 1.4;
-    text-decoration: none;
-    overflow-wrap: anywhere;
+    display: block; color: var(--primary); font-size: 17px; font-weight: 650;
+    line-height: 1.4; text-decoration: none; overflow-wrap: anywhere;
   }
-  .viz-card-link:focus-visible { outline: none; }
-  .viz-card-meta { display: flex; flex-direction: column; gap: 5px; margin-top: 20px; color: var(--secondary); font-size: 12px; }
+  .viz-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
+  .viz-chip { font-size: 11px; padding: 3px 8px; }
+  .viz-card-meta { display: flex; flex-direction: column; gap: 5px; margin-top: auto; padding-top: 18px; color: var(--secondary); font-size: 12px; }
   .viz-card-file { overflow-wrap: anywhere; opacity: 0.75; }
-  @media (prefers-reduced-motion: reduce) { .viz-card { transition: none; } .viz-card:hover { transform: none; } }
+  #viz-no-results { margin: 24px 0; color: var(--secondary); }
+  #viz-no-results[hidden] { display: none; }
+  .viz-reset { text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { .viz-card, .viz-filter, .viz-chip { transition: none; } .viz-card:hover { transform: none; } }
 </style>
 {{- end }}

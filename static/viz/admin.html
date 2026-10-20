@@ -80,6 +80,15 @@ button:disabled { background: #555; cursor: not-allowed; }
   <button type="button" class="preview-btn" onclick="updatePreview()">Preview</button>
   <button type="button" id="publishButton" onclick="pushToGitHub()">Publish to GitHub</button>
 </div>
+<div class="controls" style="margin: 8px 0 16px">
+  <div class="field">
+    <label for="tagsInput">Tags (comma-separated; e.g. GPU Architecture, Performance)</label>
+    <input id="tagsInput" list="tagSuggestions" placeholder="GPU Architecture, Performance" style="width: min(540px, 90vw)" autocomplete="off">
+    <datalist id="tagSuggestions"></datalist>
+  </div>
+  <button type="button" class="secondary-btn" id="saveTagsButton" onclick="saveTagsOnly()">Save Tags Only</button>
+</div>
+<p class="hint">Select an existing page to edit its tags without replacing the HTML. For new uploads, the tags are saved with the page. The index filters by these tags.</p>
 
 <div class="container">
   <div class="editor-panel">
@@ -98,6 +107,99 @@ button:disabled { background: #555; cursor: not-allowed; }
 const REPO = 'yiliu30/yiliu30.github.io';
 const PATH_PREFIX = 'static/viz/';
 let previewUrl = null;
+let savedTags = {};
+let tagsLoaded = false;
+
+function encodeUTF8(text) {
+  return btoa(unescape(encodeURIComponent(text)));
+}
+function decodeUTF8(encoded) {
+  const bytes = Uint8Array.from(atob(encoded.replace(/\s/g, '')), c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+function parseTags(value) {
+  const unique = [];
+  for (const part of value.split(',')) {
+    const tag = part.trim().replace(/\s+/g, ' ');
+    if (!tag) continue;
+    if (tag.length > 40 || /[|<>\u0000-\u001f]/.test(tag)) {
+      throw new Error('Tags must be under 40 characters and cannot contain |, <, >, or control characters.');
+    }
+    if (!unique.some(existing => existing.toLowerCase() === tag.toLowerCase())) unique.push(tag);
+  }
+  if (unique.length > 8) throw new Error('Use at most 8 tags per page.');
+  return unique;
+}
+function refreshTagInput() {
+  const selected = byId('existingPage').value;
+  byId('tagsInput').value = (savedTags[selected] || []).join(', ');
+  byId('saveTagsButton').disabled = !selected || !tagsLoaded;
+}
+async function readTagManifest() {
+  let file;
+  try {
+    file = await githubAPI('data/viz_tags.json');
+  } catch (error) {
+    if (error.status === 404) return {sha: null, data: {}};
+    throw error;
+  }
+  if (!file || typeof file.sha !== 'string' || typeof file.content !== 'string') {
+    throw new Error('Unexpected tag metadata from GitHub.');
+  }
+  const parsed = JSON.parse(decodeUTF8(file.content));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Unexpected tag manifest format.');
+  }
+  return {sha: file.sha, data: parsed};
+}
+async function loadTagManifest() {
+  try {
+    const manifest = await readTagManifest();
+    savedTags = manifest.data;
+    tagsLoaded = true;
+    const tags = [...new Set(Object.values(savedTags).flat().filter(tag => typeof tag === 'string'))].sort();
+    byId('tagSuggestions').replaceChildren(...tags.map(tag => new Option(tag, tag)));
+    refreshTagInput();
+  } catch (error) {
+    tagsLoaded = false;
+    byId('saveTagsButton').disabled = true;
+    showStatus('Could not load tags: ' + error.message, 'error');
+  }
+}
+async function putTagManifest(filename, tags) {
+  // Read immediately before writing to preserve unrelated edits from other sessions.
+  const manifest = await readTagManifest();
+  const next = {...manifest.data};
+  if (tags.length) next[filename] = tags;
+  else delete next[filename];
+  const payload = {
+    message: 'Update visualization tags for ' + filename,
+    content: encodeUTF8(JSON.stringify(next, null, 2) + '\n')
+  };
+  if (manifest.sha) payload.sha = manifest.sha;
+  await githubAPI('data/viz_tags.json', 'PUT', payload);
+  savedTags = next;
+  tagsLoaded = true;
+}
+async function saveTagsOnly() {
+  const button = byId('saveTagsButton');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    if (!getToken()) throw new Error('Enter a GitHub token in Token Settings.');
+    if (!tagsLoaded) throw new Error('Tag metadata could not be loaded. Refresh the page.');
+    const filename = byId('existingPage').value;
+    if (!filename) throw new Error('Select an existing page to update tags.');
+    const tags = parseTags(byId('tagsInput').value);
+    showStatus('Saving tags for ' + filename + '...', 'info');
+    await putTagManifest(filename, tags);
+    showStatus('Tags saved for ' + filename + '. Filters will update after GitHub Pages deploys. The page update timestamp is unchanged.', 'success');
+  } catch (error) {
+    showStatus('Tags could not be saved: ' + error.message, 'error');
+  } finally {
+    button.disabled = !byId('existingPage').value || !tagsLoaded;
+  }
+}
 
 const byId = id => document.getElementById(id);
 
@@ -110,7 +212,7 @@ window.addEventListener('load', () => {
       showStatus('For security, the token saved by the old publisher has been cleared. Enter a restricted token to publish.', 'info');
     }
   } catch (_) { /* Storage may be disabled; publishing still works. */ }
-  loadPages();
+  Promise.all([loadPages(), loadTagManifest()]).catch(error => showStatus(error.message, "error"));
 });
 
 function showStatus(message, kind) {
@@ -148,6 +250,7 @@ function updateMode() {
     byId('modeNote').textContent = 'New page mode: choose an HTML file or paste code, then enter its filename.';
     byId('publishButton').textContent = 'Publish New Page';
   }
+  if (tagsLoaded) refreshTagInput();
 }
 
 byId('existingPage').addEventListener('change', updateMode);
@@ -224,6 +327,8 @@ async function pushToGitHub() {
   try {
     const html = byId('htmlEditor').value;
     if (!html.trim()) throw new Error('Choose or paste an HTML file first.');
+    if (!tagsLoaded) throw new Error('Tag metadata has not loaded. Refresh the page.');
+    const tags = parseTags(byId('tagsInput').value);
     if (!getToken()) throw new Error('Enter a GitHub token in Token Settings.');
 
     const filename = getPublishFilename();
@@ -250,16 +355,23 @@ async function pushToGitHub() {
     showStatus((current ? 'Updating ' : 'Creating ') + filename + ' in GitHub...', 'info');
     const payload = {
       message: (current ? 'Update ' : 'Add ') + filename + ' in viz',
-      content: btoa(unescape(encodeURIComponent(html)))
+      content: encodeUTF8(html)
     };
     if (current) payload.sha = current.sha; // Required by GitHub to replace a file safely.
     await githubAPI(path, 'PUT', payload);
 
-    // Updating the same HTML URL triggers a new Git commit, which also moves
-    // this visualization to the top of the timestamp-sorted index.
-    await loadPages(filename);
+    // Always save tags after the HTML commit; a metadata failure is reported clearly.
+    try {
+      await putTagManifest(filename, tags);
+    } catch (tagError) {
+      await loadPages(filename).catch(() => {});
+      showStatus('HTML was committed successfully, but saving tags failed: ' + tagError.message +
+        '. Choose this page and click Save Tags Only to retry.', 'error');
+      return;
+    }
+    await loadPages(filename).catch(() => {});
     showStatus((current ? 'Updated ' : 'Created ') + filename +
-      ' in GitHub. The page is at /viz/' + encodeURIComponent(filename) +
+      ' and its tags in GitHub. The page is at /viz/' + encodeURIComponent(filename) +
       ' after GitHub Pages finishes deploying.', 'success');
   } catch (error) {
     showStatus('Publish failed: ' + error.message +
