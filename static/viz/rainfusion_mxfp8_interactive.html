@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<title>RainFusion × MXFP8 — Interactive 3D Explainer</title>
+<style>
+:root{--bg:#09111f;--surface:#101e30;--surface2:#15253a;--edge:#2a3b53;--text:#eef4ff;--muted:#a7bad2;--low:#8399b4;--accent:#52bcf9;--teal:#35d5ba;--gold:#f5b64b;--blue:#548ffb;--purple:#b17afa;--green:#25bfa1;--r:16px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 16% 0%,#182b45 0%,var(--bg) 54%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+.shell{max-width:1150px;margin:auto;padding:34px 22px 56px}.eyebrow{letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-size:11px;font-weight:800}h1{font-size:clamp(30px,4.6vw,48px);line-height:1.1;letter-spacing:-.04em;margin:10px 0 12px}h2{font-size:18px;margin:0 0 6px;letter-spacing:-.015em}h3{font-size:14px;margin:0 0 8px}p{color:var(--muted);margin:7px 0 0}.lede{max-width:830px;font-size:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 20px}.btn{border:1px solid #3b536e;color:#eef6ff;background:#192a40;border-radius:10px;padding:10px 14px;font-weight:650;font:inherit;font-size:13px;cursor:pointer}.btn:hover,.btn:focus-visible{border-color:#75bff8;background:#223852}.btn.primary{background:#096e74;border-color:#1aaab0}.btn.primary:hover{background:#087f85}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(275px,.9fr);gap:16px}.panel{border:1px solid var(--edge);border-radius:var(--r);background:linear-gradient(160deg,rgba(22,39,61,.95),rgba(13,26,43,.98));box-shadow:0 18px 45px #030a161f;overflow:hidden}.panel-pad{padding:20px}.figure-top{display:flex;justify-content:space-between;gap:8px;align-items:start;padding:18px 20px 0}.hint{font-size:11px;color:var(--low);padding-top:3px}canvas{display:block;width:100%;height:390px;cursor:grab;touch-action:none}canvas.drag{cursor:grabbing}.legend{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:0 14px 17px;font-size:12px;color:var(--muted)}.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}.controls{display:flex;flex-direction:column;gap:24px}.control-name{font-size:11px;font-weight:800;letter-spacing:.075em;color:#b7c9e0;text-transform:uppercase;margin-bottom:9px}.seg{display:flex;gap:5px;background:#081827;padding:5px;border:1px solid #2b4058;border-radius:11px}.seg button{font-family:inherit;font-size:12px;color:#9fb3cc;border:0;background:transparent;padding:9px 10px;border-radius:8px;flex:1;cursor:pointer;white-space:nowrap}.seg button[aria-pressed="true"]{color:white;background:#2b506c;box-shadow:inset 0 0 0 1px #4d7491}.range-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:600}.range-row strong{color:var(--teal)}input[type=range]{width:100%;accent-color:var(--teal);margin:13px 0 0;cursor:pointer}.tiny{font-size:12px;color:var(--muted)}.badge{font-size:11px;color:#b5ffee;background:#145a54;border:1px solid #24756e;border-radius:30px;padding:3px 9px;font-weight:700}.step{display:flex;align-items:flex-start;gap:12px;font-size:13px;color:#c1d4e9}.number{display:grid;place-items:center;flex:none;width:27px;height:27px;border-radius:8px;color:#a5fff0;background:#0a4849;font-weight:800;font-size:12px}.step strong{color:#fff}.statbox{padding:13px;border-radius:10px;background:#0b192a;border:1px solid #284059}.statval{font-size:23px;font-weight:780;font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-top:4px}.statlabel{font-size:11px;color:var(--muted)}.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}.section{margin-top:16px}.section .panel{padding:19px 20px}.row-between{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}.sequence{display:grid;grid-template-columns:repeat(48,minmax(0,1fr));gap:2px;margin:17px 0 10px}.token{height:25px;border-radius:3px;transition:opacity .2s}.group-labels{display:flex;justify-content:space-around;color:var(--muted);font-size:11px}.featuregrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}.featureblock{border:1px solid #335168;border-radius:12px;padding:12px;background:#10243a;min-width:0}.featureblock .head{display:flex;justify-content:space-between;gap:5px;font-size:11px;font-weight:800}.featureblock .scale{margin-top:10px;background:#0b1c2f;border:1px solid #2d455d;border-radius:7px;text-align:center;padding:5px 2px;font-size:11px;color:#b2ccdf}.featurevalues{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;margin-top:12px}.val{height:14px;border-radius:2px;background:#22aeae}.formulas{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.formula{border-radius:9px;background:#0a1a2b;padding:14px;font-size:13px;color:#d8e9f9;border:1px solid #293f58;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}.small-note{font-size:12px;color:var(--muted)}.chip{font-size:11px;border:1px solid #3a5770;border-radius:6px;padding:3px 8px;color:#d7ecff}.foot{border-top:1px solid #294057;margin-top:20px;padding-top:16px;font-size:12px;color:#9caec4}a{color:#86ceff}code{font-family:ui-monospace,Consolas,monospace;color:#aceee8}button:focus-visible,input:focus-visible{outline:2px solid #7ddeef;outline-offset:3px}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.shell{padding:23px 13px 40px}.featuregrid{gap:6px}.featureblock{padding:7px}.featureblock .head{font-size:9px}.featureblock .scale{font-size:9px}canvas{height:345px}.formulas{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#111}p,.tiny,.small-note,.foot,.hint,.control-name,.statlabel{color:#444}.shell{max-width:100%;padding:5mm}.toolbar,.controls{display:none}.layout{display:block}.panel{background:white;color:#111;box-shadow:none;border:1px solid #aaa}.section{break-inside:avoid}.featureblock,.statbox{background:#eee;color:#111}.statval,.featureblock .head{color:#111}canvas{height:370px}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="eyebrow">Interactive engineering note · offline-capable</div>
+  <h1>RainFusion <span style="color:var(--teal)">× MXFP8</span></h1>
+  <p class="lede">Explore how video tokens are reordered across <b style="color:white">time × height × width</b>, then inspect how MXFP8 quantizes each token’s feature channels. RainFusion determines <em>where</em> attention is computed; MXFP8 determines <em>how</em> the selected matrix multiplications are represented.</p>
+  <div class="toolbar"><button class="btn primary" id="exportPNG">↓ Save 3D view as PNG</button><button class="btn" id="resetView">↺ Reset 3D camera</button><button class="btn" onclick="window.print()">Print / Save PDF</button></div>
+  <div class="layout">
+    <section class="panel">
+      <div class="figure-top"><div><h2>01 · Video token volume</h2><p class="tiny">3 frames × 4 × 4 spatial tokens = 48 tokens</p></div><div class="hint">Drag to rotate · Scroll to zoom</div></div>
+      <canvas id="volume" role="img" aria-label="Rotatable three-dimensional diagram of video frames and spatial windows"></canvas>
+      <div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Window 0</span><span><i class="dot" style="background:var(--green)"></i>Window 1</span><span><i class="dot" style="background:var(--gold)"></i>Window 2</span><span><i class="dot" style="background:var(--purple)"></i>Window 3</span></div>
+    </section>
+    <aside class="panel panel-pad controls">
+      <div><div class="control-name">Token ordering</div><div class="seg" role="group" aria-label="Ordering"><button type="button" id="frameBtn" aria-pressed="true">Frame-major</button><button type="button" id="windowBtn" aria-pressed="false">Window-major</button></div><p class="tiny" id="orderingNote"></p></div>
+      <div><div class="control-name">Highlight group</div><div class="range-row"><span id="groupType">Frame</span><strong id="groupVal">F0</strong></div><input id="groupRange" aria-label="Highlight group" type="range" min="0" max="2" step="1" value="0"/><p class="tiny" id="highlightNote"></p></div>
+      <div><div class="control-name">Precision for Q and K</div><div class="seg" role="group" aria-label="Precision"><button type="button" id="bf16Btn" aria-pressed="false">BF16</button><button type="button" id="mxBtn" aria-pressed="true">MXFP8</button></div><p class="tiny" id="precisionNote"></p></div>
+      <div><div class="control-name">Logical Q-vector storage (D=128)</div><div class="stats"><div class="statbox"><div class="statlabel">Bytes per vector</div><div id="bytes" class="statval">132 B</div></div><div class="statbox"><div class="statlabel">Reduction vs BF16</div><div id="saving" class="statval">48.4%</div></div></div><p class="tiny">MXFP8: 128 E4M3 data bytes + four E8M0 scale bytes. Excludes padding, packing and alignment.</p></div>
+      <div class="step"><div class="number">1</div><div><strong>Reorder</strong><div>Preserve each token’s data while changing its position in the 1D sequence.</div></div></div>
+      <div class="step"><div class="number">2</div><div><strong>Predict sparse blocks</strong><div>Mean-pool Q/K blocks, score their similarity and keep important pairs.</div></div></div>
+      <div class="step"><div class="number">3</div><div><strong>Compute selected QK tiles</strong><div>Use MXFP8 for retained matmuls, subject to hardware and kernel support.</div></div></div>
+    </aside>
+  </div>
+  <section class="section panel panel-pad">
+    <div class="row-between"><div><h2>02 · Flattened memory order</h2><p class="tiny" id="sequenceTitle">Frame-major: all 16 tokens of F0, then F1, then F2</p></div><span class="chip" id="seqBadge">3 groups × 16 tokens</span></div>
+    <div id="sequence" class="sequence" aria-label="48 flattened video tokens"></div><div id="seqLabels" class="group-labels"></div>
+    <p class="small-note" style="margin-top:13px">Each color encodes a <b>spatial</b> window. In frame-major order, a single frame contains all four colors. In window-major order, a single window contains tokens drawn from all three frames.</p>
+  </section>
+  <section class="section panel panel-pad">
+    <div class="row-between"><div><h2>03 · Inside one attention-head Q vector</h2><p class="tiny">Selected token from <span id="tokenTag" style="color:#e3f8ff">F0</span> · 128 feature dimensions</p></div><span class="badge" id="dtypePill">MXFP8 E4M3 + E8M0</span></div>
+    <div class="featuregrid" id="featureGrid"></div>
+    <div class="formulas"><div class="formula">BF16: 128 × 2 B = <b>256 B</b></div><div class="formula">MXFP8: 128 × 1 B + 4 × 1 B = <b>132 B</b></div></div>
+    <p class="small-note" id="scaleFoot">For Q/K, 32-element microscale groups lie along the attention head dimension D. The spatial grouping of video tokens is independent of these channel groups.</p>
+  </section>
+  <section class="section panel panel-pad">
+    <h2>04 · Where precision fits into RainFusion</h2>
+    <p class="tiny">A proposed implementation flow, not a verified RainFusion MXFP8 backend.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:15px 0 7px;align-items:center">
+      <span class="chip">BF16 Q / K / V</span><span style="color:#93aec9">→</span><span class="chip">3D reorder</span><span style="color:#93aec9">→</span><span class="chip">BF16 mean-QK score + top-k mask</span><span style="color:#93aec9">→</span><span class="chip">MXFP8 selected QK tiles</span><span style="color:#93aec9">→</span><span class="chip">FP32 softmax / BF16 PV</span>
+    </div>
+    <p class="small-note">An incremental kernel strategy: keep the mask predictor in BF16; quantize only retained QK tiles to MXFP8; verify accuracy and speed before attempting MXFP8 PV. Real kernels also need correct scale layout, softmax handling and hardware-supported FP8 microscaling.</p>
+  </section>
+  <footer class="foot"><strong>Notes:</strong> This standalone illustration uses illustrative T=3, H=W=4, D=128 and 2×2 spatial windows. It demonstrates the underlying ideas, not exact production tensor layouts. RainFusion block size and MXFP8 quantization group size are different concepts. Open the HTML directly in any modern browser; no network or dependencies are needed. Further reading: <a href="https://arxiv.org/abs/2512.24086" target="_blank" rel="noopener">RainFusion 2.0</a> and <a href="https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf" target="_blank" rel="noopener">OCP MX formats</a>.</footer>
+</main>
+<script>
+(()=>{
+'use strict';
+const colors=['#548ffb','#25bfa1','#f5b64b','#b17afa'];
+let mode='frame',precision='mxfp8',group=0,yaw=.63,pitch=.43,zoom=1,drag=false,mouse=null;
+const $=id=>document.getElementById(id),canvas=$('volume'),ctx=canvas.getContext('2d');
+const win=(r,c)=>Math.floor(r/2)*2+Math.floor(c/2);
+function project(x,y,z,W,H,S){
+ const xc=x-2,yc=2-y,zc=(z-1)*2.9;
+ const X=xc*Math.cos(yaw)+zc*Math.sin(yaw);
+ const Z=-xc*Math.sin(yaw)+zc*Math.cos(yaw);
+ const Y=yc*Math.cos(pitch)-Z*Math.sin(pitch);
+ return [W*.5+X*S,H*.53-Y*S,Z];
+}
+function draw3d(){
+ const W=canvas.clientWidth,H=canvas.clientHeight,dpr=Math.min(devicePixelRatio||1,2);
+ if(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr)){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr)}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+ const S=Math.min((W-45)/8,51)*zoom;
+ const P=(x,y,z)=>project(x,y,z,W,H,S);
+ function line(a,b,color,width=1,dash=[]){ctx.beginPath();ctx.setLineDash(dash);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();ctx.setLineDash([])}
+ function poly(pts,fill,stroke,width=1){ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}}
+ function txt(s,x,y,color='#e2edf9',weight=600,size=12){ctx.font=`${weight} ${size}px system-ui`;ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(s,x,y)}
+ function face(x,y,z,size=1){return [P(x,y,z),P(x+size,y,z),P(x+size,y+size,z),P(x,y+size,z)]}
+ const toRGBA=(hex,a)=>{let v=parseInt(hex.substring(1),16);return `rgba(${v>>16},${(v>>8)&255},${v&255},${a})`};
+ // Subtle frame connectors
+ [[0,0],[4,0],[4,4],[0,4]].forEach(([x,y])=>line(P(x,y,0),P(x,y,2),'rgba(174,197,231,.22)',1,[4,5]));
+ // Depth sort all tiles for a true rotatable stack
+ const tiles=[];
+ for(let f=0;f<3;f++)for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+   const w=win(r,c),selected=mode==='frame'?f===group:w===group;
+   const pts=face(c+.035,r+.035,f,.93);
+   tiles.push({f,r,c,w,selected,pts,depth:pts.reduce((v,p)=>v+p[2],0)/4});
+ }
+ tiles.sort((a,b)=>a.depth-b.depth).forEach(t=>{
+    poly(t.pts,toRGBA(colors[t.w],t.selected?.91:.26),t.selected?'rgba(255,255,255,.60)':'rgba(160,194,235,.24)',t.selected?1.05:.6);
+ });
+ // Wireframes of selected time slice / selected spatial window across all times
+ if(mode==='frame'){
+   poly(face(0,0,group,4),null,'#eff7ff',2.2);
+   const label=P(2,4.43,group);txt(`FRAME ${group}`,label[0],label[1],'#f3fcff',800,12);
+ }else{
+   const x=(group%2)*2,y=Math.floor(group/2)*2;
+   [0,1,2].forEach(f=>poly(face(x,y,f,2),null,colors[group],2.5));
+   [[x,y],[x+2,y],[x+2,y+2],[x,y+2]].forEach(([cx,cy])=>line(P(cx,cy,0),P(cx,cy,2),colors[group],2.1,[6,5]));
+   const t=P(x+1,y+1,1);txt('W'+group,t[0],t[1]-7,'#fff',800,14);
+ }
+ // Labels
+ for(let f=0;f<3;f++){let p=P(0,-.33,f);txt(`F${f}`,p[0],p[1],'#e4f0ff',750,12)}
+ const ta=P(4.7,-.2,0),tb=P(4.7,-.2,2);
+ line(ta,tb,'#d6e8fe',2);
+ const a=Math.atan2(tb[1]-ta[1],tb[0]-ta[0]);
+ line(tb,[tb[0]-8*Math.cos(a-.5),tb[1]-8*Math.sin(a-.5)],'#d6e8fe',2);
+ line(tb,[tb[0]-8*Math.cos(a+.5),tb[1]-8*Math.sin(a+.5)],'#d6e8fe',2);
+ txt('Time',tb[0],tb[1]-12,'#d6e8fe',700,11);
+ // Rotatable xyz cue
+ const origin=P(0,4.4,0),w=P(1,4.4,0),h=P(0,3.4,0);
+ line(origin,w,'#83cffa',1.5);line(origin,h,'#83cffa',1.5);
+ txt('W',w[0]+7,w[1],'#a7dbfd',600,10);txt('H',h[0]-6,h[1],'#a7dbfd',600,10);
+}
+function renderSequence(){
+ const tokens=[],seq=$('sequence');seq.innerHTML='';
+ if(mode==='frame'){for(let f=0;f<3;f++)for(let r=0;r<4;r++)for(let c=0;c<4;c++)tokens.push({f,w:win(r,c)})}
+ else{for(let w=0;w<4;w++)for(let f=0;f<3;f++)for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(win(r,c)===w)tokens.push({f,w})}
+ tokens.forEach(t=>{const e=document.createElement('span');e.className='token';e.style.background=colors[t.w];e.style.opacity=(mode==='frame'?t.f===group:t.w===group)?'1':'.26';seq.appendChild(e)});
+ const count=mode==='frame'?3:4,labels=$('seqLabels');labels.innerHTML='';
+ for(let i=0;i<count;i++){const el=document.createElement('span');el.textContent=(mode==='frame'?'F':'W')+i;el.style.color=i===group?'#f0fcff':'#9dafca';el.style.fontWeight=i===group?'800':'400';labels.appendChild(el)}
+ $('sequenceTitle').textContent=mode==='frame'?'Frame-major: all 16 tokens of F0, then F1, then F2':'Window-major: each window collects 4 tokens from F0, F1 and F2';
+ $('seqBadge').textContent=mode==='frame'?'3 frames × 16 tokens':'4 windows × 12 tokens';
+}
+function renderFeatures(){
+ const fg=$('featureGrid');fg.innerHTML='';
+ for(let g=0;g<4;g++){
+   const b=document.createElement('div');b.className='featureblock';
+   const head=document.createElement('div');head.className='head';head.innerHTML=`<span>D${g*32}–${g*32+31}</span><span>${precision==='mxfp8'?'E4M3':'BF16'}</span>`;b.appendChild(head);
+   const vals=document.createElement('div');vals.className='featurevalues';
+   for(let j=0;j<32;j++){const e=document.createElement('div');e.className='val';const hue=168+g*9;e.style.background=`hsl(${hue} 70% ${31+((j*7+g)%5)*6}%)`;vals.appendChild(e)}b.appendChild(vals);
+   const sc=document.createElement('div');sc.className='scale';sc.textContent=precision==='mxfp8'?`Scale s${g}: E8M0`:'No scale';b.appendChild(sc);fg.appendChild(b);
+ }
+ $('dtypePill').textContent=precision==='mxfp8'?'MXFP8 E4M3 + E8M0':'BF16 unscaled';
+ $('bytes').textContent=precision==='mxfp8'?'132 B':'256 B';
+ $('saving').textContent=precision==='mxfp8'?'48.4%':'0%';
+ $('precisionNote').textContent=precision==='mxfp8'?'Quantize each token’s 128-dimensional Q/K vector in four groups of 32 values, each with one shared E8M0 scale.':'Keep each Q/K token value as BF16 without channel-wise microscaling.';
+ $('scaleFoot').textContent=precision==='mxfp8'?'MXFP8 microscale groups of 32 lie along the Q/K head dimension D. This is independent of RainFusion’s video-space sparse attention block size.':'BF16 requires no microscaling metadata. Frame/window permutation changes token order only and preserves tensor feature values.';
+}
+function render(){
+ $('frameBtn').setAttribute('aria-pressed',String(mode==='frame'));$('windowBtn').setAttribute('aria-pressed',String(mode==='window'));
+ $('bf16Btn').setAttribute('aria-pressed',String(precision==='bf16'));$('mxBtn').setAttribute('aria-pressed',String(precision==='mxfp8'));
+ $('groupRange').max=mode==='frame'?'2':'3';$('groupRange').value=group;
+ $('groupVal').textContent=(mode==='frame'?'F':'W')+group;$('groupType').textContent=mode==='frame'?'Frame':'Spatial window';
+ $('orderingNote').textContent=mode==='frame'?'One complete spatial frame at a time, containing all four spatial windows.':'The same spatial 2×2 region is grouped across consecutive frames.';
+ $('highlightNote').textContent=mode==='frame'?'Highlighted plane: 16 tokens in one time step.':'Highlighted 3D prism: 4 spatial tokens × 3 time steps = 12 tokens.';
+ $('tokenTag').textContent=mode==='frame'?'frame F'+group:'window W'+group;
+ renderSequence();renderFeatures();draw3d();
+}
+$('frameBtn').onclick=()=>{mode='frame';group=0;render()};$('windowBtn').onclick=()=>{mode='window';group=0;render()};
+$('bf16Btn').onclick=()=>{precision='bf16';render()};$('mxBtn').onclick=()=>{precision='mxfp8';render()};
+$('groupRange').oninput=e=>{group=+e.target.value;render()};
+canvas.addEventListener('pointerdown',e=>{drag=true;mouse=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);canvas.classList.add('drag')});
+canvas.addEventListener('pointermove',e=>{if(!drag||!mouse)return;yaw+=(e.clientX-mouse[0])*.009;pitch=Math.max(-1.2,Math.min(1.2,pitch+(e.clientY-mouse[1])*.007));mouse=[e.clientX,e.clientY];draw3d()});
+function stop(){drag=false;mouse=null;canvas.classList.remove('drag')}
+canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.7,Math.min(1.4,zoom+(e.deltaY<0?.065:-.065)));draw3d()},{passive:false});
+$('resetView').onclick=()=>{yaw=.63;pitch=.43;zoom=1;draw3d()};
+$('exportPNG').onclick=()=>{
+ const c=document.createElement('canvas'),dpr=2;c.width=1200;c.height=1000;const x=c.getContext('2d');x.fillStyle='#09111f';x.fillRect(0,0,c.width,c.height);
+ x.fillStyle='#eaf6ff';x.font='bold 42px system-ui';x.fillText('RainFusion × MXFP8',60,79);
+ x.fillStyle='#a7bad2';x.font='24px system-ui';x.fillText('3D video token ordering and spatial windows',60,120);
+ const ratio=Math.min(1080/canvas.width,640/canvas.height);const width=canvas.width*ratio,height=canvas.height*ratio;
+ x.drawImage(canvas,60,154,width,height);
+ x.fillStyle='#e7f4ff';x.font='bold 27px system-ui';x.fillText(`${mode==='frame'?'Frame-major':'Window-major'}  •  ${mode==='frame'?'F':'W'}${group}  •  ${precision.toUpperCase()}`,60,855);
+ x.fillStyle='#a6c0da';x.font='21px system-ui';x.fillText('T=3, H=W=4, D=128  |  Conceptual illustration',60,895);
+ x.fillText('File: rainfusion_mxfp8_interactive.html',60,930);
+ const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download=`rainfusion_${mode}_${precision}.png`;document.body.appendChild(a);a.click();a.remove();
+};
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(draw3d).observe(canvas);
+render();
+})();
+</script>
+</body>
+</html>
