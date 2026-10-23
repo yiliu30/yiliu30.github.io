@@ -1,12 +1,4 @@
 {
-  "B60.html": [
-    "GPU Architecture",
-    "Performance"
-  ],
-  "Sparse-Attn-Video.html": [
-    "Attention",
-    "Sparse Attention"
-  ],
   "attention_matrix_frame0_dense_detail.html": [
     "Attention",
     "Sparse Attention"
@@ -19,6 +11,10 @@
     "Performance"
   ],
   "b60_vs_b70_comparison.html": [
+    "GPU Architecture",
+    "Performance"
+  ],
+  "B60.html": [
     "GPU Architecture",
     "Performance"
   ],
@@ -71,10 +67,6 @@
   "int4-vs-fp4-encoding.html": [
     "Quantization"
   ],
-  "intel-gpu-kernel-lifecycle.html": [
-    "GPU Architecture",
-    "GPU Kernels"
-  ],
   "intel_gpu_execution_model (5).html": [
     "GPU Architecture"
   ],
@@ -90,6 +82,10 @@
   "intel_xe_stall_counter_visualizer (3).html": [
     "GPU Architecture",
     "Performance"
+  ],
+  "intel-gpu-kernel-lifecycle.html": [
+    "GPU Architecture",
+    "GPU Kernels"
   ],
   "joint_matrix_debug.html": [
     "GPU Kernels"
@@ -111,10 +107,19 @@
   "quant-granularity.html": [
     "Quantization"
   ],
+  "rainfusion_mxfp8_interactive.html": [
+    "Attention",
+    "Sparse Attention",
+    "Quantization"
+  ],
   "sparse_attention_layout_memory_access (2).html": [
     "Attention",
     "Sparse Attention",
     "Memory"
+  ],
+  "Sparse-Attn-Video.html": [
+    "Attention",
+    "Sparse Attention"
   ],
   "ssa_gist_tokens_unified_visual.html": [
     "Attention",
@@ -133,10 +138,10 @@
     "GPU Architecture",
     "Performance"
   ],
-  "topk_methods_comparison.html": [
+  "topk_methods_comparison_real_exact.html": [
     "Algorithms"
   ],
-  "topk_methods_comparison_real_exact.html": [
+  "topk_methods_comparison.html": [
     "Algorithms"
   ],
   "xe_sdpa_sagev1_concrete_instance (1).html": [
