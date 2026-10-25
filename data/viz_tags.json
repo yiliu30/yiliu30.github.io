@@ -27,6 +27,11 @@
     "Memory",
     "Performance"
   ],
+  "blockselector_subblock_topk_interactive.html": [
+    "Attention",
+    "Sparse Attention",
+    "Algorithms"
+  ],
   "cache_dit_workflow_visual.html": [
     "AI Models",
     "Performance"
