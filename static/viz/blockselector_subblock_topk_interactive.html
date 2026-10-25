@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interactive, source-grounded visualization of the vLLM-Omni SubBlockTopK BlockSelector: 16-token mean pooling, pooled similarity, LogSumExp, protected-prefix Top-k and BlockSelection.">
+<title>BlockSelector — From 64 Tokens to Selected KV Blocks</title>
+<style>
+:root{color-scheme:dark;--bg:#08111e;--panel:#101e30;--panel2:#12243a;--edge:#263b52;--txt:#edf6ff;--muted:#a6bdd2;--cyan:#50c7f1;--teal:#34d6b0;--gold:#ffbd65;--rose:#fb8099;--soft:rgba(83,199,241,.13);--font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:var(--font);color:var(--txt);background:radial-gradient(ellipse at 12% -10%,#183756 0,transparent 40%),radial-gradient(ellipse at 98% 6%,#172c40 0,transparent 38%),var(--bg)}
+a{color:#83dafa}a:hover{color:#c7f0ff}button,input,select{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #86ddff;outline-offset:3px}
+.container{width:min(1310px,calc(100% - 36px));margin:0 auto;padding:34px 0 70px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:21px}
+.brand{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--teal)}.crumb{color:var(--muted);font-size:13px;text-decoration:none}
+.hero{border:1px solid var(--edge);border-radius:24px;background:linear-gradient(130deg,rgba(28,61,85,.84),rgba(13,24,41,.95));padding:30px 32px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-90px;top:-110px;width:370px;height:370px;border-radius:50%;background:radial-gradient(circle,rgba(52,214,176,.14),transparent 68%);pointer-events:none}
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:750;color:#c2f5e9;background:rgba(52,214,176,.1);border:1px solid rgba(52,214,176,.28);border-radius:999px;padding:6px 11px;letter-spacing:.05em}
+h1{font-size:clamp(32px,4.2vw,57px);line-height:1.06;letter-spacing:-.043em;margin:16px 0 13px;max-width:900px}h2{font-size:20px;letter-spacing:-.025em;margin:0}h3{font-size:15px;margin:0}p{line-height:1.55} .lede{font-size:15px;color:#c0d4e5;max-width:920px;margin:0}
+.hero-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:19px;font-size:12px;color:var(--muted)}.hero-meta a{font-weight:700}
+.hero-meta span{border:1px solid #2c4c61;border-radius:7px;padding:6px 9px;background:#0a1d2b}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:20px 0 19px}
+.flow button{border:1px solid var(--edge);background:#10243a;color:var(--muted);border-radius:14px;padding:14px 8px;min-height:80px;text-align:left;transition:background .17s,border-color .17s,transform .17s}
+.flow button:hover{transform:translateY(-2px);border-color:#527994}.flow button.active{color:#e9ffff;background:linear-gradient(160deg,#174a60,#132d3c);border-color:#50c7f1;box-shadow:inset 0 0 0 1px rgba(80,199,241,.15)}
+.flow b{display:block;font-size:12px;color:var(--teal);margin-bottom:5px}.flow strong{display:block;font-size:13px;color:inherit}
+.workspace{display:grid;grid-template-columns:minmax(270px,315px) minmax(0,1fr);gap:16px}
+.panel{border:1px solid var(--edge);background:rgba(16,30,48,.92);border-radius:20px;padding:20px;min-width:0;box-shadow:0 14px 35px rgba(0,0,0,.11)}
+.sidebar .panel+.panel{margin-top:15px}
+.sub{color:var(--muted);font-size:12px;line-height:1.5;margin:8px 0 0}.heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
+.accent{color:var(--teal)}
+.control{margin-top:20px}.control-head{display:flex;justify-content:space-between;gap:6px;align-items:center;margin-bottom:12px;font-size:13px}
+.control-head output{color:var(--cyan);font-variant-numeric:tabular-nums;font-weight:800}
+input[type=range]{width:100%;accent-color:#50c7f1;cursor:pointer}
+.select{width:100%;color:var(--txt);border:1px solid var(--edge);background:#11243b;border-radius:9px;padding:11px 12px;margin-top:8px}
+.micro{font-size:11px;color:var(--muted);line-height:1.55}
+.divider{border-top:1px solid var(--edge);margin:18px 0}
+.meter-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin:12px 0 7px}
+.track{height:9px;background:#22364d;border-radius:999px;overflow:hidden;display:flex}
+.track .prt{height:100%;background:var(--gold)}.track .keep{height:100%;background:var(--teal)}
+.statline{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px;color:#bed2e3}
+.statline strong{font-size:17px;color:var(--txt);font-variant-numeric:tabular-nums}
+.figure{display:grid;gap:16px}
+.section-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:start;gap:12px}
+.chapter{display:inline-flex;background:#172e44;color:var(--teal);padding:5px 9px;border-radius:8px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.controls{display:flex;gap:7px;flex-wrap:wrap}
+.smallbtn{background:#1a324b;color:var(--txt);border:1px solid #36536e;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700}
+.smallbtn.primary{background:#1c6880;border-color:#3f9fbd}
+.smallbtn:hover{filter:brightness(1.14)}
+.stepnote{border:1px solid rgba(80,199,241,.23);border-left:3px solid var(--cyan);border-radius:11px;background:rgba(80,199,241,.06);padding:12px 14px;font-size:13px;color:#c5deeb;line-height:1.55;margin:0}
+.block-cols{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.boxmini{border:1px solid var(--edge);background:#0c1a2b;padding:14px;border-radius:13px}
+.boxmini h3{margin-bottom:12px}.bmeta{font-size:11px;color:var(--muted);margin-bottom:10px}
+.tokens{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:2px;margin:9px 0 10px}
+.token{height:18px;background:#233f57;border-radius:2px}.token:nth-child(4n+1){background:#244f67}
+.subblocks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.subblock{border:1px solid #38627a;background:#153c57;border-radius:9px;min-height:69px;padding:8px 4px;display:grid;place-content:center;text-align:center;gap:6px}
+.subblock.k{background:#133d37;border-color:#2c6b5e}
+.subblock b{font-size:14px}.subblock small{font-size:10px;color:#bad4e5}
+.matrix4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;max-width:340px;margin:15px auto 9px}
+.cell4{min-height:53px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.11);border-radius:7px;color:#f6fdff;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#b8e8f8;background:#0b1a2b;border:1px solid #2b445b;border-radius:11px;padding:12px;line-height:1.75;overflow-x:auto;white-space:pre-wrap}
+.lse{display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;padding:15px 17px;border:1px solid #2f7190;border-radius:12px;background:#103148;margin-top:14px}
+.lse span{color:#a8d8e8;font-size:12px}.lse strong{font-size:29px;font-variant-numeric:tabular-nums;color:#e1fbff}
+.readout{padding:15px;border:1px solid var(--edge);border-radius:13px;background:#0d2033;display:grid;gap:9px}
+.readout b{font-size:12px;color:var(--muted);font-weight:650}.readout code{color:#bdeefb;white-space:pre-wrap;word-break:break-word;line-height:1.65;font-size:12px}
+.heat-scroll{overflow-x:auto;padding-bottom:5px}.heatmap{min-width:680px}.heat-head,.heat-row{display:grid;grid-template-columns:55px repeat(24,minmax(0,1fr));gap:3px;margin:3px 0}
+.axis{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}
+.hmhead{text-align:center;color:#829fb4;font-size:10px;padding-bottom:5px}
+.hcell{border-radius:5px;border:1px solid transparent;height:35px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#eff7ff;font-variant-numeric:tabular-nums;transition:transform .15s,border-color .15s}
+.hcell:hover{border-color:#eee!important;transform:translateY(-2px)}.hcell.focus{outline:2px solid var(--gold);outline-offset:-2px}.hcell.protected{background:#8b5b32!important;color:#fff4e6}.hcell.selected{background:#166f79!important;color:#eaffff}.hcell.discarded{background:#172537!important;color:#829db3}
+.legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;color:var(--muted);font-size:11px}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+.inline-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{border:1px solid var(--edge);border-radius:10px;padding:11px;background:#0d1f32}.kpi em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-bottom:4px}.kpi b{font-size:19px;font-variant-numeric:tabular-nums}
+.highnote{font-size:12px;color:var(--muted);line-height:1.6}
+.badge-row{display:flex;gap:6px;flex-wrap:wrap}.tag{display:inline-block;border:1px solid #365970;border-radius:6px;padding:5px 9px;font-size:11px;color:#c1deec}
+.bottom{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.footer{font-size:12px;color:#95adbf;text-align:center;margin-top:25px}.kbd{border:1px solid #44647e;background:#192d3e;border-radius:4px;font-size:11px;padding:2px 5px}
+@media(max-width:1000px){.workspace{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sidebar .panel+.panel{margin:0}}
+@media(max-width:680px){.container{width:min(100% - 22px,1310px);padding-top:18px}.hero{padding:22px 18px}.flow{grid-template-columns:repeat(5,minmax(112px,1fr));overflow-x:auto}.flow button{min-width:110px}.sidebar{grid-template-columns:1fr}.block-cols,.bottom{grid-template-columns:1fr}.inline-kpis{grid-template-columns:repeat(3,1fr)}.panel{padding:15px}.lse strong{font-size:23px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="container">
+<div class="topbar"><div class="brand">GPU / Attention / Interactive Lab</div><a class="crumb" href="/viz/">← All visualizations</a></div>
+<header class="hero">
+<span class="pill">SOURCE-GROUNDED · SUBBLOCKTOPK · PR #8335</span>
+<h1>How BlockSelector works</h1>
+<p class="lede">Watch 64 tokens become four 16-token mean vectors, produce a 4×4 similarity matrix, collapse into one FP32 block score, and finally become a sparse KV-block selection. All numbers are computed from reproducible synthetic Q/K tensors in your browser.</p>
+<div class="hero-meta"><span>Q/K layout: BSHD</span><span>Demo head dim: D=32</span><span>Logical blocks: 64×64</span><span>16-token pooling</span><a href="https://github.com/rahul-steiger-nv/vllm-omni/blob/rsteiger/block-sparse-foundation/vllm_omni/diffusion/attention/block_selection/subblock_topk.py" target="_blank" rel="noopener">Original source ↗</a></div>
+</header>
+<nav class="flow" id="stepnav" aria-label="Pipeline stages">
+<button type="button" data-stage="0"><b>01 · INPUTS</b><strong>Q / K tokens</strong></button>
+<button type="button" data-stage="1"><b>02 · POOL</b><strong>16-token means</strong></button>
+<button type="button" data-stage="2"><b>03 · SCORE</b><strong>4×4 → one FP32</strong></button>
+<button type="button" data-stage="3"><b>04 · SELECT</b><strong>Budget + Top-k</strong></button>
+<button type="button" data-stage="4"><b>05 · OUTPUT</b><strong>indices + counts</strong></button>
+</nav>
+<div class="workspace">
+<aside class="sidebar">
+<section class="panel">
+<div class="heading"><h2>Experiment controls</h2><button type="button" class="smallbtn" id="reroll">New tensors ↻</button></div>
+<label class="control-head" for="pattern">Synthetic attention pattern</label>
+<select id="pattern" class="select" aria-label="Attention concentration">
+<option value="mixed">Mixed / multiple peaks</option><option value="focused">Concentrated</option><option value="diffuse">Diffuse</option>
+</select>
+<div class="control"><div class="control-head"><label for="sparsity">Target sparsity</label><output id="sparsityVal">75%</output></div><input id="sparsity" type="range" min="0" max=".875" step=".125" value=".75"><div class="micro">SubBlockTopK's target applies only to unprotected blocks, with a budget rounded up to multiples of eight.</div></div>
+<div class="control"><div class="control-head"><label for="prefix">Protected prefix (KV blocks)</label><output id="prefixVal">2</output></div><input id="prefix" type="range" min="0" max="8" step="1" value="2"><div class="micro">Every KV block intersecting the protected token prefix is retained, independently of Top-k.</div></div>
+<div class="divider"></div>
+<div class="control-head"><label for="queryrow">Selected query block</label><output id="qValue">Q0</output></div>
+<select id="queryrow" class="select" aria-label="Query block"><option value="0">Q0 · tokens 0–63</option><option value="1">Q1 · tokens 64–127</option><option value="2">Q2 · tokens 128–191</option><option value="3">Q3 · tokens 192–255</option></select>
+<div class="control-head" style="margin-top:16px"><label for="kvblock">Inspect KV block</label><output id="kValue">K5</output></div>
+<input id="kvblock" type="range" min="0" max="23" step="1" value="5">
+<div class="micro">Or click any cell in the block score map.</div>
+</section>
+<section class="panel">
+<div class="heading"><h2>Budget inspector</h2><span class="pill">CURRENT CODE</span></div>
+<div class="eq" id="budgetEq">N = 24 - 2 = 22
+raw = ceil(0.25 × 22) = 6
+aligned = ceil(6 / 8) × 8 = 8
+keep = protected 2 + 8 = 10</div>
+<div class="meter-row"><span>Retained blocks</span><strong id="retainedPct">41.7%</strong></div>
+<div class="track"><div class="prt" id="prefixBar" style="width:8.33%"></div><div class="keep" id="keepBar" style="width:33.33%"></div></div>
+<div class="statline"><span>Effective sparsity</span><strong id="actualSp">58.3%</strong></div>
+<div class="statline"><span>Selected per Q row</span><strong id="numKept">10 / 24</strong></div>
+<div class="micro" style="margin-top:12px">A 75% target is <b>not</b> 75% global sparsity in this small example: eight-block rounding and prefix protection lower the effective sparsity.</div>
+</section>
+</aside>
+<div class="figure">
+<section class="panel">
+<div class="section-top">
+<div><div class="chapter" id="chapter">STEP 01 / 05</div><h2 id="stageTitle">Start with Q and K</h2><p class="sub" id="stageDescription">Pick a query block and a key block to inspect their 64-token representations.</p></div>
+<div class="controls"><button class="smallbtn" id="prev">← Back</button><button class="smallbtn primary" id="next">Next step →</button><button class="smallbtn" id="play">▶ Play</button></div>
+</div>
+<p class="stepnote" id="stageNote" style="margin-top:15px">The current scorer pools 16-token groups instead of computing all 4096 Q×K token interactions.</p>
+</section>
+<section class="panel">
+<div class="heading"><div><h2>Inside one 64 × 64 block pair</h2><p class="sub" id="pairTitle">Q0 and K5 · four pooled vectors each</p></div><div class="tag" id="poolMeta">64 → 4 groups</div></div>
+<div class="block-cols">
+<div class="boxmini"><h3 style="color:#7bd9ff">Query tokens [64, 32]</h3><div class="bmeta">Four contiguous 16-token groups; each position below is a token.</div><div id="qtokens" class="tokens"></div><div id="qsub" class="subblocks"></div></div>
+<div class="boxmini"><h3 style="color:#78e8c9">Key tokens [64, 32]</h3><div class="bmeta">Same pooling, separately applied to K.</div><div id="ktokens" class="tokens"></div><div id="ksub" class="subblocks"></div></div>
+</div>
+<div class="eq" style="margin-top:14px" id="poolFormula">q̄ᵢ[d] = (1/16) × Σ q[16i+t, d]   for t=0..15
+k̄ⱼ[d] = (1/16) × Σ k[16j+t, d]   for t=0..15
+
+Q̄: [4, 32]        K̄: [4, 32]</div>
+</section>
+<section class="panel">
+<div class="heading"><div><h2>Sixteen similarities → one block score</h2><p class="sub">Actual dot products from the pooled tensors above (D=32).</p></div><span class="tag">FP32 accumulator</span></div>
+<div class="block-cols" style="align-items:center">
+<div class="boxmini">
+<div class="bmeta" style="text-align:center">Sᵢⱼ = mean(Qᵢ) · mean(Kⱼ) / √D</div>
+<div id="sim4" class="matrix4" aria-label="4 by 4 pooled similarity matrix"></div>
+<div class="micro" style="text-align:center">Click a value to inspect its Q/K subblock pair.</div>
+</div>
+<div class="boxmini">
+<div class="eq">S_block = log ∑ᵢ₌₀³ ∑ⱼ₌₀³ exp(Sᵢⱼ)
+
+Implemented as two LogSumExp reductions:
+K subblocks → Q subblocks.
+
+The GPU uses exp2/log2 internally,
+then converts back to natural-log units.</div>
+<div class="lse"><div><strong style="font-size:14px;font-weight:750;display:block;margin-bottom:4px">Block relevance score</strong><span>one scalar for selected Q × K</span></div><strong id="lse">0.000</strong></div>
+</div>
+</div>
+</section>
+<section class="panel">
+<div class="section-top">
+<div><h2>Block scores → Top-k selection</h2><p class="sub">4 query blocks × 24 key blocks; each cell is one LogSumExp score.</p></div>
+<div class="controls"><button class="smallbtn" data-mode="score" id="showScore">Scores</button><button class="smallbtn" data-mode="mask" id="showMask">Selected blocks</button></div>
+</div>
+<div class="heat-scroll" style="margin-top:14px"><div id="heatmap" class="heatmap"></div></div>
+<div class="legend" id="legend"><span><i class="swatch" style="background:#277ca0"></i>higher score → stronger blue</span><span><i class="swatch" style="background:var(--gold)"></i>focused pair</span></div>
+<div class="divider"></div>
+<div class="inline-kpis"><div class="kpi"><em>Protected</em><b id="protectedN">2</b></div><div class="kpi"><em>Top-k from candidates</em><b id="quotaN">8</b></div><div class="kpi"><em>Total selected</em><b id="totalN">10</b></div></div>
+<p class="highnote" style="margin-bottom:0">Upstream's <code>_fused_topk</code> uses 16–32 rounds of a Triton threshold search, then compacts selected block IDs. This page ranks scores exactly for illustration; tie/threshold behavior in the GPU implementation can differ in pathological cases.</p>
+</section>
+<section class="panel">
+<div class="heading"><div><h2>BlockSelection contract</h2><p class="sub">The adapter consumes indices and counts; it does not redo block selection.</p></div><span class="pill">EXISTING ABI</span></div>
+<div class="readout"><b>indices: int32 [B=1, Hq=1, Qblocks=4, capacity=<span id="capacityLabel">10</span>]</b><code id="indices">[0, 1, 4, 8, ...]</code><b>counts: int32 [1, 1, 4]</b><code id="counts">[10, 10, 10, 10]</code></div>
+<div class="badge-row" style="margin-top:12px"><span class="tag">Sorted IDs</span><span class="tag">Unique + in range</span><span class="tag">Prefix preserved</span><span class="tag">Constant counts (current Top-k)</span></div>
+<div class="stepnote" style="margin-top:14px"><b>Top-p is not implemented here.</b> The proposed adaptive selector in <a href="https://github.com/yiliu30/omni-next/blob/main/docs/rfcs/0002-adaptive-blockselector-topk-topp-hybrid.md">RFC 0002</a> would normalize these scores and produce variable counts per query block, while keeping the same ABI.</div>
+</section>
+</div>
+</div>
+<div class="bottom">
+<section class="panel"><h2>Source ↔ visualization</h2><div class="eq" style="margin-top:13px">SubBlockTopK.select()
+  └─ select_subblocks()     [opaque custom op]
+     └─ _route()
+        ├─ block_budget() [round up to 8]
+        ├─ _compute_scores()
+        │  ├─ _fused_pool(Q), _fused_pool(K)
+        │  └─ _fused_scores() [dot + LogSumExp]
+        └─ _select_blocks()
+           └─ _fused_topk() [threshold + compact]
+  └─ BlockSelection(indices, counts)</div><p class="sub">The source branch is a draft of <a href="https://github.com/vllm-project/vllm-omni/pull/8335">PR #8335</a> (not yet merged at creation). It supports CUDA, FP16/BF16 Q/K, a protected KV prefix, and native MHA/MQA/GQA mapping.</p></section>
+<section class="panel"><h2>Important interpretation</h2><p class="sub">The score is an <b>approximation</b> of Q-block relevance to a KV block. It is not the exact probability mass from full 64×64 token attention. Top-k uses the score <b>rank</b> rather than a Softmax probability.</p><p class="sub">The output has only KV-block IDs and counts. <b>V is not used by this selector</b>; the selected-key attention provider consumes Q/K/V afterward.</p><p class="sub">The data here are synthetic but every pooled mean, dot product, LogSumExp, budget and output array is recomputed on interaction. No CDN, tracking, external scripts or build dependencies.</p><p class="sub">Links: <a href="https://github.com/vllm-project/vllm-omni/issues/8396">Upstream RFC #8396</a> · <a href="https://github.com/yiliu30/omni-next/issues/8">Adaptive selector RFC tracking</a></p></section>
+</div>
+<div class="footer">Standalone HTML · SubBlockTopK explainer · created October 2026 · <a href="/viz/">Visualization gallery</a></div>
+</main>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const D=32, Q_BLOCKS=4, K_BLOCKS=24, BLOCK=64, SUB=16, SG=4;
+const centers=[[4,15,22],[8,10,19],[1,11,20],[6,13,17]];
+let stage=0, selectedQ=0, selectedK=5, mode="score", pattern="mixed", seed=7, timer=null;
+let Q,K,Qp,Kp,scoreTable,selection,quota,kept,prefix,sparsity;
+const stateInfo=[
+["STEP 01 / 05","Start with Q and K","Select a query block and key block; each contains 64 token vectors.","The original tensor inputs are BSHD (batch, sequence, heads, dimension). This interactive example uses one head and D=32, with deterministic synthetic values."],
+["STEP 02 / 05","Mean-pool 16-token subblocks","Each 64-token block becomes four vectors; each is an elementwise average of 16 token vectors.","The two _fused_pool calls produce Q̄ and K̄. This reduces 4096 token-pair dot products to 16 pooled-vector dot products per 64×64 block pair."],
+["STEP 03 / 05","Compute one FP32 block relevance","Multiply pooled Q [4,32] by pooled Kᵀ [32,4], then reduce 16 scores with LogSumExp.","The GPU calculates pooled dot products with a 1/√D scale, reduces key subblocks then query subblocks using exp2/log2, and stores one FP32 score per logical Q/KV block pair."],
+["STEP 04 / 05","Choose a fixed Top-k block budget","Protect the prefix; choose the highest-scoring remaining KV blocks using a rounded-up quota.","The budget is ceil((1 − target_sparsity) × unprotected blocks), rounded up to a multiple of eight and capped. The real Triton kernel uses bounded threshold search and compaction—not an exact sort."],
+["STEP 05 / 05","Return indices and counts","The selector returns sorted KV IDs and active counts to a compatible sparse-attention adapter.","Current Top-k returns fixed capacity and the same count for each query row. Top-p/Hybrid will need variable row counts while retaining this BlockSelection ABI."]
+];
+function fract(x){return x-Math.floor(x)}
+function rand(t,d,s){return fract(Math.sin((t+1)*12.9898+(d+1)*78.233+s*23.1)*43758.5453)*2-1}
+function gauss(j,c,w){return Math.exp(-.5*Math.pow((j-c)/w,2))}
+function tokenVec(t,kind){
+ const b=Math.floor(t/BLOCK),sub=Math.floor((t%BLOCK)/SUB),out=[];
+ const amp=pattern==="focused"?1.75:pattern==="diffuse"?.37:1;
+ for(let d=0;d<D;d++){
+  let base;
+  if(kind==="q"){
+   base=d===b?3.5+.21*Math.sin(sub*2.2+b):d<4?.14*Math.cos(b+d+sub*.7):.16*Math.sin((b+1)*(d+3)*.27+sub*.8);
+  }else{
+   const peaks=centers[d]||[];
+   const c=d<4?peaks.reduce((sum,p,i)=>sum+(3.7-i*.6)*gauss(b,p,1.25+i*.33),0):0;
+   base=d<4?amp*c+.12+.27*Math.sin(sub*.95+d*.8+b*.17):.16*Math.sin((d+1)*(b+1)*.27+sub*.33);
+  }
+  base+=.19*rand(t,d,seed);
+  out.push(base);
+ }
+ return out;
+}
+function pool(all){
+ const out=[];
+ for(let base=0;base<all.length;base+=SUB){
+  const vec=new Array(D).fill(0);
+  for(let t=base;t<Math.min(base+SUB,all.length);t++){
+   for(let d=0;d<D;d++)vec[d]+=all[t][d]/SUB;
+  }
+  out.push(vec);
+ }
+ return out;
+}
+function dot(a,b){let s=0;for(let i=0;i<D;i++)s+=a[i]*b[i];return s/Math.sqrt(D)}
+function grid4(q,k){
+ const cells=[];
+ for(let i=0;i<SG;i++){
+  const row=[];for(let j=0;j<SG;j++)row.push(dot(Qp[q*SG+i],Kp[k*SG+j]));
+  cells.push(row);
+ }
+ return cells;
+}
+function lse(mat){
+ const v=mat.flat(),m=Math.max(...v);
+ return m+Math.log(v.reduce((sum,x)=>sum+Math.exp(x-m),0));
+}
+function buildData(){
+ Q=Array.from({length:Q_BLOCKS*BLOCK},(_,t)=>tokenVec(t,"q"));
+ K=Array.from({length:K_BLOCKS*BLOCK},(_,t)=>tokenVec(t,"k"));
+ Qp=pool(Q);Kp=pool(K);
+ scoreTable=Array.from({length:Q_BLOCKS},(_,q)=>Array.from({length:K_BLOCKS},(_,k)=>lse(grid4(q,k))));
+}
+function computeSelection(){
+ prefix=+$("prefix").value;sparsity=+$("sparsity").value;
+ const n=K_BLOCKS-prefix;
+ const raw=n?Math.ceil((1-sparsity)*n):0;
+ quota=n?Math.min(n,Math.ceil(Math.max(1,raw)/8)*8):0;
+ kept=prefix+quota;
+ selection=scoreTable.map(sc=>{
+  const mandatory=Array.from({length:prefix},(_,j)=>j);
+  const ids=Array.from({length:n},(_,j)=>j+prefix);
+  ids.sort((a,b)=>(sc[b]-sc[a])||(a-b));
+  return mandatory.concat(ids.slice(0,quota)).sort((a,b)=>a-b);
+ });
+}
+function fmt(x){return x.toFixed(2)}
+function fmtPct(x){return (100*x).toFixed(1)+"%"}
+function updateControls(){
+ $("sparsityVal").textContent=fmtPct(sparsity);$("prefixVal").textContent=prefix;
+ $("qValue").textContent="Q"+selectedQ;$("kValue").textContent="K"+selectedK;
+ const n=K_BLOCKS-prefix,raw=Math.ceil((1-sparsity)*n);
+ $("budgetEq").textContent="N = "+K_BLOCKS+" − "+prefix+" = "+n+"\nraw = ceil("+(1-sparsity).toFixed(3)+" × "+n+") = "+raw+"\naligned = min(N, ceil(max(1, raw)/8) × 8) = "+quota+"\nkeep = protected "+prefix+" + "+quota+" = "+kept;
+ $("actualSp").textContent=fmtPct((K_BLOCKS-kept)/K_BLOCKS);
+ $("retainedPct").textContent=fmtPct(kept/K_BLOCKS);
+ $("numKept").textContent=kept+" / "+K_BLOCKS;
+ $("prefixBar").style.width=fmtPct(prefix/K_BLOCKS);
+ $("keepBar").style.width=fmtPct(quota/K_BLOCKS);
+ $("protectedN").textContent=prefix;$("quotaN").textContent=quota;$("totalN").textContent=kept;
+}
+function renderTokenGrid(id,kind){
+ const el=$(id);el.innerHTML="";
+ const block=kind==="q"?selectedQ:selectedK;
+ for(let i=0;i<BLOCK;i++){
+  const cell=document.createElement("div");cell.className="token";
+  cell.title=(kind.toUpperCase())+" token "+(block*BLOCK+i)+" · subblock "+Math.floor(i/SUB);
+  const group=Math.floor(i/SUB),levels=kind==="q"?[.47,.72,.88,.55]:[.44,.73,.64,.86];
+  cell.style.background=kind==="q"?"rgba(55,173,223,"+levels[group]+")":"rgba(51,181,142,"+levels[group]+")";
+  el.appendChild(cell);
+ }
+}
+function renderSub(id,kind){
+ const wrap=$(id);wrap.innerHTML="";
+ const block=kind==="q"?selectedQ:selectedK,data=kind==="q"?Qp:Kp;
+ for(let i=0;i<4;i++){
+  const el=document.createElement("div");el.className="subblock "+(kind==="k"?"k":"");
+  const vec=data[block*4+i];
+  el.innerHTML="<b>"+kind.toUpperCase()+"̄"+i+"</b><small>["+vec.slice(0,3).map(fmt).join(", ")+", …]</small>";
+  el.title="Mean vector first 8 channels: "+vec.slice(0,8).map(fmt).join(", ");
+  wrap.appendChild(el);
+ }
+}
+function renderMatrix(){
+ const grid=grid4(selectedQ,selectedK),flat=grid.flat(),low=Math.min(...flat),high=Math.max(...flat);
+ const target=$("sim4");target.innerHTML="";
+ grid.forEach((row,i)=>row.forEach((val,j)=>{
+   const el=document.createElement("button");el.type="button";el.className="cell4";
+   const z=(val-low)/(high-low||1);
+   el.style.background="rgba(45,150,198,"+(0.16+.72*z)+")";
+   el.textContent=fmt(val);el.title="Q pooled vector "+i+" · K pooled vector "+j+" · "+val.toFixed(4);
+   el.addEventListener("click",()=>{el.style.outline="2px solid #ffbd65";setTimeout(()=>{el.style.outline=""},600)});
+   target.appendChild(el);
+ }));
+ $("lse").textContent=lse(grid).toFixed(4);
+ $("pairTitle").textContent="Q"+selectedQ+" (tokens "+selectedQ*64+"–"+(selectedQ*64+63)+") × K"+selectedK+" (tokens "+selectedK*64+"–"+(selectedK*64+63)+")";
+}
+function heatColor(value,min,max){const z=(value-min)/(max-min||1);return "rgba(39,139,193,"+(0.12+z*.80)+")"}
+function renderHeat(){
+ const target=$("heatmap");target.innerHTML="";
+ const flat=scoreTable.flat(),min=Math.min(...flat),max=Math.max(...flat);
+ const head=document.createElement("div");head.className="heat-head";
+ const blank=document.createElement("div");blank.className="axis";blank.textContent="Q ↓  K →";head.appendChild(blank);
+ for(let k=0;k<K_BLOCKS;k++){const cell=document.createElement("div");cell.className="hmhead";cell.textContent=k;head.appendChild(cell)}
+ target.appendChild(head);
+ for(let q=0;q<Q_BLOCKS;q++){
+  const row=document.createElement("div");row.className="heat-row";
+  const axis=document.createElement("button");axis.className="axis smallbtn";axis.style.padding="0";axis.textContent="Q"+q;axis.title="Select query block "+q;
+  axis.addEventListener("click",()=>{selectedQ=q;$("queryrow").value=String(q);render()});
+  row.appendChild(axis);
+  const retained=new Set(selection[q]);
+  for(let k=0;k<K_BLOCKS;k++){
+    const btn=document.createElement("button");btn.type="button";btn.className="hcell";
+    if(q===selectedQ&&k===selectedK)btn.classList.add("focus");
+    const isProtected=k<prefix, isRetained=retained.has(k);
+    if(mode==="mask"){
+      btn.classList.add(isProtected?"protected":isRetained?"selected":"discarded");
+      btn.textContent=isProtected?"P":isRetained?"✓":"·";
+    }else{
+      btn.style.background=heatColor(scoreTable[q][k],min,max);
+      if(q===selectedQ)btn.style.borderColor="rgba(143,216,242,.36)";
+      btn.textContent=scoreTable[q][k].toFixed(1);
+    }
+    btn.title="Q"+q+" × K"+k+": "+scoreTable[q][k].toFixed(4)+" | "+(isProtected?"protected":isRetained?"selected":"skipped");
+    btn.setAttribute("aria-label",btn.title);
+    btn.addEventListener("click",()=>{selectedQ=q;selectedK=k;$("queryrow").value=String(q);$("kvblock").value=String(k);render()});
+    row.appendChild(btn);
+  }
+  target.appendChild(row);
+ }
+ $("showScore").classList.toggle("primary",mode==="score");$("showMask").classList.toggle("primary",mode==="mask");
+ $("legend").innerHTML=mode==="score"?'<span><i class="swatch" style="background:#277ca0"></i>Stronger blue = higher LogSumExp score</span><span><i class="swatch" style="background:#ffbd65"></i>gold outline = inspected pair</span>':'<span><i class="swatch" style="background:#8b5b32"></i>Protected prefix</span><span><i class="swatch" style="background:#166f79"></i>Top-k selected</span><span><i class="swatch" style="background:#172537"></i>Skipped</span>';
+}
+function renderContract(){
+ $("capacityLabel").textContent=kept;
+ const lines=selection.map((ids,q)=>"Q"+q+": ["+ids.join(", ")+"]");
+ $("indices").textContent=lines.join("\n");
+ $("counts").textContent="["+Array(Q_BLOCKS).fill(kept).join(", ")+"]";
+}
+function renderStage(){
+ const state=stateInfo[stage];
+ $("chapter").textContent=state[0];$("stageTitle").textContent=state[1];$("stageDescription").textContent=state[2];$("stageNote").textContent=state[3];
+ document.querySelectorAll("#stepnav button").forEach(b=>{const on=Number(b.dataset.stage)===stage;b.classList.toggle("active",on);b.setAttribute("aria-current",on?"step":"false")});
+ $("prev").disabled=stage===0;$("next").textContent=stage===4?"Back to start ↺":"Next step →";
+ $("showMask").classList.toggle("primary",mode==="mask");
+}
+function render(){
+ computeSelection();updateControls();
+ renderTokenGrid("qtokens","q");renderTokenGrid("ktokens","k");
+ renderSub("qsub","q");renderSub("ksub","k");
+ renderMatrix();renderHeat();renderContract();renderStage();
+}
+function stop(){if(timer!==null){clearInterval(timer);timer=null;$("play").textContent="▶ Play"}}
+function go(s){stage=(s+5)%5;if(stage>=3)mode="mask";else mode="score";render()}
+$("sparsity").addEventListener("input",()=>{stop();render()});
+$("prefix").addEventListener("input",()=>{stop();render()});
+$("pattern").addEventListener("change",e=>{stop();pattern=e.target.value;buildData();render()});
+$("queryrow").addEventListener("change",e=>{stop();selectedQ=Number(e.target.value);render()});
+$("kvblock").addEventListener("input",e=>{stop();selectedK=Number(e.target.value);render()});
+$("reroll").addEventListener("click",()=>{stop();seed++;buildData();render()});
+$("showScore").addEventListener("click",()=>{stop();mode="score";render()});
+$("showMask").addEventListener("click",()=>{stop();mode="mask";render()});
+document.querySelectorAll("#stepnav button").forEach(b=>b.addEventListener("click",()=>{stop();go(Number(b.dataset.stage))}));
+$("prev").addEventListener("click",()=>{stop();go(Math.max(0,stage-1))});
+$("next").addEventListener("click",()=>{stop();go(stage===4?0:stage+1)});
+$("play").addEventListener("click",()=>{if(timer!==null){stop();return}timer=setInterval(()=>go(stage===4?0:stage+1),1850);$("play").textContent="Ⅱ Pause";go(stage===4?0:stage+1)});
+buildData();render();
+})();
+</script>
+</body>
+</html>
