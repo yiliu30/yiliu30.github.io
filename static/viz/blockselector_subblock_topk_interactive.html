@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <meta name="description" content="Interactive, source-grounded visualization of the vLLM-Omni SubBlockTopK BlockSelector: 16-token mean pooling, pooled similarity, LogSumExp, protected-prefix Top-k and BlockSelection.">
 <title>BlockSelector — From 64 Tokens to Selected KV Blocks</title>
 <style>
@@ -78,6 +79,31 @@ input[type=range]{width:100%;accent-color:#50c7f1;cursor:pointer}
 @media(max-width:1000px){.workspace{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sidebar .panel+.panel{margin:0}}
 @media(max-width:680px){.container{width:min(100% - 22px,1310px);padding-top:18px}.hero{padding:22px 18px}.flow{grid-template-columns:repeat(5,minmax(112px,1fr));overflow-x:auto}.flow button{min-width:110px}.sidebar{grid-template-columns:1fr}.block-cols,.bottom{grid-template-columns:1fr}.inline-kpis{grid-template-columns:repeat(3,1fr)}.panel{padding:15px}.lse strong{font-size:23px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+@media(prefers-color-scheme:light){
+:root{color-scheme:light;--bg:#f4f8fc;--panel:#fff;--panel2:#f4f8fc;--edge:#cbd8e5;--txt:#132235;--muted:#5c6f84;--cyan:#0877a8;--teal:#087a65;--gold:#a86200;--rose:#b13b56;--soft:rgba(8,119,168,.09)}
+body{background:radial-gradient(ellipse at 12% -10%,#dcecf8 0,transparent 40%),radial-gradient(ellipse at 98% 6%,#e3edf5 0,transparent 38%),var(--bg)}
+a{color:#086c9a}a:hover{color:#064f70}
+button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#0877a8}
+.hero{border-color:#c7d7e5;background:linear-gradient(130deg,rgba(238,247,253,.96),rgba(255,255,255,.98));box-shadow:0 18px 40px rgba(40,77,108,.08)}
+.hero:after{background:radial-gradient(circle,rgba(8,122,101,.11),transparent 68%)}
+.pill{color:#087463;background:rgba(8,122,101,.08);border-color:rgba(8,122,101,.22)}
+.lede{color:#425870}.hero-meta span{background:#edf4fa;border-color:#cbd9e6}
+.flow button{background:#f8fbfd;color:#5a6d82}.flow button:hover{border-color:#7d9bb4}
+.flow button.active{color:#063e51;background:linear-gradient(160deg,#e4f5fb,#eef8f9);border-color:#0b87ac;box-shadow:inset 0 0 0 1px rgba(11,135,172,.12)}
+.panel{background:rgba(255,255,255,.95);box-shadow:0 14px 35px rgba(26,62,91,.08)}
+.select{background:#f7fbff}.track{background:#dbe6f0}.statline{color:#4e647b}
+.chapter{background:#e5f0f7}.smallbtn{background:#eef5fa;color:var(--txt);border-color:#bccddd}
+.smallbtn.primary{background:#0d7993;color:#fff;border-color:#0d7993}.smallbtn:hover{filter:brightness(.97)}
+.stepnote{background:#eff9fd;color:#456074;border-color:rgba(8,119,168,.2)}
+.boxmini{background:#f8fbfe}.token{background:#c5dced}.token:nth-child(4n+1){background:#a9cce2}
+.block-cols .boxmini:first-child h3{color:#0877a8!important}.block-cols .boxmini:nth-child(2) h3{color:#087a65!important}
+.subblock{background:#e1f1fa;border-color:#8bb9cf}.subblock.k{background:#e1f4ee;border-color:#85bfae}.subblock small{color:#4f6f83}
+.cell4{color:#17324a;border-color:rgba(20,50,70,.14)}.eq{color:#2d6077;background:#f4f9fc;border-color:#c8dbe7}
+.lse{background:#eaf7fc;border-color:#86bdd4}.lse span{color:#426d80}.lse strong{color:#113c4f}
+.readout{background:#f7fbfe}.readout code{color:#286277}.hmhead{color:#637b90}.hcell{color:#15324a}
+.hcell.protected{background:#c88a45!important;color:#2b1b08}.hcell.selected{background:#238e99!important;color:#fff}.hcell.discarded{background:#e8edf3!important;color:#71869a}
+.kpi{background:#f8fbfe}.tag{border-color:#b9cedd;color:#4f6f84}.footer{color:#62788b}.kbd{background:#e9f0f6;border-color:#b6c9da}
+}
 </style>
 </head>
 <body>
