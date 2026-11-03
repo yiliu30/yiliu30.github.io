@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add unobtrusive GitHub links to published visualization HTML.
+"""Add gallery and GitHub links to published visualization HTML.
 
 Run AFTER Hugo has generated public/, so HTML in inference-viz is never changed.
 """
@@ -7,13 +7,12 @@ Run AFTER Hugo has generated public/, so HTML in inference-viz is never changed.
 from __future__ import annotations
 
 import argparse
-from html import escape
 from pathlib import Path
 import re
 import tempfile
-from urllib.parse import quote
 
 REPO_URL = "https://github.com/yiliu30/inference-viz"
+GALLERY_URL = "https://yiliu30.github.io/viz/"
 MARKER = "<!-- inference-viz:github-navigation -->"
 BODY_END = re.compile(r"</body\s*>", flags=re.IGNORECASE)
 
@@ -70,12 +69,10 @@ STYLE = """<style id="inference-viz-github-navigation-style">
 
 
 def bar(filename: str) -> str:
-    source_url = f"{REPO_URL}/blob/main/viz/{quote(filename, safe='')}"
     return (
         f"{MARKER}\n{STYLE}\n"
         '<nav id="inference-viz-github-navigation" aria-label="Inference Viz project links">\n'
-        f'  <a href="{escape(source_url, quote=True)}" target="_blank" rel="noopener noreferrer"'
-        f' aria-label="View source for {escape(filename, quote=True)}">&lt;/&gt; View source</a>\n'
+        f'  <a href="{GALLERY_URL}" aria-label="Back to visualization gallery">&#8592; Back to gallery</a>\n'
         f'  <a href="{REPO_URL}" target="_blank" rel="noopener noreferrer"'
         ' aria-label="Star Inference Viz on GitHub">&#9733; Star project</a>\n'
         '</nav>\n'
@@ -114,8 +111,10 @@ def self_test() -> None:
     first = inject(sample, 'tiny_gpu_trace_explorer (2).html')
     assert first.startswith(sample.split('</body>')[0])
     assert first.endswith('</body></html>')
-    assert 'tiny_gpu_trace_explorer%20%282%29.html' in first
-    assert 'Star project' in first and 'View source' in first
+    assert 'href="https://yiliu30.github.io/viz/"' in first
+    assert 'Back to gallery' in first
+    assert 'View source' not in first
+    assert 'Star project' in first
     assert first.count(MARKER) == 1
     assert inject(first, 'tiny_gpu_trace_explorer (2).html') == first
     try:
