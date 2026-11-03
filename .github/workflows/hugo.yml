@@ -80,6 +80,10 @@ jobs:
             --gc \
             --minify \
             --baseURL "${{ steps.pages.outputs.base_url }}/"          
+      - name: Add project links to published visualizations
+        run: |
+          python3 scripts/inject_viz_nav.py --self-test
+          python3 scripts/inject_viz_nav.py public/viz
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
