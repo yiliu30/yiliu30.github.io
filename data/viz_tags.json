@@ -152,5 +152,10 @@
   "xe_sdpa_sagev1_concrete_instance (1).html": [
     "Attention",
     "GPU Kernels"
+  ],
+  "triage_attention_error_lab.html": [
+    "Attention",
+    "Sparse Attention",
+    "Algorithms"
   ]
 }
