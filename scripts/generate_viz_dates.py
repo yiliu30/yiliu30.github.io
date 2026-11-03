@@ -10,15 +10,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SOURCE_REPO = ROOT / ".viz-source"
 VIZ_DIR = ROOT / "static" / "viz"
 OUTPUT = ROOT / "data" / "viz_dates.json"
 
 
 def last_updated(path: Path) -> int:
-    relative = path.relative_to(ROOT).as_posix()
+    if (SOURCE_REPO / "viz").is_dir():
+        git_root = SOURCE_REPO
+        relative = (Path("viz") / path.name).as_posix()
+    else:
+        git_root = ROOT
+        relative = path.relative_to(ROOT).as_posix()
     result = subprocess.run(
         ["git", "log", "-1", "--format=%ct", "--", relative],
-        cwd=ROOT,
+        cwd=git_root,
         check=True,
         capture_output=True,
         text=True,

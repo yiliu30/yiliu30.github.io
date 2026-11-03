@@ -10,6 +10,10 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+  # Refresh the live gallery from the standalone repository every 2 hours.
+  schedule:
+    - cron: "17 */2 * * *"
+
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
@@ -45,6 +49,19 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Checkout Inference Viz
+        uses: actions/checkout@v4
+        with:
+          repository: yiliu30/inference-viz
+          ref: main
+          path: .viz-source
+          fetch-depth: 0
+      - name: Sync visualization pages and tags
+        run: |
+          test -f .viz-source/viz/admin.html
+          test -f .viz-source/data/viz_tags.json
+          rsync -a --delete .viz-source/viz/ static/viz/
+          cp .viz-source/data/viz_tags.json data/viz_tags.json
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
