@@ -90,6 +90,14 @@ Edit `hugo.toml` to customize:
 - Menu items
 - Theme parameters
 
+## Interactive visualization publishing
+
+Interactive demos are maintained in [yiliu30/inference-viz](https://github.com/yiliu30/inference-viz/tree/main/viz), not edited directly in this site's generated `public/viz/` output. This site's [Hugo deployment workflow](.github/workflows/hugo.yml) checks out that repository, synchronizes the HTML files and gallery tags, and publishes them on GitHub Pages.
+
+New demos appear at `https://yiliu30.github.io/viz/<filename>.html` after a successful website deployment. Deployments run on pushes to `main`, manually, and on a two-hour schedule; committing only to `inference-viz` does not immediately publish the page.
+
+Latest addition: [Spark-H3 reblocking and speedup visualization](https://yiliu30.github.io/viz/spark_h3_attention_speedup_projection.html).
+
 ## Deployment
 
 ### GitHub Pages
