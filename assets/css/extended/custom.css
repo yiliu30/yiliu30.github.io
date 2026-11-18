@@ -68,3 +68,99 @@ img {
   height: auto;
   border-radius: 8px;
 }
+
+/* Minimal, Jino-style chronological blog index (home and /posts/ only).
+   All selectors are scoped so the visualization gallery and articles stay intact. */
+.blog-index {
+  max-width: 930px;
+  margin: 28px auto 72px;
+}
+.blog-index__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 10px;
+}
+.blog-index__header h1,
+.blog-index__header h2 {
+  margin: 0;
+  color: var(--primary);
+  font-size: clamp(1.45rem, 3vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.blog-index__count {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: var(--secondary);
+}
+.blog-index__intro {
+  margin: 8px 0 16px;
+  color: var(--secondary);
+}
+.blog-index__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.blog-index__item {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  gap: 22px;
+  align-items: baseline;
+  padding: 17px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.blog-index__date {
+  color: var(--secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.blog-index__title {
+  margin: 0;
+  font-size: clamp(0.98rem, 1.9vw, 1.075rem);
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+}
+.blog-index__title a {
+  color: var(--primary);
+  border-bottom: 0;
+  text-decoration: none;
+}
+.blog-index__title a:hover {
+  color: var(--tertiary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.blog-index__title a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.blog-index__pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  font-size: 0.9rem;
+  color: var(--secondary);
+}
+.blog-index__pagination a {
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  .blog-index { margin-top: 22px; }
+  .blog-index__item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 15px 2px;
+  }
+  .blog-index__date { font-size: 0.8rem; }
+}

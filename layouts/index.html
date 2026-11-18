@@ -1,0 +1,6 @@
+{{- define "main" }}
+{{- if site.Params.homeInfoParams }}
+{{- partial "home_info.html" . }}
+{{- end }}
+{{- partial "chronological_post_list.html" (dict "Page" . "Home" true) }}
+{{- end }}

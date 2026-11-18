@@ -1,0 +1,41 @@
+{{- /* Shared, date-first blog list for the homepage and /posts/. */ -}}
+{{- $page := .Page -}}
+{{- $home := .Home | default false -}}
+{{- $posts := where site.RegularPages "Section" "posts" -}}
+{{- $posts = $posts.ByDate.Reverse -}}
+{{- $paginator := $page.Paginate $posts -}}
+
+<section class="blog-index" aria-label="Blog Posts">
+  <header class="blog-index__header">
+    {{- if $home }}
+    <h2>Blog Posts</h2>
+    {{- else }}
+    <h1>Blog Posts</h1>
+    {{- end }}
+    <span class="blog-index__count">{{ len $posts }} {{ if eq (len $posts) 1 }}article{{ else }}articles{{ end }}</span>
+  </header>
+  {{- with $page.Content }}
+  <div class="blog-index__intro">{{ . }}</div>
+  {{- end }}
+  <ol class="blog-index__items">
+    {{- range $paginator.Pages }}
+    <li class="blog-index__item">
+      <time class="blog-index__date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+      <h3 class="blog-index__title">
+        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+      </h3>
+    </li>
+    {{- end }}
+  </ol>
+  {{- if gt $paginator.TotalPages 1 }}
+  <nav class="blog-index__pagination" aria-label="Blog list pages">
+    {{- if $paginator.HasPrev }}
+    <a href="{{ $paginator.Prev.URL }}" rel="prev">&larr; Newer posts</a>
+    {{- end }}
+    <span>Page {{ $paginator.PageNumber }} of {{ $paginator.TotalPages }}</span>
+    {{- if $paginator.HasNext }}
+    <a href="{{ $paginator.Next.URL }}" rel="next">Older posts &rarr;</a>
+    {{- end }}
+  </nav>
+  {{- end }}
+</section>

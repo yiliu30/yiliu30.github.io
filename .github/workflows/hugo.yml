@@ -80,6 +80,15 @@ jobs:
             --gc \
             --minify \
             --baseURL "${{ steps.pages.outputs.base_url }}/"          
+      - name: Verify chronological blog lists
+        run: |
+          test -f public/index.html
+          test -f public/posts/index.html
+          grep -q 'class="blog-index"' public/index.html
+          grep -q 'class="blog-index"' public/posts/index.html
+          grep -q 'from-cuda-to-intel-xe-part1-vector-add' public/index.html
+          grep -q 'from-cuda-to-intel-xe-part1-vector-add' public/posts/index.html
+          test -f public/viz/index.html
       - name: Add project links to published visualizations
         run: |
           python3 scripts/inject_viz_nav.py --self-test
