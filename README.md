@@ -96,7 +96,7 @@ Interactive demos are maintained in [yiliu30/inference-viz](https://github.com/y
 
 New demos appear at `https://yiliu30.github.io/viz/<filename>.html` after a successful website deployment. Deployments run on pushes to `main`, manually, and on a two-hour schedule; committing only to `inference-viz` does not immediately publish the page.
 
-Latest addition: [Spark-H3 reblocking and speedup visualization](https://yiliu30.github.io/viz/spark_h3_attention_speedup_projection.html).
+Latest addition: [FlashAttention online softmax step-by-step visualizer](https://yiliu30.github.io/viz/flashattention_online_softmax_visualizer.html).
 
 ## Deployment
 
