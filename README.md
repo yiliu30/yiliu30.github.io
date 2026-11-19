@@ -97,7 +97,7 @@ Interactive demos are maintained in [yiliu30/inference-viz](https://github.com/y
 New demos appear at `https://yiliu30.github.io/viz/<filename>.html` after a successful website deployment. Deployments run on pushes to `main`, manually, and on a two-hour schedule; committing only to `inference-viz` does not immediately publish the page.
 
 Latest addition: [FlashAttention online softmax step-by-step visualizer](https://yiliu30.github.io/viz/flashattention_online_softmax_visualizer.html).
-The FlashAttention demo retains the original corresponding pseudocode and now has a second full, indented, color-coded pseudocode with no KV-block sidebar. Select an operation and KV tile to inspect its values.
+The FlashAttention demo retains the original corresponding pseudocode and a second full, indented, color-coded breakdown without a KV-block sidebar. Its numerical trace is now checked against an independent dense-softmax reference for each KV tile and query row.
 
 
 ## Deployment
