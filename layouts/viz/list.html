@@ -12,7 +12,7 @@
 {{- $dir := "static/viz" }}
 {{- range (readDir $dir) }}
   {{- $name := .Name }}
-  {{- if and (strings.HasSuffix $name ".html") (ne $name "admin.html") }}
+  {{- if and (strings.HasSuffix $name ".html") (ne $name "admin.html") (not (in (os.ReadFile (printf "%s/%s" $dir $name)) "viz-gallery-hide")) }}
     {{- $path := printf "%s/%s" $dir $name }}
     {{- $raw := os.ReadFile $path }}
     {{- $title := $name }}
