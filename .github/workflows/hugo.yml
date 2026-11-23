@@ -89,6 +89,8 @@ jobs:
           grep -q 'from-cuda-to-intel-xe-part1-vector-add' public/index.html
           grep -q 'from-cuda-to-intel-xe-part1-vector-add' public/posts/index.html
           test -f public/viz/index.html
+          # Guard against missing newly published visualizations.
+          test -f public/viz/spatial_tiling_q_kv_visualizer.html
       - name: Add project links to published visualizations
         run: |
           python3 scripts/inject_viz_nav.py --self-test
