@@ -91,6 +91,7 @@ jobs:
           test -f public/viz/index.html
           # Guard against missing newly published visualizations.
           test -f public/viz/spatial_tiling_q_kv_visualizer.html
+          test -f public/viz/intel_xe_stall_atlas.html
       - name: Add project links to published visualizations
         run: |
           python3 scripts/inject_viz_nav.py --self-test
